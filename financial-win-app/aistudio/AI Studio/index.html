@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FinancialWin Enterprise</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Roboto+Flex:opsz,wght@8..144,300;400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            boxShadow: {
+              'card': '0 4px 14px rgba(0,0,0,0.06)',
+              'table': '0 2px 8px rgba(0,0,0,0.04)',
+            },
+            fontFamily: {
+              poppins: ['Poppins', 'sans-serif'],
+              roboto: ['Roboto Flex', 'sans-serif'],
+            },
+            colors: {
+              brand: {
+                DEFAULT: '#B84E9D', // Fucsia/Magenta Corporativo
+                50: '#fdf4fa',
+                100: '#fae8f6',
+                500: '#B84E9D',
+                600: '#9d3f85',
+                900: '#4d153e',
+              },
+              neutral: {
+                50: '#fafafa',
+                900: '#171717',
+              },
+              secondary: {
+                800: '#131B29', // Dark Surface
+                900: '#0B1018', // Dark App BG
+                border: '#2A3B5A',
+              },
+              primaryDark: '#0A1B4F',
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      body {
+        font-family: 'Roboto Flex', sans-serif;
+      }
+      h1, h2, h3, h4, h5, h6 {
+        font-family: 'Poppins', sans-serif;
+      }
+      /* Custom Scrollbar */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 4px;
+      }
+      .dark ::-webkit-scrollbar-thumb {
+        background: #2A3B5A;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
+    "react-dom": "https://aistudiocdn.com/react-dom@^19.2.0",
+    "recharts": "https://esm.sh/recharts@2.12.3?external=react,react-dom"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body class="bg-neutral-50 text-neutral-900 dark:bg-secondary-900 dark:text-gray-100 transition-colors duration-200">
+    <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>
