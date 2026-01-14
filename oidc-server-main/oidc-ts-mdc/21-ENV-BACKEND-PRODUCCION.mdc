@@ -1,0 +1,593 @@
+# Variables de Entorno - Backend OIDC (Producción)
+
+## 📋 Archivo: `backend/.env`
+
+Este documento describe todas las variables de entorno requeridas para desplegar el **Backend OIDC** en un ambiente de producción.
+
+---
+
+## 🔴 Variables Requeridas (Críticas)
+
+### `PROVIDER_EXTERNAL_URL` ✅ REQUERIDO
+
+**Descripción**: URL externa del Provider OIDC vista desde el navegador del usuario.
+
+**Formato**: URL completa con protocolo HTTPS
+
+**Uso**:
+
+- Redirecciones del navegador al Provider
+- Validación de tokens OIDC
+- URL de autorización para passport
+
+**Ejemplo Producción**:
+
+```env
+PROVIDER_EXTERNAL_URL=https://auth.acceleralia.com
+```
+
+**Importante**:
+
+- ✅ DEBE ser HTTPS en producción
+- ✅ DEBE ser la misma URL pública configurada en `PROVIDER_URL` del provider
+- ✅ NO debe tener trailing slash
+- ✅ Esta es la URL que el navegador usa para acceder al provider
+
+---
+
+### `PROVIDER_INTERNAL_URL` ⚠️ OPCIONAL (Condicional)
+
+**Descripción**: URL interna del Provider para comunicación servidor-servidor.
+
+**Formato**: URL completa (puede ser HTTP si está en la misma red privada)
+
+**Uso**:
+
+- Llamadas HTTP desde el backend al provider (token exchange, userinfo)
+- Usado cuando backend y provider están en redes diferentes
+
+**Cuándo usar**:
+
+- ✅ **Usar cuando**: Backend y Provider están en servidores diferentes o en Docker con redes separadas
+- ❌ **NO usar cuando**: Backend y Provider están en el mismo servidor o misma red (usar `PROVIDER_EXTERNAL_URL`)
+
+**Ejemplo Producción - Servidores Separados**:
+
+```env
+# Si backend y provider están en el mismo servidor
+PROVIDER_INTERNAL_URL=https://auth.acceleralia.com
+```
+
+**Ejemplo Producción - Docker/Red Interna**:
+
+```env
+# Si backend está en Docker y provider también
+PROVIDER_INTERNAL_URL=http://provider:8080
+# O si está en Kubernetes
+PROVIDER_INTERNAL_URL=http://oidc-provider-service:8080
+```
+
+**Ejemplo Producción - Sin especificar**:
+
+```env
+# Si no se especifica, se usa PROVIDER_EXTERNAL_URL para todo
+# (Comportamiento por defecto)
+```
+
+---
+
+### `OIDC_CLIENT_ID` ✅ REQUERIDO
+
+**Descripción**: ID del cliente OIDC registrado en la base de datos del Provider.
+
+**Formato**: String alfanumérico (puede incluir guiones y guiones bajos)
+
+**Uso**:
+
+- Identificación del cliente en el flujo OIDC
+- Validación de requests al Provider
+
+**Ejemplo Producción**:
+
+```env
+OIDC_CLIENT_ID=acceleralia-client
+```
+
+**Importante**:
+
+- ✅ DEBE coincidir exactamente con el `client_id` registrado en la tabla `oidc_clients` de la BD
+- ✅ Case-sensitive (distingue mayúsculas/minúsculas)
+- ✅ No debe tener espacios
+
+---
+
+### `OIDC_CLIENT_SECRET` ✅ REQUERIDO
+
+**Descripción**: Secreto del cliente OIDC para autenticación con el Provider.
+
+**Formato**: String seguro (mínimo 32 caracteres recomendado)
+
+**Uso**:
+
+- Autenticación del cliente en el token endpoint
+- Validación de requests al Provider
+
+**Ejemplo Producción**:
+
+```env
+OIDC_CLIENT_SECRET=TU_CLIENT_SECRET_MUY_SEGURO_MIN_32_CARACTERES_ALEATORIOS
+```
+
+**Importante**:
+
+- ✅ DEBE coincidir exactamente con el `client_secret` registrado en la tabla `oidc_clients` de la BD
+- ✅ Mínimo 32 caracteres recomendado
+- ✅ Debe ser único y aleatorio
+- ✅ **CRÍTICO**: Nunca exponer este valor en logs, commits, o mensajes
+
+**Generación de secreto seguro**:
+
+```bash
+openssl rand -base64 32
+```
+
+---
+
+### `OIDC_CALLBACK_URL` ✅ REQUERIDO
+
+**Descripción**: URL donde el Provider redirige después de la autenticación exitosa.
+
+**Formato**: URL completa con protocolo HTTPS
+
+**Uso**:
+
+- Callback después del login OIDC
+- El Provider redirige aquí con el `code` de autorización
+
+**Ejemplo Producción**:
+
+```env
+OIDC_CALLBACK_URL=https://api.acceleralia.com/auth/callback
+```
+
+**Importante**:
+
+- ✅ DEBE usar HTTPS en producción
+- ✅ DEBE estar registrada exactamente en `redirect_uris` del cliente OIDC en la BD
+- ✅ La ruta `/auth/callback` debe estar manejada por el backend
+- ✅ Case-sensitive y debe coincidir exactamente (incluyendo trailing slash si lo tiene)
+
+**Verificación en BD**:
+
+```sql
+SELECT redirect_uris FROM oidc_clients WHERE client_id = 'acceleralia-client';
+-- Debe incluir: https://api.acceleralia.com/auth/callback
+```
+
+---
+
+### `FRONTEND_URL` ✅ REQUERIDO
+
+**Descripción**: URL del frontend de la aplicación.
+
+**Formato**: URL completa con protocolo HTTPS
+
+**Uso**:
+
+- Redirección después del login exitoso
+- CORS origin permitido
+- Redirección en caso de error
+
+**Ejemplo Producción**:
+
+```env
+FRONTEND_URL=https://app.acceleralia.com
+```
+
+**Importante**:
+
+- ✅ DEBE usar HTTPS en producción
+- ✅ Esta URL se usa para CORS, debe coincidir con el origen del frontend
+- ✅ NO debe tener trailing slash
+
+---
+
+### `BACKEND_URL` ✅ REQUERIDO
+
+**Descripción**: URL pública del Backend API.
+
+**Formato**: URL completa con protocolo HTTPS
+
+**Uso**:
+
+- URLs en respuestas de la API
+- Redirecciones internas
+- URLs de logout
+
+**Ejemplo Producción**:
+
+```env
+BACKEND_URL=https://api.acceleralia.com
+```
+
+**Importante**:
+
+- ✅ DEBE usar HTTPS en producción
+- ✅ Debe ser la URL pública donde el backend es accesible
+- ✅ NO debe tener trailing slash
+
+---
+
+### `SESSION_SECRET` ✅ REQUERIDO
+
+**Descripción**: Secreto para firmar y encriptar las sesiones de Express.
+
+**Formato**: String seguro (mínimo 32 caracteres recomendado)
+
+**Uso**:
+
+- Firma de cookies de sesión
+- Encriptación de datos de sesión
+- Protección CSRF
+
+**Ejemplo Producción**:
+
+```env
+SESSION_SECRET=TU_SESSION_SECRET_MUY_SEGURO_MIN_32_CARACTERES_ALEATORIOS
+```
+
+**Importante**:
+
+- ✅ Mínimo 32 caracteres altamente recomendado
+- ✅ Debe ser único y aleatorio
+- ✅ **CRÍTICO**: Si cambias este valor, todas las sesiones existentes se invalidarán
+- ✅ NO debe ser el mismo que otros secretos (`OIDC_CLIENT_SECRET`, etc.)
+
+**Generación de secreto seguro**:
+
+```bash
+openssl rand -base64 32
+```
+
+---
+
+## 🟡 Variables Opcionales (Recomendadas)
+
+### `SESSION_DOMAIN` ⚠️ RECOMENDADO (Si aplica)
+
+**Descripción**: Dominio de las cookies de sesión para compartir entre subdominios.
+
+**Formato**: Dominio con punto inicial (`.dominio.com`)
+
+**Uso**:
+
+- Compartir cookies entre subdominios
+- Solo necesario si frontend y backend están en subdominios diferentes
+
+**Cuándo usar**:
+
+- ✅ **Usar cuando**: Frontend y backend están en subdominios diferentes
+  - Ejemplo: `app.acceleralia.com` y `api.acceleralia.com`
+- ❌ **NO usar cuando**: Frontend y backend están en el mismo dominio o diferentes dominios
+
+**Ejemplo Producción - Subdominios**:
+
+```env
+# Permite cookies entre app.acceleralia.com y api.acceleralia.com
+SESSION_DOMAIN=.acceleralia.com
+```
+
+**Ejemplo Producción - Mismo Dominio**:
+
+```env
+# Si frontend y backend están en el mismo dominio, omitir esta variable
+```
+
+**Importante**:
+
+- ✅ El punto inicial (`.`) es necesario para compartir entre subdominios
+- ✅ Solo funciona para subdominios del mismo dominio padre
+- ✅ No funciona para dominios completamente diferentes
+
+---
+
+### `TRUST_PROXY` ✅ REQUERIDO (Si usas reverse proxy)
+
+**Descripción**: Indica si Express debe confiar en los headers `X-Forwarded-*` del reverse proxy.
+
+**Formato**: `"1"` o `"0"` (string)
+
+**Uso**:
+
+- Detección correcta de HTTPS cuando está detrás de nginx/Apache
+- Obtención correcta de IP del cliente
+- Generación de URLs HTTPS correctas
+
+**Cuándo usar**:
+
+- ✅ **Siempre usar `"1"`** en producción con reverse proxy (nginx, Apache, load balancer)
+- ❌ **NO usar o usar `"0"`** solo si el servidor está directamente expuesto sin proxy
+
+**Ejemplo Producción - Con Reverse Proxy**:
+
+```env
+TRUST_PROXY=1
+```
+
+**Ejemplo Producción - Sin Reverse Proxy** (RARO):
+
+```env
+TRUST_PROXY=0
+```
+
+**Importante**:
+
+- ✅ **CRÍTICO** si usas HTTPS con reverse proxy: sin esto, Express no detectará HTTPS correctamente
+- ✅ Si no está configurado, las cookies pueden no funcionar correctamente con HTTPS
+
+---
+
+### `PORT` ⚠️ OPCIONAL
+
+**Descripción**: Puerto interno donde el servidor Express escuchará.
+
+**Formato**: Número entero (1-65535)
+
+**Uso**: Puerto interno del contenedor/servicio
+
+**Ejemplo**:
+
+```env
+PORT=8080
+```
+
+**Nota**:
+
+- Puerto **interno** del servicio
+- Normalmente se mapea a puerto público mediante reverse proxy
+- Si no se especifica, el código usa `8080` por defecto
+- **Recomendación**: Dejar sin especificar o usar `8080` estándar
+
+---
+
+## 📝 Ejemplo Completo de `.env` para Producción
+
+### Escenario 1: Servidor Único con Nginx
+
+```env
+# ============================================
+# OIDC BACKEND - PRODUCCIÓN
+# Servidor único con nginx como reverse proxy
+# ============================================
+
+# URL externa del Provider (REQUERIDO)
+PROVIDER_EXTERNAL_URL=https://auth.acceleralia.com
+
+# URL interna del Provider (opcional - misma que external si están en mismo servidor)
+# Omitir si backend y provider están en el mismo servidor
+# PROVIDER_INTERNAL_URL=http://localhost:8080
+
+# Credenciales del Cliente OIDC (REQUERIDO)
+# Deben coincidir con lo registrado en la BD del Provider
+OIDC_CLIENT_ID=acceleralia-client
+OIDC_CLIENT_SECRET=TU_CLIENT_SECRET_MUY_SEGURO_MIN_32_CARACTERES_ALEATORIOS
+
+# Callback URL (REQUERIDO)
+# Debe estar registrada en redirect_uris del cliente en la BD
+OIDC_CALLBACK_URL=https://api.acceleralia.com/auth/callback
+
+# URLs de la aplicación (REQUERIDO)
+FRONTEND_URL=https://app.acceleralia.com
+BACKEND_URL=https://api.acceleralia.com
+
+# Secreto de sesión (REQUERIDO)
+SESSION_SECRET=TU_SESSION_SECRET_MUY_SEGURO_MIN_32_CARACTERES_ALEATORIOS
+
+# Dominio de cookies (RECOMENDADO si usas subdominios)
+SESSION_DOMAIN=.acceleralia.com
+
+# Trust Proxy (REQUERIDO si usas reverse proxy con HTTPS)
+TRUST_PROXY=1
+
+# Puerto interno (OPCIONAL)
+PORT=8080
+```
+
+### Escenario 2: Servidores Separados
+
+```env
+# ============================================
+# OIDC BACKEND - PRODUCCIÓN
+# Backend y Provider en servidores diferentes
+# ============================================
+
+# URL externa del Provider (REQUERIDO)
+PROVIDER_EXTERNAL_URL=https://auth.acceleralia.com
+
+# URL interna del Provider (opcional - usar si hay red interna)
+# Si backend y provider están en internet público, usar misma URL que external
+PROVIDER_INTERNAL_URL=https://auth.acceleralia.com
+
+# Credenciales del Cliente OIDC (REQUERIDO)
+OIDC_CLIENT_ID=acceleralia-client
+OIDC_CLIENT_SECRET=TU_CLIENT_SECRET_MUY_SEGURO_MIN_32_CARACTERES_ALEATORIOS
+
+# Callback URL (REQUERIDO)
+OIDC_CALLBACK_URL=https://api.acceleralia.com/auth/callback
+
+# URLs de la aplicación (REQUERIDO)
+FRONTEND_URL=https://app.acceleralia.com
+BACKEND_URL=https://api.acceleralia.com
+
+# Secreto de sesión (REQUERIDO)
+SESSION_SECRET=TU_SESSION_SECRET_MUY_SEGURO_MIN_32_CARACTERES_ALEATORIOS
+
+# Dominio de cookies (RECOMENDADO)
+SESSION_DOMAIN=.acceleralia.com
+
+# Trust Proxy (REQUERIDO)
+TRUST_PROXY=1
+
+# Puerto interno (OPCIONAL)
+PORT=8080
+```
+
+### Escenario 3: Docker/Kubernetes
+
+```env
+# ============================================
+# OIDC BACKEND - PRODUCCIÓN
+# Backend en Docker/Kubernetes
+# ============================================
+
+# URL externa del Provider (para navegador)
+PROVIDER_EXTERNAL_URL=https://auth.acceleralia.com
+
+# URL interna del Provider (para comunicación entre contenedores)
+PROVIDER_INTERNAL_URL=http://oidc-provider:8080
+
+# Credenciales del Cliente OIDC
+OIDC_CLIENT_ID=acceleralia-client
+OIDC_CLIENT_SECRET=TU_CLIENT_SECRET_MUY_SEGURO_MIN_32_CARACTERES_ALEATORIOS
+
+# Callback URL
+OIDC_CALLBACK_URL=https://api.acceleralia.com/auth/callback
+
+# URLs de la aplicación
+FRONTEND_URL=https://app.acceleralia.com
+BACKEND_URL=https://api.acceleralia.com
+
+# Secreto de sesión
+SESSION_SECRET=TU_SESSION_SECRET_MUY_SEGURO_MIN_32_CARACTERES_ALEATORIOS
+
+# Dominio de cookies
+SESSION_DOMAIN=.acceleralia.com
+
+# Trust Proxy (siempre necesario en Docker/Kubernetes)
+TRUST_PROXY=1
+
+# Puerto interno
+PORT=8080
+```
+
+---
+
+## ✅ Checklist de Configuración
+
+Antes de desplegar, verifica:
+
+### Variables Requeridas
+
+- [ ] `PROVIDER_EXTERNAL_URL` usa HTTPS
+- [ ] `OIDC_CLIENT_ID` coincide con BD del Provider
+- [ ] `OIDC_CLIENT_SECRET` coincide con BD del Provider (y es seguro)
+- [ ] `OIDC_CALLBACK_URL` está registrada en `redirect_uris` del cliente en BD
+- [ ] `FRONTEND_URL` usa HTTPS
+- [ ] `BACKEND_URL` usa HTTPS
+- [ ] `SESSION_SECRET` es seguro (32+ caracteres) y único
+
+### Configuración OIDC
+
+- [ ] Cliente OIDC existe en la BD con `client_id` correcto
+- [ ] `redirect_uris` incluye exactamente `OIDC_CALLBACK_URL`
+- [ ] `client_secret` en BD coincide con `OIDC_CLIENT_SECRET`
+
+### Seguridad
+
+- [ ] `TRUST_PROXY=1` si usas reverse proxy (recomendado)
+- [ ] `SESSION_DOMAIN` configurado si usas subdominios
+- [ ] Todos los secretos son únicos y seguros
+- [ ] No hay valores de desarrollo en producción
+
+---
+
+## 🔐 Consideraciones de Seguridad
+
+### Generación de Secretos
+
+```bash
+# Generar SESSION_SECRET
+openssl rand -base64 32
+
+# Generar OIDC_CLIENT_SECRET
+openssl rand -base64 32
+
+# Usar diferentes secretos para cada propósito
+```
+
+### Protección de Variables
+
+- ✅ **NUNCA** commits el archivo `.env` al repositorio
+- ✅ Usa gestión de secretos (AWS Secrets Manager, etc.)
+- ✅ Permisos restrictivos: `chmod 600 backend/.env`
+- ✅ Rotación periódica de secretos
+- ✅ Diferentes credenciales para producción y desarrollo
+
+---
+
+## 🔄 Matriz de Configuración según Escenario
+
+| Escenario                | PROVIDER_INTERNAL_URL            | TRUST_PROXY | SESSION_DOMAIN |
+| ------------------------ | -------------------------------- | ----------- | -------------- |
+| **Servidor único**       | Omitir o `http://localhost:8080` | `1`         | `.dominio.com` |
+| **Servidores separados** | `https://auth.acceleralia.com`   | `1`         | `.dominio.com` |
+| **Docker/Kubernetes**    | `http://provider:8080`           | `1`         | `.dominio.com` |
+| **Sin reverse proxy**    | Igual que external               | `0`         | Omitir         |
+
+---
+
+## 🐛 Troubleshooting
+
+### Error: "Missing required environment variables"
+
+**Causa**: Faltan variables requeridas en `.env`.
+
+**Solución**:
+
+1. Verificar que todas las variables requeridas están presentes
+2. Verificar que no hay espacios alrededor del `=`
+3. Verificar ubicación del archivo: `backend/.env`
+
+### Error: "Redirect URI mismatch"
+
+**Causa**: `OIDC_CALLBACK_URL` no coincide con `redirect_uris` en BD.
+
+**Solución**:
+
+1. Verificar `OIDC_CALLBACK_URL` en `.env`
+2. Verificar `redirect_uris` en tabla `oidc_clients`:
+   ```sql
+   SELECT redirect_uris FROM oidc_clients WHERE client_id = 'TU_CLIENT_ID';
+   ```
+3. Deben coincidir exactamente (incluyendo protocolo, puerto, path)
+
+### Error: "Invalid client credentials"
+
+**Causa**: `OIDC_CLIENT_ID` o `OIDC_CLIENT_SECRET` incorrectos.
+
+**Solución**:
+
+1. Verificar `OIDC_CLIENT_ID` en BD:
+   ```sql
+   SELECT client_id FROM oidc_clients WHERE client_id = 'TU_CLIENT_ID';
+   ```
+2. Verificar `OIDC_CLIENT_SECRET` coincide con BD (case-sensitive)
+3. Verificar que el cliente está activo: `is_active = true`
+
+### URLs generadas son HTTP en vez de HTTPS
+
+**Causa**: `TRUST_PROXY=1` no configurado o reverse proxy no envía headers.
+
+**Solución**:
+
+1. Configurar `TRUST_PROXY=1` en `.env`
+2. Verificar que nginx/Apache envía `X-Forwarded-Proto: https`
+3. Verificar configuración del reverse proxy
+
+---
+
+## 📚 Referencias
+
+- [Guía de Deployment sin Docker](19-DEPLOYMENT-PRODUCCION-SIN-DOCKER.mdc)
+- [Guía de Testing Funcional](18-TESTING-FUNCIONAL.mdc)
+- [Documentación de Express Trust Proxy](https://expressjs.com/en/guide/behind-proxies.html)

@@ -1,0 +1,576 @@
+# Title
+
+Integración OIDC en Frontend React - Guía Completa
+
+# Summary
+
+Este documento proporciona una guía paso a paso completa para integrar autenticación OIDC en una aplicación React. Cubre AuthContext, ProtectedRoutes, Axios client con interceptors, manejo de errores, y variables de entorno.
+
+**Prerequisitos**: Debes haber completado `24-OIDC-SERVER-SETUP.mdc` y `25-OIDC-BACKEND-NESTJS-INTEGRATION.mdc` (o equivalente para otro framework backend).
+
+# Prerequisites
+
+- [ ] Backend API con OIDC integrado (ver `25-OIDC-BACKEND-NESTJS-INTEGRATION.mdc`)
+- [ ] Endpoints `/auth/login`, `/auth/callback`, `/auth/logout`, `/auth/me` funcionando
+- [ ] Proyecto React funcionando (con Vite, Create React App, o similar)
+- [ ] Acceso a variables de entorno del frontend
+
+# TechnicalDetails
+
+## Paso 1: Variables de Entorno
+
+Crea un archivo `.env` en la raíz de tu proyecto React:
+
+```bash
+VITE_API_URL=https://your-api.com/api
+```
+
+**IMPORTANTE**:
+
+- En Vite, las variables de entorno deben empezar con `VITE_` para ser accesibles desde el código
+- Esta variable es de build-time, no runtime (se inyecta durante el build)
+
+## Paso 2: Crear Helper de Configuración
+
+Archivo: `src/config/env.ts`
+
+```typescript
+/**
+ * Gets the API URL from environment variables.
+ * Throws an error if VITE_API_URL is not defined.
+ */
+export function getApiUrl(): string {
+  const apiUrl = import.meta.env.VITE_API_URL;
+
+  if (!apiUrl) {
+    const errorMessage = `
+❌ CRITICAL CONFIGURATION ERROR ❌
+
+VITE_API_URL environment variable is not defined.
+Please configure VITE_API_URL in your environment variables.
+
+Expected format: VITE_API_URL=https://your-api.com/api
+    `.trim();
+
+    console.error(errorMessage);
+
+    // Show error in UI if possible
+    if (typeof window !== "undefined") {
+      const errorDiv = document.createElement("div");
+      errorDiv.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        background: #ef4444;
+        color: white;
+        padding: 20px;
+        z-index: 99999;
+        font-family: monospace;
+        white-space: pre-wrap;
+      `;
+      errorDiv.textContent = errorMessage;
+      document.body.prepend(errorDiv);
+    }
+
+    throw new Error("VITE_API_URL is not defined");
+  }
+
+  return apiUrl.replace(/\/$/, ""); // Remove trailing slash
+}
+```
+
+## Paso 3: Crear Axios Client con Interceptors
+
+Archivo: `src/api/client.ts`
+
+```typescript
+import axios from "axios";
+import { getApiUrl } from "../config/env";
+
+// Lazy initialization
+let API_BASE_URL: string | null = null;
+
+function getApiBaseUrl(): string {
+  if (!API_BASE_URL) {
+    try {
+      API_BASE_URL = getApiUrl();
+    } catch (error: any) {
+      console.error("❌ Failed to get API URL:", error.message);
+      API_BASE_URL = "CONFIGURATION_ERROR";
+    }
+  }
+  return API_BASE_URL;
+}
+
+const apiClient = axios.create({
+  baseURL: getApiBaseUrl(),
+  headers: {
+    "Content-Type": "application/json",
+  },
+  withCredentials: true, // CRÍTICO: Permite enviar cookies
+});
+
+// Request interceptor - Add token from localStorage
+apiClient.interceptors.request.use(
+  (config) => {
+    if (config.baseURL === "CONFIGURATION_ERROR") {
+      return Promise.reject(new Error("API URL not configured"));
+    }
+
+    const token = localStorage.getItem("oauth_token");
+    if (token) {
+      config.headers["Authorization"] = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Response interceptor - Handle 401 errors
+apiClient.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+
+    // Handle 401 Unauthorized
+    if (error.response?.status === 401) {
+      // Don't redirect for /auth/me (let AuthContext handle it)
+      if (originalRequest.url?.includes("/auth/me")) {
+        return Promise.reject(error);
+      }
+
+      // For other protected routes, redirect to login
+      if (!originalRequest._retry) {
+        originalRequest._retry = true;
+        localStorage.removeItem("oauth_token");
+
+        try {
+          const API_URL = getApiUrl();
+          window.location.href = `${API_URL}/auth/login`;
+        } catch (redirectError) {
+          console.error("Failed to redirect:", redirectError);
+        }
+      }
+
+      const friendlyError = new Error(
+        "Tu sesión ha expirado. Redirigiendo al login..."
+      );
+      (friendlyError as any).isAuthError = true;
+      return Promise.reject(friendlyError);
+    }
+
+    return Promise.reject(error);
+  }
+);
+
+export default apiClient;
+```
+
+## Paso 4: Crear AuthContext
+
+Archivo: `src/contexts/AuthContext.tsx`
+
+```typescript
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { getApiUrl } from '../config/env';
+import apiClient from '../api/client';
+
+interface User {
+  sub: string;
+  email: string;
+  name: string;
+  company_id: string;
+}
+
+interface AuthContextType {
+  user: User | null;
+  authenticated: boolean;
+  loading: boolean;
+  login: () => void;
+  logout: () => void;
+  refreshUser: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [authenticated, setAuthenticated] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const checkAuth = useCallback(async () => {
+    console.log('🔍 Checking authentication...');
+    setLoading(true);
+
+    try {
+      // Check for token in localStorage first
+      const storedToken = localStorage.getItem('oauth_token');
+
+      // Check for token in URL (from callback redirect)
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlToken = urlParams.get('token');
+
+      if (urlToken) {
+        console.log('✅ Token found in URL, storing in localStorage');
+        localStorage.setItem('oauth_token', urlToken);
+        // Clean URL
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+
+      // Always call /auth/me to verify session (even if no token)
+      const response = await apiClient.get('/auth/me');
+
+      if (response.data.authenticated && response.data.user) {
+        console.log('✅ User authenticated:', response.data.user.email);
+        setUser(response.data.user);
+        setAuthenticated(true);
+      } else {
+        console.log('❌ User not authenticated');
+        setUser(null);
+        setAuthenticated(false);
+      }
+    } catch (error: any) {
+      console.log('❌ Auth check failed:', error.message);
+      setUser(null);
+      setAuthenticated(false);
+
+      // Don't redirect here - let ProtectedRoutes handle it
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
+
+  const login = useCallback(() => {
+    console.log('🔐 Initiating login...');
+    try {
+      const API_URL = getApiUrl();
+      window.location.href = `${API_URL}/auth/login`;
+    } catch (error: any) {
+      console.error('❌ Failed to redirect to login:', error);
+    }
+  }, []);
+
+  const logout = useCallback(async () => {
+    console.log('🚪 Logging out...');
+    try {
+      const API_URL = getApiUrl();
+      localStorage.removeItem('oauth_token');
+      window.location.href = `${API_URL}/auth/logout`;
+    } catch (error: any) {
+      console.error('❌ Failed to logout:', error);
+    }
+  }, []);
+
+  const refreshUser = useCallback(async () => {
+    await checkAuth();
+  }, [checkAuth]);
+
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        authenticated,
+        loading,
+        login,
+        logout,
+        refreshUser,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+}
+```
+
+## Paso 5: Crear ProtectedRoutes Component
+
+Archivo: `src/components/auth/ProtectedRoutes.tsx`
+
+```typescript
+import { useEffect, useRef } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
+import { getApiUrl } from '../../config/env';
+
+interface ProtectedRoutesProps {
+  children: React.ReactNode;
+}
+
+export function ProtectedRoutes({ children }: ProtectedRoutesProps) {
+  const { authenticated, loading, login } = useAuth();
+  const hasRedirected = useRef(false);
+
+  useEffect(() => {
+    // Timeout if auth check takes too long
+    const timeoutId = setTimeout(() => {
+      if (loading && !hasRedirected.current) {
+        console.warn('⚠️ Auth check taking too long, redirecting...');
+        hasRedirected.current = true;
+        try {
+          const API_URL = getApiUrl();
+          window.location.href = `${API_URL}/auth/login`;
+        } catch (error) {
+          console.error('❌ Cannot redirect:', error);
+        }
+      }
+    }, 3000);
+
+    // Redirect if not authenticated after loading
+    if (!loading && !authenticated && !hasRedirected.current) {
+      console.log('❌ Not authenticated, redirecting to login...');
+      hasRedirected.current = true;
+      clearTimeout(timeoutId);
+      try {
+        const API_URL = getApiUrl();
+        window.location.href = `${API_URL}/auth/login`;
+      } catch (error) {
+        console.error('❌ Cannot redirect:', error);
+      }
+    }
+
+    // Cleanup
+    if (!loading && authenticated) {
+      clearTimeout(timeoutId);
+    }
+
+    return () => clearTimeout(timeoutId);
+  }, [authenticated, loading, login]);
+
+  // Show loading while checking auth
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Verificando autenticación...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render children if not authenticated
+  if (!authenticated) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Redirigiendo al login...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Render children only if authenticated
+  return <>{children}</>;
+}
+```
+
+## Paso 6: Crear UserInfo Component
+
+Archivo: `src/components/auth/UserInfo.tsx`
+
+```typescript
+import { useEffect } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
+
+export function UserInfo() {
+  const { user, authenticated, logout, refreshUser } = useAuth();
+
+  useEffect(() => {
+    if (!user && !authenticated) {
+      refreshUser();
+    }
+  }, [user, authenticated, refreshUser]);
+
+  if (!authenticated || !user) {
+    return null;
+  }
+
+  return (
+    <div className="flex items-center space-x-3">
+      <div className="flex items-center space-x-2 px-3 py-2 bg-gray-50 rounded-lg">
+        <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center">
+          <span className="text-white font-bold text-xs">
+            {user.name?.charAt(0).toUpperCase() || 'U'}
+          </span>
+        </div>
+        <div className="flex flex-col">
+          <span className="text-sm font-medium text-gray-900">{user.name}</span>
+          <span className="text-xs text-gray-500">{user.email}</span>
+        </div>
+      </div>
+
+      <button
+        onClick={logout}
+        className="flex items-center space-x-1 px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg"
+      >
+        <span>Salir</span>
+      </button>
+    </div>
+  );
+}
+```
+
+## Paso 7: Configurar App.tsx
+
+```typescript
+import { AuthProvider } from './contexts/AuthContext';
+import { ProtectedRoutes } from './components/auth/ProtectedRoutes';
+import { UserInfo } from './components/auth/UserInfo';
+import ErrorBoundary from './components/common/ErrorBoundary';
+
+function App() {
+  return (
+    <ErrorBoundary>
+      <AuthProvider>
+        <ProtectedRoutes>
+          <div className="min-h-screen bg-gray-50">
+            {/* Header con UserInfo */}
+            <header className="bg-white shadow">
+              <div className="max-w-7xl mx-auto px-4 py-4 flex justify-end">
+                <UserInfo />
+              </div>
+            </header>
+
+            {/* Contenido de la app */}
+            <main>
+              {/* Tu contenido aquí */}
+            </main>
+          </div>
+        </ProtectedRoutes>
+      </AuthProvider>
+    </ErrorBoundary>
+  );
+}
+
+export default App;
+```
+
+## Paso 8: Crear ErrorBoundary
+
+Archivo: `src/components/common/ErrorBoundary.tsx`
+
+```typescript
+import { Component, ErrorInfo, ReactNode } from 'react';
+
+interface Props {
+  children: ReactNode;
+}
+
+interface State {
+  hasError: boolean;
+  error?: Error;
+}
+
+class ErrorBoundary extends Component<Props, State> {
+  constructor(props: Props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: Error): State {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    const isAuthError =
+      (error as any).isAuthError ||
+      (error as any).statusCode === 401;
+
+    if (isAuthError) {
+      setTimeout(() => {
+        const currentHost = window.location.hostname;
+        window.location.href = `https://${currentHost}/api/auth/login`;
+      }, 2000);
+    }
+  }
+
+  render() {
+    if (this.state.hasError) {
+      const isAuthError = (this.state.error as any)?.isAuthError;
+
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+          <div className="max-w-md w-full bg-white shadow-lg rounded-lg p-6">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">
+              {isAuthError ? 'Sesión Expirada' : 'Error'}
+            </h3>
+            <p className="text-sm text-gray-600 mb-4">
+              {isAuthError
+                ? 'Tu sesión ha expirado. Redirigiendo al login...'
+                : 'Ha ocurrido un error inesperado.'}
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+export default ErrorBoundary;
+```
+
+## Paso 9: Instalar Dependencias
+
+```bash
+npm install axios
+npm install --save-dev @types/node
+```
+
+# Configuration
+
+## Checklist
+
+- [ ] Variable `VITE_API_URL` configurada en `.env`
+- [ ] `getApiUrl()` helper creado
+- [ ] Axios client configurado con `withCredentials: true`
+- [ ] `AuthContext` y `AuthProvider` creados
+- [ ] `ProtectedRoutes` component creado
+- [ ] `UserInfo` component creado
+- [ ] `ErrorBoundary` creado
+- [ ] `AuthProvider` envuelve la app en `App.tsx`
+- [ ] `ProtectedRoutes` envuelve rutas protegidas
+
+# Troubleshooting
+
+## Error: "VITE_API_URL is not defined"
+
+**Solución**: Agrega `VITE_API_URL` a tu `.env` y reinicia el servidor de desarrollo.
+
+## Problema: Cookies no se envían
+
+**Solución**:
+
+1. Verifica que `withCredentials: true` esté en el axios client
+2. Verifica que el backend tenga CORS configurado con `credentials: true`
+3. Verifica que las URLs coincidan (sin diferencias de dominio/puerto en desarrollo)
+
+## Problema: Redirección infinita
+
+**Solución**:
+
+1. Verifica que `/auth/me` no esté protegido en el backend
+2. Verifica que el interceptor de Axios no redirija en `/auth/me`
+3. Verifica que `ProtectedRoutes` no redirija mientras `loading === true`
+
+# NextSteps
+
+1. **Testing**: `29-OIDC-TESTING-VALIDATION.mdc`
+2. **Next.js**: Si migras a Next.js, ver `28-OIDC-FRONTEND-NEXTJS-INTEGRATION.mdc`
+3. **Deployment**: `30-OIDC-DEPLOYMENT-CONSIDERATIONS.mdc`

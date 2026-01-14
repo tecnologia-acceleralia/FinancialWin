@@ -1,0 +1,269 @@
+# Title
+
+Integración OIDC en Frontend Next.js - Guía Completa
+
+# Summary
+
+Este documento proporciona guías para integrar autenticación OIDC en aplicaciones Next.js, cubriendo tanto App Router (Next.js 13+) como Pages Router, incluyendo middleware, Server Components, y API Routes.
+
+**Prerequisitos**: Backend OIDC funcionando (ver `25-OIDC-BACKEND-NESTJS-INTEGRATION.mdc`).
+
+# TechnicalDetails
+
+## Next.js App Router (13+)
+
+### Configuración de Variables de Entorno
+
+`.env.local`:
+
+```bash
+NEXT_PUBLIC_API_URL=https://your-api.com/api
+```
+
+### Middleware de Autenticación
+
+Archivo: `middleware.ts` (raíz del proyecto)
+
+```typescript
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+
+export function middleware(request: NextRequest) {
+  const token = request.cookies.get("oauth_session")?.value;
+  const isAuthRoute = request.nextUrl.pathname.startsWith("/auth");
+  const isApiRoute = request.nextUrl.pathname.startsWith("/api");
+
+  // Allow auth routes and API routes
+  if (isAuthRoute || isApiRoute) {
+    return NextResponse.next();
+  }
+
+  // Redirect to login if not authenticated
+  if (!token) {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+    return NextResponse.redirect(`${apiUrl}/auth/login`);
+  }
+
+  return NextResponse.next();
+}
+
+export const config = {
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+};
+```
+
+### Client Component para Auth
+
+Archivo: `app/providers/AuthProvider.tsx`
+
+```typescript
+'use client';
+
+import { createContext, useContext, useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+
+interface AuthContextType {
+  user: any | null;
+  loading: boolean;
+  logout: () => void;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
+
+  useEffect(() => {
+    fetch('/api/auth/me')
+      .then(res => res.json())
+      .then(data => {
+        if (data.authenticated) {
+          setUser(data.user);
+        }
+        setLoading(false);
+      });
+  }, []);
+
+  const logout = () => {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+    window.location.href = `${apiUrl}/auth/logout`;
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, loading, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+```
+
+### API Route para Auth
+
+Archivo: `app/api/auth/me/route.ts`
+
+```typescript
+import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
+
+export async function GET() {
+  const cookieStore = cookies();
+  const token = cookieStore.get("oauth_session")?.value;
+
+  if (!token) {
+    return NextResponse.json({ authenticated: false });
+  }
+
+  try {
+    // Verify token with backend
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+    const response = await fetch(`${apiUrl}/auth/me`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const data = await response.json();
+    return NextResponse.json(data);
+  } catch {
+    return NextResponse.json({ authenticated: false });
+  }
+}
+```
+
+### Server Component Protegido
+
+Archivo: `app/dashboard/page.tsx`
+
+```typescript
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
+
+export default async function DashboardPage() {
+  const cookieStore = cookies();
+  const token = cookieStore.get('oauth_session')?.value;
+
+  if (!token) {
+    redirect('/api/auth/login');
+  }
+
+  // Fetch user data (server-side)
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+  const response = await fetch(`${apiUrl}/auth/me`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  });
+
+  const { user } = await response.json();
+
+  return (
+    <div>
+      <h1>Dashboard</h1>
+      <p>Welcome, {user.name}</p>
+    </div>
+  );
+}
+```
+
+## Next.js Pages Router
+
+### API Route para Callback
+
+Archivo: `pages/api/auth/callback.ts`
+
+```typescript
+import type { NextApiRequest, NextApiResponse } from "next";
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  const { code, state } = req.query;
+
+  // Exchange code for tokens via backend
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+  const response = await fetch(
+    `${apiUrl}/auth/callback?code=${code}&state=${state}`,
+    {
+      credentials: "include",
+    }
+  );
+
+  if (response.ok) {
+    res.redirect("/dashboard");
+  } else {
+    res.redirect("/?error=auth_failed");
+  }
+}
+```
+
+### HOC para Proteger Páginas
+
+Archivo: `lib/withAuth.tsx`
+
+```typescript
+import { useEffect } from 'react';
+import { useRouter } from 'next/router';
+
+export function withAuth(Component: any) {
+  return function AuthenticatedComponent(props: any) {
+    const router = useRouter();
+    const [loading, setLoading] = useState(true);
+    const [authenticated, setAuthenticated] = useState(false);
+
+    useEffect(() => {
+      fetch('/api/auth/me', { credentials: 'include' })
+        .then(res => res.json())
+        .then(data => {
+          if (data.authenticated) {
+            setAuthenticated(true);
+          } else {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+            window.location.href = `${apiUrl}/auth/login`;
+          }
+          setLoading(false);
+        });
+    }, []);
+
+    if (loading) {
+      return <div>Loading...</div>;
+    }
+
+    if (!authenticated) {
+      return null;
+    }
+
+    return <Component {...props} />;
+  };
+}
+```
+
+### Uso en Página
+
+Archivo: `pages/dashboard.tsx`
+
+```typescript
+import { withAuth } from '../lib/withAuth';
+
+function Dashboard() {
+  return <div>Dashboard Content</div>;
+}
+
+export default withAuth(Dashboard);
+```
+
+# Configuration
+
+- [ ] Variables de entorno configuradas (`NEXT_PUBLIC_API_URL`)
+- [ ] Middleware configurado (App Router)
+- [ ] API Routes creadas (`/api/auth/me`, `/api/auth/callback`)
+- [ ] AuthProvider configurado (si usas Client Components)
+
+# Troubleshooting
+
+Mismos problemas que React - ver `27-OIDC-FRONTEND-REACT-INTEGRATION.mdc`.
+
+# NextSteps
+
+Ver `29-OIDC-TESTING-VALIDATION.mdc` y `30-OIDC-DEPLOYMENT-CONSIDERATIONS.mdc`.

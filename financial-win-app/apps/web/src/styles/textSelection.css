@@ -1,0 +1,272 @@
+/* Estilos para selección parcial de texto en chat bubbles */
+
+/* Permitir selección de texto en mensajes del asistente */
+.select-text {
+  user-select: text;
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+}
+
+/* Animación de fade-in para indicadores */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out;
+}
+
+/* Animación de bounce-in para botones */
+@keyframes bounce-in {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-bounce-in {
+  animation: bounce-in 0.3s ease-out;
+}
+
+/* Estilos para texto ya insertado */
+.inserted-text {
+  background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 50%, #6ee7b7 100%);
+  text-decoration: line-through;
+  opacity: 0.85;
+  border-radius: 4px;
+  padding: 2px 4px;
+  margin: 0 1px;
+  position: relative;
+  transition: all 0.3s ease-in-out;
+  cursor: pointer;
+  border: 1px solid transparent;
+  box-shadow: 0 1px 2px rgba(34, 197, 94, 0.1);
+}
+
+.inserted-text:hover {
+  opacity: 1;
+  background: linear-gradient(135deg, #a7f3d0 0%, #6ee7b7 50%, #34d399 100%);
+  border-color: #10b981;
+  box-shadow: 0 2px 4px rgba(34, 197, 94, 0.2);
+  transform: translateY(-1px);
+}
+
+.inserted-text.hover-enabled {
+  cursor: pointer;
+}
+
+.inserted-text.hover-enabled:hover {
+  background: linear-gradient(135deg, #86efac 0%, #4ade80 50%, #22c55e 100%);
+  border-color: #16a34a;
+  box-shadow: 0 4px 8px rgba(34, 197, 94, 0.3);
+}
+
+.inserted-text::before {
+  content: "✓";
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 12px;
+  height: 12px;
+  background: #10b981;
+  color: white;
+  border-radius: 50%;
+  font-size: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.inserted-text::after {
+  content: "Insertado";
+  position: absolute;
+  top: -25px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  color: #059669;
+  background: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.2s ease-in-out;
+  z-index: 30;
+  white-space: nowrap;
+  border: 1px solid #d1fae5;
+  font-weight: 500;
+}
+
+.inserted-text:hover::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(-2px);
+}
+
+/* Animación para texto recién insertado */
+.inserted-text.recently-inserted {
+  animation: highlightInsertion 2s ease-in-out;
+}
+
+@keyframes highlightInsertion {
+  0% {
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 50%, #f59e0b 100%);
+    transform: scale(1.02);
+  }
+  50% {
+    background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 50%, #6ee7b7 100%);
+    transform: scale(1);
+  }
+  100% {
+    background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 50%, #6ee7b7 100%);
+    transform: scale(1);
+  }
+}
+
+/* Estilos para texto seleccionado */
+.selected-text {
+  background-color: rgba(59, 130, 246, 0.2);
+  border-radius: 2px;
+  padding: 1px 2px;
+  transition: background-color 0.1s ease-in-out;
+}
+
+/* Estilos para indicador de selección */
+.selection-indicator {
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  border: 1px solid #2563eb;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  backdrop-filter: blur(4px);
+}
+
+/* Estilos para botones de selección contextual */
+.selection-toolbar {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.selection-toolbar button {
+  padding: 4px 8px;
+  font-size: 12px;
+  border-radius: 4px;
+  transition: all 0.2s ease-in-out;
+  white-space: nowrap;
+}
+
+.selection-toolbar button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Estilos para estados de botón */
+.btn-select-partial {
+  background-color: #3b82f6;
+  color: white;
+  border: none;
+}
+
+.btn-select-partial:hover {
+  background-color: #2563eb;
+}
+
+.btn-select-full {
+  background-color: #6b7280;
+  color: white;
+  border: none;
+}
+
+.btn-select-full:hover {
+  background-color: #4b5563;
+}
+
+.btn-select-disabled {
+  background-color: #f3f4f6;
+  color: #9ca3af;
+  border: 1px solid #d1d5db;
+  cursor: not-allowed;
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  .selection-indicator {
+    font-size: 11px;
+    padding: 3px 6px;
+  }
+  
+  .selection-toolbar {
+    flex-direction: column;
+    gap: 2px;
+  }
+  
+  .selection-toolbar button {
+    width: 100%;
+    padding: 6px 8px;
+  }
+  
+  .inserted-text::after {
+    font-size: 9px;
+    padding: 1px 3px;
+  }
+}
+
+/* Mejoras de accesibilidad */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in,
+  .animate-bounce-in {
+    animation: none;
+  }
+  
+  .inserted-text,
+  .selected-text {
+    transition: none;
+  }
+}
+
+/* Estilos para modo oscuro */
+@media (prefers-color-scheme: dark) {
+  .selection-indicator {
+    background: linear-gradient(135deg, #1e40af, #1e3a8a);
+    border-color: #1e40af;
+    color: white;
+  }
+  
+  .inserted-text {
+    background: linear-gradient(45deg, #064e3b, #065f46);
+    color: #d1fae5;
+  }
+  
+  .inserted-text::after {
+    background: #1f2937;
+    color: #10b981;
+    border: 1px solid #374151;
+  }
+  
+  .selection-toolbar {
+    background: #1f2937;
+    border-color: #374151;
+  }
+}

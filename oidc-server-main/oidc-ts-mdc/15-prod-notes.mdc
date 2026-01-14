@@ -1,0 +1,9 @@
+# Title
+Notas para producción
+
+- Separar imágenes (provider/backend) y pipeline CI/CD.
+- Migrar SQLite → Postgres si necesitas HA/replicas.
+- TLS y headers seguros en proxy. Healthchecks:
+  - Provider: `/.well-known/openid-configuration`
+  - Backend: `/health` (agregar) o 401 controlado en `/api/me`
+- Observabilidad: logs estructurados (pino/winston) + métricas.

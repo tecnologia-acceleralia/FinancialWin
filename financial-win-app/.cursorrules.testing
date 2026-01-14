@@ -1,0 +1,413 @@
+# Cursor Rules - Testing
+
+## Stack Tecnológico
+- **Backend**: Jest 29.x + ts-jest + Supertest
+- **Frontend**: Vitest 4.x + Testing Library + jsdom
+- **Coverage**: Cobertura de código configurada
+
+## Arquitectura de Testing
+
+### Backend Tests
+```
+apps/api/
+├── src/
+│   └── **/*.spec.ts          # Unit tests (junto al código fuente)
+└── test/
+    ├── setup.ts              # Configuración global de tests
+    ├── **/*.e2e-spec.ts      # E2E tests
+    └── utils/                # Utilidades de test (JWT helpers, etc.)
+```
+
+### Frontend Tests
+```
+apps/web/src/
+├── **/*.test.tsx             # Component tests (junto al componente)
+└── test-utils.tsx            # Test wrapper y utilidades
+```
+
+## Backend Testing (Jest)
+
+### Configuración
+- Configuración en `jest.config.js`
+- Test environment: `node`
+- Transformación: `ts-jest`
+- Setup files: `test/setup.ts`
+- Coverage threshold: 70% (branches, functions, lines, statements)
+
+### Unit Tests
+
+#### Ubicación
+- Archivos `*.spec.ts` junto al archivo fuente
+- Ejemplo: `user.service.ts` → `user.service.spec.ts`
+
+#### Estructura
+```typescript
+import { Test, TestingModule } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { EntityService } from './entity.service';
+import { Entity } from './entities/entity.entity';
+
+describe('EntityService', () => {
+  let service: EntityService;
+  let repository: Repository<Entity>;
+
+  // Mock del repositorio
+  const mockRepository = {
+    create: jest.fn(),
+    save: jest.fn(),
+    findOne: jest.fn(),
+    find: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+  };
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        EntityService,
+        {
+          provide: getRepositoryToken(Entity),
+          useValue: mockRepository,
+        },
+      ],
+    }).compile();
+
+    service = module.get<EntityService>(EntityService);
+    repository = module.get<Repository<Entity>>(getRepositoryToken(Entity));
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  describe('create', () => {
+    it('should create a new entity', async () => {
+      // Arrange
+      const companyId = 'company-123';
+      const createData = { name: 'Test Entity' };
+      const expectedEntity = { id: 'uuid', company_id: companyId, ...createData };
+
+      mockRepository.create.mockReturnValue(expectedEntity);
+      mockRepository.save.mockResolvedValue(expectedEntity);
+
+      // Act
+      const result = await service.create(companyId, createData);
+
+      // Assert
+      expect(result).toEqual(expectedEntity);
+      expect(mockRepository.create).toHaveBeenCalledWith({
+        ...createData,
+        company_id: companyId,
+      });
+      expect(mockRepository.save).toHaveBeenCalledWith(expectedEntity);
+    });
+
+    it('should throw error on validation failure', async () => {
+      // Arrange
+      const companyId = 'company-123';
+      const invalidData = {};
+
+      // Act & Assert
+      await expect(service.create(companyId, invalidData)).rejects.toThrow();
+    });
+  });
+});
+```
+
+#### Reglas para Unit Tests
+- **Arrange-Act-Assert**: Estructurar tests claramente
+- **Mock Dependencies**: Mockear todos los repositorios y servicios externos
+- **Isolation**: Cada test debe ser independiente
+- **Clear Names**: Nombres descriptivos que explican qué se está probando
+- **Test Behavior**: Probar comportamiento, no implementación
+- **Edge Cases**: Probar casos límite y errores
+
+### E2E Tests
+
+#### Ubicación
+- Archivos `*.e2e-spec.ts` en `test/`
+- Ejemplo: `test/example/example.e2e-spec.ts`
+
+#### Estructura
+```typescript
+import { Test, TestingModule } from '@nestjs/testing';
+import { INestApplication } from '@nestjs/common';
+import * as request from 'supertest';
+import { AppModule } from '../../src/app.module';
+import { createTestJwtToken } from '../utils/jwt-helper';
+
+describe('ExampleController (e2e)', () => {
+  let app: INestApplication;
+  let authToken: string;
+
+  beforeAll(async () => {
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
+
+    app = moduleFixture.createNestApplication();
+    await app.init();
+
+    // Crear token de autenticación para tests
+    authToken = createTestJwtToken({
+      sub: 'user-123',
+      company_id: 'company-123',
+    });
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  describe('/example (POST)', () => {
+    it('should create an example', () => {
+      return request(app.getHttpServer())
+        .post('/example')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ name: 'Test Example' })
+        .expect(201)
+        .expect((res) => {
+          expect(res.body).toHaveProperty('id');
+          expect(res.body.name).toBe('Test Example');
+          expect(res.body.company_id).toBe('company-123');
+        });
+    });
+
+    it('should return 401 without authentication', () => {
+      return request(app.getHttpServer())
+        .post('/example')
+        .send({ name: 'Test Example' })
+        .expect(401);
+    });
+  });
+});
+```
+
+#### Reglas para E2E Tests
+- **Real Database**: Usar base de datos de test (configurada en `test.env`)
+- **Cleanup**: Limpiar datos después de cada test o suite
+- **Authentication**: Usar helpers para crear tokens JWT
+- **Full Flow**: Probar flujos completos end-to-end
+- **Status Codes**: Verificar códigos de estado HTTP apropiados
+
+### Test Utilities
+
+#### JWT Helper
+```typescript
+// test/utils/jwt-helper.ts
+import { sign } from 'jsonwebtoken';
+
+export function createTestJwtToken(payload: { sub: string; company_id: string }): string {
+  return sign(payload, process.env.JWT_SECRET || 'test-secret');
+}
+
+export function createAuthHeaders(companyId: string) {
+  const token = createTestJwtToken({ sub: 'test-user', company_id: companyId });
+  return { Authorization: `Bearer ${token}` };
+}
+```
+
+## Frontend Testing (Vitest + Testing Library)
+
+### Configuración
+- Configuración en `vitest.config.ts`
+- Test environment: `jsdom` (simula DOM del navegador)
+- Globals: habilitado (describe, it, expect disponibles globalmente)
+
+### Component Tests
+
+#### Ubicación
+- Archivos `*.test.tsx` junto al componente
+- Ejemplo: `ExamplePage.tsx` → `ExamplePage.test.tsx`
+
+#### Estructura
+```typescript
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
+import { TestWrapper } from '../test-utils';
+import { ExamplePage } from './ExamplePage';
+import { apiClient } from '../api/client';
+
+// Mock del cliente API
+vi.mock('../api/client', () => ({
+  apiClient: {
+    get: vi.fn(),
+    post: vi.fn(),
+  },
+}));
+
+describe('ExamplePage', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should render examples list', async () => {
+    // Arrange
+    const mockData = [
+      { id: '1', name: 'Example 1' },
+      { id: '2', name: 'Example 2' },
+    ];
+
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockData });
+
+    // Act
+    render(
+      <TestWrapper>
+        <ExamplePage />
+      </TestWrapper>
+    );
+
+    // Assert
+    await waitFor(() => {
+      expect(screen.getByText('Example 1')).toBeInTheDocument();
+      expect(screen.getByText('Example 2')).toBeInTheDocument();
+    });
+  });
+
+  it('should show loading state', () => {
+    // Arrange
+    vi.mocked(apiClient.get).mockImplementation(
+      () => new Promise(() => {}) // Promise que nunca resuelve
+    );
+
+    // Act
+    render(
+      <TestWrapper>
+        <ExamplePage />
+      </TestWrapper>
+    );
+
+    // Assert
+    expect(screen.getByText(/loading/i)).toBeInTheDocument();
+  });
+});
+```
+
+#### Reglas para Component Tests
+- **Test Wrapper**: Usar `TestWrapper` para componentes que necesitan providers
+- **Mock API**: Mockear llamadas API con Vitest mocks
+- **Async**: Usar `waitFor` para operaciones asíncronas
+- **Accessible Queries**: Preferir `getByRole`, `getByLabelText` sobre `getByText`
+- **User Interactions**: Usar `@testing-library/user-event` para interacciones
+
+### Test Wrapper
+```typescript
+// test-utils.tsx
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { BrowserRouter } from 'react-router-dom';
+import { ReactNode } from 'react';
+
+export const TestWrapper: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },  // No retry en tests
+      mutations: { retry: false },
+    },
+  });
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        {children}
+      </BrowserRouter>
+    </QueryClientProvider>
+  );
+};
+```
+
+### Hook Tests
+```typescript
+import { renderHook, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useExampleQuery } from './useExampleQuery';
+
+describe('useExampleQuery', () => {
+  it('should fetch data', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={queryClient}>
+        {children}
+      </QueryClientProvider>
+    );
+
+    const { result } = renderHook(() => useExampleQuery('company-123'), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    expect(result.current.data).toBeDefined();
+  });
+});
+```
+
+## Coverage
+
+### Backend Coverage
+- Threshold: 70% (branches, functions, lines, statements)
+- Excluye: `*.spec.ts`, `*.interface.ts`, `*.dto.ts`, `*.entity.ts`, `main.ts`, `migrations/`
+- Reportes: text, lcov, html, json-summary
+
+### Frontend Coverage
+- Threshold: 60% para componentes críticos
+- Configuración en `vitest.config.ts`
+
+### Ver Coverage
+```bash
+# Backend
+pnpm --filter financial-win-api test:cov
+
+# Frontend
+pnpm --filter financial-win-web test:cov
+```
+
+## Mejores Prácticas
+
+### General
+1. **Arrange-Act-Assert**: Estructura clara
+2. **Descriptive Names**: Nombres que explican qué se prueba
+3. **One Assertion**: Un concepto por test (aunque múltiples expects están bien)
+4. **Fast Tests**: Unit tests deben ser rápidos
+5. **Independent**: Tests no deben depender de otros tests
+6. **No Flakiness**: Tests deben ser determinísticos
+
+### Backend
+1. **Mock Repositories**: Mockear repositorios en unit tests
+2. **Real DB for E2E**: Usar base de datos real para E2E
+3. **JWT Helpers**: Usar helpers para autenticación en tests
+4. **Cleanup**: Limpiar datos después de tests
+
+### Frontend
+1. **Test Wrapper**: Siempre usar TestWrapper cuando sea necesario
+2. **Mock API**: Mockear llamadas API
+3. **Accessibility**: Usar queries accesibles
+4. **Async Handling**: Manejar operaciones asíncronas apropiadamente
+
+### Coverage
+1. **Aim for 70%+**: Backend debe tener al menos 70%
+2. **Critical Paths**: 100% coverage en rutas críticas
+3. **Don't Obsess**: No buscar 100% en todo - enfocarse en código importante
+
+## Comandos
+
+```bash
+# Backend
+pnpm --filter financial-win-api test              # Unit tests
+pnpm --filter financial-win-api test:watch        # Watch mode
+pnpm --filter financial-win-api test:cov          # Coverage
+pnpm --filter financial-win-api test:e2e          # E2E tests
+pnpm --filter financial-win-api test:unit         # Solo unit tests
+pnpm --filter financial-win-api test:integration  # Solo integration tests
+
+# Frontend
+pnpm --filter financial-win-web test              # Tests
+pnpm --filter financial-win-web test:watch        # Watch mode
+pnpm --filter financial-win-web test:cov          # Coverage
+
+# Ambos
+pnpm test                                         # Todos los tests
+```

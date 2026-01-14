@@ -1,0 +1,52 @@
+# Development Dockerfile with hot-reload - robust & aligned with LTS stack
+FROM node:22-bullseye-slim
+
+# Working directory
+WORKDIR /app
+
+# Install procps for `ps` command (used por NestJS en watch / debug)
+RUN apt-get update && apt-get install -y procps && rm -rf /var/lib/apt/lists/*
+
+# Install pnpm (dev environment)
+RUN npm install -g pnpm
+
+# Explicitly mark this as a development image
+ENV NODE_ENV=development
+
+# Optional cache buster (útil si querés forzar reinstall de deps)
+ARG CACHE_BUST
+RUN echo "Cache bust: $CACHE_BUST"
+
+# Copy only manifests first to aprovechar cache de dependencias
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/api/package.json ./apps/api/
+COPY packages/shared-types/package.json ./packages/shared-types/
+COPY packages/shared-config/package.json ./packages/shared-config/
+
+# Install dependencies para todos los paquetes del workspace
+# En desarrollo, usar --no-frozen-lockfile para ser más permisivo si el lockfile está desactualizado
+RUN pnpm install --no-frozen-lockfile
+
+# Copiar el código de los paquetes compartidos primero
+COPY packages/shared-types ./packages/shared-types
+COPY packages/shared-config ./packages/shared-config
+
+# Construir los paquetes compartidos antes de copiar el resto del código
+RUN pnpm --filter @financial-win/shared-types build
+RUN pnpm --filter @financial-win/shared-config build
+
+# Copiar el resto del código
+COPY . .
+
+# Cambiar al directorio de la API
+WORKDIR /app/apps/api
+
+# Puerto de la API en dev
+EXPOSE 6000
+
+# Health check sencillo contra /health
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:6000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"
+
+# Arrancar NestJS en modo watch (hot-reload)
+CMD ["pnpm", "run", "start:dev"]

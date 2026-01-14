@@ -1,0 +1,1248 @@
+# Configuración de Cookies OIDC - Guía Completa
+
+## 📋 Tabla de Contenidos
+
+1. [Introducción](#introducción)
+2. [Variables de Configuración](#variables-de-configuración)
+3. [Explicación Detallada de Cada Variable](#explicación-detallada-de-cada-variable)
+4. [Configuración por Entorno](#configuración-por-entorno)
+5. [Seguridad de Cookies](#seguridad-de-cookies)
+6. [Troubleshooting](#troubleshooting)
+7. [Mejores Prácticas](#mejores-prácticas)
+8. [Ejemplos de Configuración](#ejemplos-de-configuración)
+
+---
+
+## Introducción
+
+Las cookies OIDC son el mecanismo principal para mantener la sesión del usuario autenticado en aplicaciones web. Este documento explica en detalle cada variable de configuración relacionada con cookies OIDC y cómo afectan el comportamiento y la seguridad de la aplicación.
+
+### ¿Qué son las Cookies OIDC?
+
+Las cookies OIDC almacenan el token JWT de sesión del usuario después de completar el flujo de autenticación. Este token contiene información del usuario (sub, email, name, company_id) y los tokens OIDC (id_token, access_token, refresh_token).
+
+### Flujo de Uso
+
+```
+Usuario inicia sesión
+    ↓
+Backend recibe tokens OIDC
+    ↓
+Backend crea token JWT interno
+    ↓
+Backend establece cookie con token JWT
+    ↓
+Navegador almacena cookie
+    ↓
+Navegador envía cookie en cada request
+    ↓
+Backend valida cookie y extrae información del usuario
+```
+
+---
+
+## Variables de Configuración
+
+### Resumen Rápido
+
+| Variable | Tipo | Default | Descripción |
+|----------|------|---------|-------------|
+| `OIDC_COOKIE_NAME` | String | `oauth_session` | Nombre de la cookie |
+| `OIDC_COOKIE_SECURE` | Boolean | `false` | Solo HTTPS |
+| `OIDC_COOKIE_SAME_SITE` | Enum | `lax` | Política SameSite |
+| `OIDC_COOKIE_MAX_AGE` | Number (ms) | `604800000` | Tiempo de vida (7 días) |
+| `OIDC_TOKEN_REFRESH_WINDOW` | Number (ms) | `1800000` | Ventana de renovación (30 min) |
+| `OIDC_COOKIE_DOMAIN` | String | `""` | Dominio de la cookie |
+| `OIDC_COOKIE_PATH` | String | `"/"` | Ruta de la cookie |
+
+---
+
+## Explicación Detallada de Cada Variable
+
+### 1. `OIDC_COOKIE_NAME`
+
+**Variable:** `OIDC_COOKIE_NAME`  
+**Tipo:** String  
+**Valor por Defecto:** `oauth_session`  
+**Requerido:** Sí
+
+#### ¿Qué es?
+
+El nombre de la cookie que almacena el token JWT de sesión del usuario autenticado.
+
+#### ¿Cómo se usa?
+
+```typescript
+// En auth.controller.ts
+res.cookie(this.oidcConfig.cookieName, sessionToken, cookieOptions);
+// Crea una cookie con el nombre especificado
+```
+
+#### Ejemplo Práctico
+
+**Configuración:**
+```bash
+OIDC_COOKIE_NAME=oauth_session
+```
+
+**Cookie Creada:**
+```http
+Set-Cookie: oauth_session=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+**Request del Navegador:**
+```http
+Cookie: oauth_session=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+#### Lectura de la Cookie
+
+```typescript
+// En el backend
+const token = req.cookies[this.oidcConfig.cookieName];
+// O
+const token = req.cookies['oauth_session'];
+```
+
+#### Recomendaciones
+
+- ✅ Usa nombres descriptivos pero no obvios
+- ✅ Evita nombres genéricos como `token`, `session`, `auth`
+- ✅ Mantén consistencia entre desarrollo y producción
+- ❌ No uses nombres que revelen información sensible
+- ❌ No uses caracteres especiales o espacios
+
+#### Ejemplos de Nombres
+
+| Nombre | ¿Recomendado? | Razón |
+|--------|---------------|-------|
+| `oauth_session` | ✅ Sí | Descriptivo y específico |
+| `app_session` | ✅ Sí | Genérico pero aceptable |
+| `token` | ❌ No | Demasiado genérico |
+| `user_auth_token` | ✅ Sí | Descriptivo |
+| `session` | ❌ No | Demasiado genérico |
+| `jwt_token` | ⚠️ Parcial | Revela tipo de token |
+
+---
+
+### 2. `OIDC_COOKIE_SECURE`
+
+**Variable:** `OIDC_COOKIE_SECURE`  
+**Tipo:** Boolean  
+**Valor por Defecto:** `false`  
+**Requerido:** Sí
+
+#### ¿Qué es?
+
+Controla si la cookie solo se envía sobre conexiones HTTPS. Es una medida de seguridad crítica que previene el robo de cookies en conexiones HTTP no encriptadas.
+
+#### Valores Posibles
+
+- `false`: Cookie se envía sobre HTTP y HTTPS
+- `true`: Cookie solo se envía sobre HTTPS
+
+#### ¿Cómo se usa?
+
+```typescript
+// En buildCookieOptions()
+cookieOptions.secure = this.oidcConfig.cookieSecure;
+// Si es true, el navegador solo envía la cookie si la conexión es HTTPS
+```
+
+#### Comportamiento Detallado
+
+**Con `secure: false` (Desarrollo):**
+
+```
+✅ Funciona en:
+   - http://localhost:5008
+   - http://127.0.0.1:5008
+   - http://api.localhost
+
+❌ Riesgos:
+   - Cookie puede ser interceptada en HTTP
+   - Vulnerable a ataques man-in-the-middle
+   - No recomendado para producción
+```
+
+**Con `secure: true` (Producción):**
+
+```
+✅ Funciona en:
+   - https://api.tudominio.com
+   - https://app.tudominio.com
+
+❌ NO funciona en:
+   - http://api.tudominio.com (navegador bloquea)
+   - http://localhost:5008 (navegador bloquea)
+```
+
+#### Seguridad
+
+**¿Por qué es importante?**
+
+1. **Protección contra Interceptación:**
+   - En HTTP, las cookies pueden ser leídas por atacantes en la red
+   - En HTTPS, las cookies están encriptadas en tránsito
+
+2. **Prevención de Ataques:**
+   - Man-in-the-Middle (MITM)
+   - Eavesdropping (escucha pasiva)
+   - Cookie theft (robo de cookies)
+
+#### Configuración Recomendada
+
+**Desarrollo:**
+```bash
+OIDC_COOKIE_SECURE=false
+```
+- Permite desarrollo local sin HTTPS
+- Facilita debugging
+- No requiere certificados SSL
+
+**Producción:**
+```bash
+OIDC_COOKIE_SECURE=true
+```
+- ⚠️ **CRÍTICO:** Siempre `true` en producción
+- Requiere HTTPS configurado
+- Protege contra interceptación
+
+#### Verificación
+
+**Cómo verificar que funciona:**
+
+```bash
+# En desarrollo (secure: false)
+curl -v http://localhost:5008/auth/login
+# Cookie se envía en respuesta
+
+# En producción (secure: true)
+curl -v https://api.tudominio.com/auth/login
+# Cookie se envía en respuesta
+
+curl -v http://api.tudominio.com/auth/login
+# Cookie NO se envía (navegador bloquea)
+```
+
+#### Troubleshooting
+
+**Problema:** Cookie no se envía en producción
+
+**Causa:** `secure: true` pero conexión es HTTP
+
+**Solución:**
+1. Verificar que HTTPS está configurado
+2. Verificar que el certificado SSL es válido
+3. Verificar que el proxy reverso está configurado correctamente
+
+---
+
+### 3. `OIDC_COOKIE_SAME_SITE`
+
+**Variable:** `OIDC_COOKIE_SAME_SITE`  
+**Tipo:** Enum (`'strict'`, `'lax'`, `'none'`)  
+**Valor por Defecto:** `lax`  
+**Requerido:** Sí
+
+#### ¿Qué es?
+
+Controla cuándo el navegador envía la cookie en requests cross-site (entre diferentes dominios). Es una protección contra ataques CSRF (Cross-Site Request Forgery).
+
+#### Valores Posibles
+
+| Valor | Descripción | Uso |
+|-------|-------------|-----|
+| `strict` | Cookie solo en mismo sitio | Máxima seguridad |
+| `lax` | Cookie en navegación top-level | Recomendado para OIDC |
+| `none` | Cookie en todos los requests | Requiere `secure: true` |
+
+#### Comportamiento Detallado
+
+**Con `sameSite: 'strict'`:**
+
+```
+✅ Cookie se envía en:
+   - Navegación directa (usuario escribe URL)
+   - Links internos dentro del mismo sitio
+   - Formularios del mismo sitio
+
+❌ Cookie NO se envía en:
+   - Links desde otros sitios: <a href="https://app.com">Click</a>
+   - Formularios desde otros sitios
+   - Iframes de otros sitios
+   - Requests AJAX desde otros sitios
+```
+
+**Ejemplo:**
+```
+Usuario en: https://malicious.com
+Click en: <a href="https://app.com/dashboard">Dashboard</a>
+Resultado: Cookie NO se envía (protección CSRF)
+```
+
+**Con `sameSite: 'lax'` (Recomendado):**
+
+```
+✅ Cookie se envía en:
+   - Links desde otros sitios: <a href="https://app.com">Click</a>
+   - Navegación directa
+   - Links internos
+   - Formularios GET del mismo sitio
+
+❌ Cookie NO se envía en:
+   - Formularios POST desde otros sitios
+   - Iframes de otros sitios
+   - Requests AJAX desde otros sitios
+```
+
+**Ejemplo:**
+```
+Usuario en: https://malicious.com
+Click en: <a href="https://app.com/dashboard">Dashboard</a>
+Resultado: Cookie SÍ se envía (permite redirects OAuth)
+
+Usuario en: https://malicious.com
+Formulario POST a: https://app.com/api/delete
+Resultado: Cookie NO se envía (protección CSRF)
+```
+
+**Con `sameSite: 'none'`:**
+
+```
+✅ Cookie se envía en:
+   - Todos los requests cross-site
+   - Iframes
+   - Formularios desde otros sitios
+   - Requests AJAX desde otros sitios
+
+⚠️ REQUIERE: secure: true (HTTPS obligatorio)
+```
+
+#### ¿Por qué `lax` es Recomendado para OIDC?
+
+1. **Permite Redirects OAuth:**
+   - El flujo OIDC requiere redirects entre dominios
+   - `strict` bloquearía estos redirects
+   - `lax` permite redirects top-level
+
+2. **Protección CSRF:**
+   - Bloquea formularios POST maliciosos
+   - Permite navegación normal
+   - Balance entre seguridad y funcionalidad
+
+3. **Compatibilidad:**
+   - Funciona con la mayoría de navegadores
+   - No requiere configuración especial
+   - Comportamiento predecible
+
+#### Configuración Recomendada
+
+**Desarrollo:**
+```bash
+OIDC_COOKIE_SAME_SITE=lax
+```
+
+**Producción:**
+```bash
+OIDC_COOKIE_SAME_SITE=lax  # Recomendado
+# O
+OIDC_COOKIE_SAME_SITE=strict  # Si no necesitas redirects cross-site
+```
+
+**Si necesitas iframes o embeds:**
+```bash
+OIDC_COOKIE_SAME_SITE=none
+OIDC_COOKIE_SECURE=true  # ⚠️ OBLIGATORIO con 'none'
+```
+
+#### Comparación Visual
+
+```
+Escenario: Usuario en malicious.com hace click en link a app.com
+
+sameSite: strict
+  Link click → ❌ Cookie NO enviada → Usuario debe re-autenticarse
+
+sameSite: lax
+  Link click → ✅ Cookie SÍ enviada → Usuario autenticado automáticamente
+
+sameSite: none
+  Link click → ✅ Cookie SÍ enviada → Usuario autenticado automáticamente
+  (Requiere secure: true)
+```
+
+---
+
+### 4. `OIDC_COOKIE_MAX_AGE`
+
+**Variable:** `OIDC_COOKIE_MAX_AGE`  
+**Tipo:** Number (milisegundos)  
+**Valor por Defecto:** `604800000` (7 días)  
+**Requerido:** No (tiene default)
+
+#### ¿Qué es?
+
+Tiempo de vida de la cookie en milisegundos. Después de este tiempo, el navegador elimina automáticamente la cookie.
+
+#### Conversión de Tiempo
+
+| Milisegundos | Segundos | Minutos | Horas | Días |
+|--------------|----------|---------|-------|------|
+| `1800000` | 1800 | 30 | 0.5 | - |
+| `3600000` | 3600 | 60 | 1 | - |
+| `86400000` | 86400 | 1440 | 24 | 1 |
+| `604800000` | 604800 | 10080 | 168 | 7 |
+| `2592000000` | 2592000 | 43200 | 720 | 30 |
+
+#### ¿Cómo se usa?
+
+```typescript
+// En buildCookieOptions()
+cookieOptions.maxAge = this.oidcConfig.cookieMaxAge;
+// Después de este tiempo, el navegador elimina la cookie automáticamente
+```
+
+#### Comportamiento
+
+**Ejemplo con `maxAge: 604800000` (7 días):**
+
+```
+T=0:     Usuario inicia sesión, cookie creada
+T=1 día: Cookie aún válida
+T=3 días: Cookie aún válida
+T=7 días: Cookie expira, navegador la elimina
+T=7+ días: Cookie no existe, usuario debe re-autenticarse
+```
+
+#### Valores Recomendados
+
+**Desarrollo:**
+```bash
+OIDC_COOKIE_MAX_AGE=86400000  # 24 horas
+```
+- Sesiones más cortas para testing
+- Facilita limpieza de cookies
+
+**Producción:**
+```bash
+OIDC_COOKIE_MAX_AGE=604800000  # 7 días (recomendado)
+# O
+OIDC_COOKIE_MAX_AGE=2592000000  # 30 días (sesiones largas)
+```
+
+#### Relación con Refresh Token
+
+**Importante:** `maxAge` controla cuándo el navegador elimina la cookie, pero NO controla la validez del token JWT interno.
+
+**Con `offline_access` y refresh_token:**
+
+```
+T=0:     Usuario inicia sesión
+         Cookie creada (maxAge: 7 días)
+         Token JWT expira en 24 horas
+
+T=23h:   Token JWT próximo a expirar
+         Sistema renueva automáticamente
+         Nueva cookie creada (maxAge: 7 días más)
+
+T=7 días: Cookie expira (maxAge alcanzado)
+         Navegador elimina cookie
+         Usuario debe re-autenticarse
+```
+
+**Sin `offline_access`:**
+
+```
+T=0:     Usuario inicia sesión
+         Cookie creada (maxAge: 7 días)
+         Token JWT expira en 1 hora
+
+T=1h:    Token JWT expira
+         Cookie aún existe pero token inválido
+         Usuario debe re-autenticarse
+```
+
+#### Consideraciones
+
+1. **Seguridad vs UX:**
+   - Sesiones más cortas = más seguro pero peor UX
+   - Sesiones más largas = mejor UX pero menos seguro
+
+2. **Alineación con Refresh Token:**
+   - Si tienes `offline_access`, `maxAge` puede ser largo
+   - El refresh_token renueva la sesión automáticamente
+   - Sin `offline_access`, `maxAge` debe alinearse con expiración del token
+
+3. **Recomendación:**
+   - Con `offline_access`: 7-30 días
+   - Sin `offline_access`: 1-24 horas
+
+---
+
+### 5. `OIDC_TOKEN_REFRESH_WINDOW`
+
+**Variable:** `OIDC_TOKEN_REFRESH_WINDOW`  
+**Tipo:** Number (milisegundos)  
+**Valor por Defecto:** `1800000` (30 minutos)  
+**Requerido:** No (tiene default)
+
+#### ¿Qué es?
+
+Ventana de tiempo antes de la expiración del token para iniciar la renovación automática. El sistema renueva el token cuando quedan menos minutos que este valor antes de que expire.
+
+#### Conversión de Tiempo
+
+```
+1800000 ms = 1800 segundos = 30 minutos
+```
+
+#### ¿Cómo Funciona?
+
+```typescript
+// En auth.controller.ts - refresh endpoint
+const expiresAt = currentPayload.exp * 1000;
+const timeUntilExpiry = expiresAt - Date.now();
+const refreshWindow = this.oidcConfig.tokenRefreshWindow; // 30 minutos
+
+if (timeUntilExpiry > refreshWindow) {
+  // Token aún válido, no renovar
+  return res.json({ refreshed: false });
+}
+
+// Token próximo a expirar, renovar
+const tokenSet = await this.oidcService.refreshTokens(...);
+```
+
+#### Ejemplo Práctico
+
+**Escenario:**
+- `access_token` expira en: 1 hora (3600 segundos)
+- `OIDC_TOKEN_REFRESH_WINDOW`: 30 minutos (1800 segundos)
+
+**Timeline:**
+
+```
+T=0min:   Usuario inicia sesión
+          Token expira en 60 minutos
+          Refresh window: 30 minutos
+
+T=30min:  Token aún válido (quedan 30 minutos)
+          timeUntilExpiry (30min) = refreshWindow (30min)
+          ❌ NO renueva (aún no está dentro de la ventana)
+
+T=31min:  Token próximo a expirar (quedan 29 minutos)
+          timeUntilExpiry (29min) < refreshWindow (30min)
+          ✅ SÍ renueva automáticamente
+
+T=31min:  Nuevo token obtenido
+          Nuevo token expira en 60 minutos más
+          Nueva cookie creada
+
+T=61min:  Token próximo a expirar nuevamente
+          ✅ SÍ renueva automáticamente
+          ...continúa cada ~30 minutos...
+```
+
+#### Valores Recomendados
+
+| Valor (ms) | Tiempo | Uso |
+|------------|--------|-----|
+| `300000` | 5 minutos | Máxima seguridad, más requests |
+| `900000` | 15 minutos | Balance seguridad/rendimiento |
+| `1800000` | 30 minutos | Recomendado (default) |
+| `3600000` | 60 minutos | Menos requests, más riesgo |
+
+#### Consideraciones
+
+1. **Balance Seguridad/UX:**
+   - Ventana pequeña (5 min): Más seguro pero más requests
+   - Ventana grande (60 min): Menos requests pero riesgo de expiración
+
+2. **Alineación con Token Lifetime:**
+   - `refreshWindow` debe ser menor que `access_token_lifetime`
+   - Recomendado: 30-50% del tiempo de vida del token
+
+3. **Ejemplo de Cálculo:**
+   ```
+   access_token_lifetime = 3600 segundos (1 hora)
+   refreshWindow recomendado = 30% de 3600 = 1080 segundos (18 minutos)
+   Valor usado = 1800 segundos (30 minutos) ✅
+   ```
+
+#### Configuración Recomendada
+
+**Desarrollo:**
+```bash
+OIDC_TOKEN_REFRESH_WINDOW=1800000  # 30 minutos
+```
+
+**Producción:**
+```bash
+OIDC_TOKEN_REFRESH_WINDOW=1800000  # 30 minutos (recomendado)
+# O
+OIDC_TOKEN_REFRESH_WINDOW=900000   # 15 minutos (más seguro)
+```
+
+---
+
+### 6. `OIDC_COOKIE_DOMAIN`
+
+**Variable:** `OIDC_COOKIE_DOMAIN`  
+**Tipo:** String (opcional)  
+**Valor por Defecto:** `""` (vacío)  
+**Requerido:** No
+
+#### ¿Qué es?
+
+Dominio donde la cookie es válida. Si está vacío, la cookie solo es válida en el dominio exacto donde se creó (same-origin).
+
+#### Valores Posibles
+
+**Vacío (`""` o sin definir):**
+```
+Cookie válida solo en: api.tudominio.com
+❌ NO válida en: app.tudominio.com
+❌ NO válida en: www.tudominio.com
+❌ NO válida en: tudominio.com
+```
+
+**Con punto inicial (`.tudominio.com`):**
+```
+Cookie válida en:
+✅ api.tudominio.com
+✅ app.tudominio.com
+✅ www.tudominio.com
+✅ cualquier-subdominio.tudominio.com
+✅ tudominio.com
+
+❌ NO válida en: otro-dominio.com
+```
+
+**Sin punto inicial (`tudominio.com`):**
+```
+Cookie válida en:
+✅ tudominio.com
+✅ app.tudominio.com (si el punto se agrega automáticamente)
+
+⚠️ Comportamiento puede variar entre navegadores
+```
+
+#### ¿Cómo se usa?
+
+```typescript
+// En buildCookieOptions()
+if (this.oidcConfig.cookieDomain && 
+    this.oidcConfig.cookieDomain.trim() !== '') {
+  cookieOptions.domain = this.oidcConfig.cookieDomain;
+}
+// Si está vacío, no se establece domain (same-origin)
+```
+
+#### Ejemplos de Configuración
+
+**Desarrollo (localhost):**
+```bash
+OIDC_COOKIE_DOMAIN=  # Vacío - solo funciona en localhost:5008
+```
+
+**Producción (múltiples subdominios):**
+```bash
+OIDC_COOKIE_DOMAIN=.tudominio.com  # Funciona en todos los subdominios
+```
+
+**Producción (dominio específico):**
+```bash
+OIDC_COOKIE_DOMAIN=  # Vacío - solo funciona en api.tudominio.com
+```
+
+#### Reglas Importantes
+
+1. **Punto Inicial:**
+   - `.tudominio.com` → Válida en todos los subdominios
+   - `tudominio.com` → Comportamiento inconsistente
+
+2. **No puede ser TLD:**
+   - ❌ `.com` → No permitido
+   - ❌ `.org` → No permitido
+
+3. **Seguridad:**
+   - Dominio más amplio = menos seguro
+   - Solo usa dominio compartido si es necesario
+
+#### Casos de Uso
+
+**Caso 1: Aplicación Monolítica**
+```
+Backend: api.tudominio.com
+Frontend: app.tudominio.com
+
+Configuración:
+OIDC_COOKIE_DOMAIN=.tudominio.com
+
+Resultado:
+✅ Cookie compartida entre api y app
+✅ Usuario autenticado en ambos subdominios
+```
+
+**Caso 2: Aplicación Separada**
+```
+Backend: api.tudominio.com
+Frontend: app.otro-dominio.com
+
+Configuración:
+OIDC_COOKIE_DOMAIN=  # Vacío
+
+Resultado:
+✅ Cookie solo en api.tudominio.com
+✅ Frontend debe usar otro método (ej: token en URL)
+```
+
+**Caso 3: Desarrollo Local**
+```
+Backend: localhost:5008
+Frontend: localhost:3010
+
+Configuración:
+OIDC_COOKIE_DOMAIN=  # Vacío
+
+Resultado:
+✅ Cookie solo en localhost:5008
+⚠️ Frontend debe manejar token de otra forma
+```
+
+---
+
+### 7. `OIDC_COOKIE_PATH`
+
+**Variable:** `OIDC_COOKIE_PATH`  
+**Tipo:** String  
+**Valor por Defecto:** `"/"`  
+**Requerido:** No (tiene default)
+
+#### ¿Qué es?
+
+Ruta donde la cookie es válida dentro del dominio. Controla qué rutas del servidor pueden acceder a la cookie.
+
+#### Valores Posibles
+
+**`/` (raíz - recomendado):**
+```
+Cookie válida en:
+✅ https://api.com/
+✅ https://api.com/auth/login
+✅ https://api.com/api/users
+✅ https://api.com/cualquier/ruta
+✅ https://api.com/api/auth/callback
+```
+
+**`/api`:**
+```
+Cookie válida en:
+✅ https://api.com/api/users
+✅ https://api.com/api/auth/callback
+✅ https://api.com/api/cualquier/ruta
+
+❌ NO válida en:
+❌ https://api.com/auth/login
+❌ https://api.com/
+❌ https://api.com/health
+```
+
+**`/auth`:**
+```
+Cookie válida en:
+✅ https://api.com/auth/login
+✅ https://api.com/auth/callback
+✅ https://api.com/auth/logout
+
+❌ NO válida en:
+❌ https://api.com/api/users
+❌ https://api.com/
+```
+
+#### ¿Cómo se usa?
+
+```typescript
+// En buildCookieOptions()
+if (this.oidcConfig.cookiePath && process.env.NODE_ENV === 'production') {
+  cookieOptions.path = this.oidcConfig.cookiePath;
+} else {
+  cookieOptions.path = '/';  // Desarrollo: siempre raíz
+}
+```
+
+#### Comportamiento en Desarrollo vs Producción
+
+**Desarrollo:**
+- Siempre usa `path: '/'` independientemente de la configuración
+- Permite que la cookie funcione en todas las rutas
+- Facilita desarrollo y testing
+
+**Producción:**
+- Usa el valor configurado en `OIDC_COOKIE_PATH`
+- Permite restringir la cookie a rutas específicas
+- Útil para arquitecturas complejas
+
+#### Ejemplos de Configuración
+
+**Aplicación Simple (todas las rutas):**
+```bash
+OIDC_COOKIE_PATH=/
+```
+
+**API Separada:**
+```bash
+OIDC_COOKIE_PATH=/api
+```
+
+**Solo Rutas de Autenticación:**
+```bash
+OIDC_COOKIE_PATH=/auth
+```
+
+#### Recomendaciones
+
+1. **Para la mayoría de casos:**
+   ```bash
+   OIDC_COOKIE_PATH=/
+   ```
+   - Funciona en todas las rutas
+   - Más simple de configurar
+   - Menos problemas de compatibilidad
+
+2. **Si tienes rutas en `/auth` y `/api`:**
+   ```bash
+   OIDC_COOKIE_PATH=/
+   ```
+   - Necesitas la cookie en ambas rutas
+   - Usa raíz para máxima compatibilidad
+
+3. **Solo si necesitas restricción:**
+   ```bash
+   OIDC_COOKIE_PATH=/api
+   ```
+   - Útil si tienes múltiples aplicaciones en el mismo dominio
+   - Restringe la cookie a rutas específicas
+
+---
+
+## Configuración por Entorno
+
+### Desarrollo Local
+
+```bash
+# Configuración de Cookies OIDC
+OIDC_COOKIE_NAME=oauth_session
+OIDC_COOKIE_SECURE=false
+OIDC_COOKIE_SAME_SITE=lax
+OIDC_COOKIE_MAX_AGE=86400000
+OIDC_TOKEN_REFRESH_WINDOW=1800000
+OIDC_COOKIE_DOMAIN=
+OIDC_COOKIE_PATH=/
+```
+
+**Características:**
+- `secure: false` → Permite HTTP local
+- `sameSite: lax` → Permite redirects OAuth
+- `maxAge: 24h` → Sesiones cortas para testing
+- `domain: vacío` → Solo mismo origen
+- `path: /` → Todas las rutas
+
+### Producción
+
+```bash
+# Configuración de Cookies OIDC
+OIDC_COOKIE_NAME=oauth_session
+OIDC_COOKIE_SECURE=true
+OIDC_COOKIE_SAME_SITE=lax
+OIDC_COOKIE_MAX_AGE=604800000
+OIDC_TOKEN_REFRESH_WINDOW=1800000
+OIDC_COOKIE_DOMAIN=.tudominio.com
+OIDC_COOKIE_PATH=/
+```
+
+**Características:**
+- `secure: true` → ⚠️ Solo HTTPS
+- `sameSite: lax` → Balance seguridad/funcionalidad
+- `maxAge: 7 días` → Sesiones largas
+- `domain: .tudominio.com` → Compartida entre subdominios
+- `path: /` → Todas las rutas
+
+### Staging
+
+```bash
+# Configuración de Cookies OIDC
+OIDC_COOKIE_NAME=oauth_session
+OIDC_COOKIE_SECURE=true
+OIDC_COOKIE_SAME_SITE=lax
+OIDC_COOKIE_MAX_AGE=86400000
+OIDC_TOKEN_REFRESH_WINDOW=1800000
+OIDC_COOKIE_DOMAIN=.staging.tudominio.com
+OIDC_COOKIE_PATH=/
+```
+
+**Características:**
+- Similar a producción pero con dominio de staging
+- Sesiones más cortas para testing
+
+---
+
+## Seguridad de Cookies
+
+### Atributos de Seguridad
+
+Las cookies OIDC deben tener los siguientes atributos de seguridad:
+
+#### 1. HttpOnly
+
+**Siempre activado** (hardcoded en el código):
+```typescript
+cookieOptions.httpOnly = true;
+```
+
+**¿Por qué?**
+- Previene acceso desde JavaScript
+- Protege contra XSS (Cross-Site Scripting)
+- El token JWT no puede ser leído por scripts maliciosos
+
+#### 2. Secure
+
+**Configurado por:** `OIDC_COOKIE_SECURE`
+
+**¿Por qué?**
+- Solo envía cookie sobre HTTPS
+- Protege contra interceptación en la red
+- ⚠️ Crítico en producción
+
+#### 3. SameSite
+
+**Configurado por:** `OIDC_COOKIE_SAME_SITE`
+
+**¿Por qué?**
+- Protege contra CSRF (Cross-Site Request Forgery)
+- Controla cuándo se envía la cookie cross-site
+- Balance entre seguridad y funcionalidad
+
+### Cookie Completa (Ejemplo)
+
+Con la configuración recomendada, la cookie se ve así:
+
+```http
+Set-Cookie: oauth_session=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...; 
+            HttpOnly; 
+            Secure; 
+            SameSite=Lax; 
+            Max-Age=604800000; 
+            Domain=.tudominio.com; 
+            Path=/
+```
+
+**Desglose:**
+- `oauth_session`: Nombre de la cookie
+- `HttpOnly`: No accesible desde JavaScript
+- `Secure`: Solo HTTPS
+- `SameSite=Lax`: Política cross-site
+- `Max-Age=604800000`: 7 días
+- `Domain=.tudominio.com`: Todos los subdominios
+- `Path=/`: Todas las rutas
+
+### Amenazas y Protecciones
+
+| Amenaza | Protección | Variable Relacionada |
+|---------|------------|---------------------|
+| XSS (Cross-Site Scripting) | `HttpOnly` | Hardcoded |
+| Interceptación en red | `Secure` | `OIDC_COOKIE_SECURE` |
+| CSRF (Cross-Site Request Forgery) | `SameSite` | `OIDC_COOKIE_SAME_SITE` |
+| Cookie theft | `Secure` + `HttpOnly` | `OIDC_COOKIE_SECURE` |
+| Sesiones largas no deseadas | `Max-Age` | `OIDC_COOKIE_MAX_AGE` |
+| Acceso desde subdominios no autorizados | `Domain` | `OIDC_COOKIE_DOMAIN` |
+
+---
+
+## Troubleshooting
+
+### Problema 1: Cookie no se establece
+
+**Síntomas:**
+- Login exitoso pero cookie no aparece en navegador
+- Logs muestran "Set-Cookie header NOT present"
+
+**Causas Posibles:**
+
+1. **`secure: true` pero conexión es HTTP**
+   ```bash
+   # Verificar
+   OIDC_COOKIE_SECURE=true
+   # Pero conexión es: http://localhost:5008
+   ```
+
+2. **Dominio incorrecto**
+   ```bash
+   # Verificar
+   OIDC_COOKIE_DOMAIN=.tudominio.com
+   # Pero estás en: api.otro-dominio.com
+   ```
+
+3. **Path incorrecto**
+   ```bash
+   # Verificar
+   OIDC_COOKIE_PATH=/api
+   # Pero cookie se establece en: /auth/callback
+   ```
+
+**Solución:**
+1. Verificar configuración de `OIDC_COOKIE_SECURE`
+2. Verificar `OIDC_COOKIE_DOMAIN` coincide con el dominio actual
+3. Verificar `OIDC_COOKIE_PATH` incluye todas las rutas necesarias
+
+---
+
+### Problema 2: Cookie no se envía en requests
+
+**Síntomas:**
+- Cookie existe en navegador pero no se envía al backend
+- Requests fallan con 401 Unauthorized
+
+**Causas Posibles:**
+
+1. **`sameSite: strict` bloquea requests cross-site**
+   ```bash
+   # Verificar
+   OIDC_COOKIE_SAME_SITE=strict
+   # Request viene de otro dominio
+   ```
+
+2. **`secure: true` pero conexión es HTTP**
+   ```bash
+   # Verificar
+   OIDC_COOKIE_SECURE=true
+   # Request es: http://api.com
+   ```
+
+3. **Dominio no coincide**
+   ```bash
+   # Cookie creada en: api.tudominio.com
+   # Request desde: app.tudominio.com
+   # OIDC_COOKIE_DOMAIN no está configurado
+   ```
+
+**Solución:**
+1. Verificar `OIDC_COOKIE_SAME_SITE` (usar `lax` si necesitas cross-site)
+2. Verificar HTTPS está configurado si `secure: true`
+3. Configurar `OIDC_COOKIE_DOMAIN` si necesitas compartir entre subdominios
+
+---
+
+### Problema 3: Cookie expira muy rápido
+
+**Síntomas:**
+- Usuario se desconecta frecuentemente
+- Cookie desaparece antes de lo esperado
+
+**Causas Posibles:**
+
+1. **`maxAge` muy corto**
+   ```bash
+   # Verificar
+   OIDC_COOKIE_MAX_AGE=1800000  # Solo 30 minutos
+   ```
+
+2. **Navegador elimina cookies**
+   - Usuario tiene configuración de privacidad estricta
+   - Modo incógnito
+   - Extensión de navegador bloquea cookies
+
+**Solución:**
+1. Aumentar `OIDC_COOKIE_MAX_AGE` a valor apropiado
+2. Verificar configuración del navegador del usuario
+3. Considerar usar `offline_access` para renovación automática
+
+---
+
+### Problema 4: Renovación automática no funciona
+
+**Síntomas:**
+- Token expira pero no se renueva automáticamente
+- Usuario debe re-autenticarse manualmente
+
+**Causas Posibles:**
+
+1. **`refreshWindow` muy grande**
+   ```bash
+   # Verificar
+   OIDC_TOKEN_REFRESH_WINDOW=3600000  # 60 minutos
+   # Token expira en 60 minutos, nunca entra en ventana
+   ```
+
+2. **No hay `refresh_token` disponible**
+   - `offline_access` no está configurado
+   - Token JWT no contiene `refresh_token`
+
+**Solución:**
+1. Reducir `OIDC_TOKEN_REFRESH_WINDOW` a valor apropiado (30 minutos)
+2. Verificar que `offline_access` está configurado
+3. Verificar que el token JWT contiene `refresh_token`
+
+---
+
+## Mejores Prácticas
+
+### 1. Seguridad
+
+- ✅ **Siempre usa `secure: true` en producción**
+- ✅ **Usa `sameSite: lax` para OIDC**
+- ✅ **`HttpOnly` siempre activado** (ya implementado)
+- ✅ **`maxAge` alineado con necesidades de seguridad**
+- ❌ **Nunca uses `sameSite: none` sin `secure: true`**
+- ❌ **No uses dominios muy amplios innecesariamente**
+
+### 2. Configuración
+
+- ✅ **Mantén consistencia entre desarrollo y producción**
+- ✅ **Documenta cambios en configuración**
+- ✅ **Usa valores por defecto sensatos**
+- ✅ **Valida configuración al iniciar**
+- ❌ **No hardcodees valores sensibles**
+- ❌ **No uses configuración diferente sin documentar**
+
+### 3. Testing
+
+- ✅ **Prueba cookies en diferentes navegadores**
+- ✅ **Verifica comportamiento con HTTPS/HTTP**
+- ✅ **Prueba renovación automática**
+- ✅ **Verifica expiración de cookies**
+- ❌ **No asumas que funciona sin probar**
+
+### 4. Monitoreo
+
+- ✅ **Monitorea logs de cookies**
+- ✅ **Rastrea errores de autenticación**
+- ✅ **Mide tiempo de sesión promedio**
+- ✅ **Alertas por renovaciones fallidas**
+
+---
+
+## Ejemplos de Configuración
+
+### Ejemplo 1: Aplicación Simple (Monolítica)
+
+**Arquitectura:**
+- Backend y Frontend en mismo dominio
+- Desarrollo local con HTTP
+- Producción con HTTPS
+
+**Desarrollo:**
+```bash
+OIDC_COOKIE_NAME=oauth_session
+OIDC_COOKIE_SECURE=false
+OIDC_COOKIE_SAME_SITE=lax
+OIDC_COOKIE_MAX_AGE=86400000
+OIDC_TOKEN_REFRESH_WINDOW=1800000
+OIDC_COOKIE_DOMAIN=
+OIDC_COOKIE_PATH=/
+```
+
+**Producción:**
+```bash
+OIDC_COOKIE_NAME=oauth_session
+OIDC_COOKIE_SECURE=true
+OIDC_COOKIE_SAME_SITE=lax
+OIDC_COOKIE_MAX_AGE=604800000
+OIDC_TOKEN_REFRESH_WINDOW=1800000
+OIDC_COOKIE_DOMAIN=
+OIDC_COOKIE_PATH=/
+```
+
+---
+
+### Ejemplo 2: Aplicación con Subdominios
+
+**Arquitectura:**
+- Backend: `api.tudominio.com`
+- Frontend: `app.tudominio.com`
+- Admin: `admin.tudominio.com`
+
+**Producción:**
+```bash
+OIDC_COOKIE_NAME=oauth_session
+OIDC_COOKIE_SECURE=true
+OIDC_COOKIE_SAME_SITE=lax
+OIDC_COOKIE_MAX_AGE=604800000
+OIDC_TOKEN_REFRESH_WINDOW=1800000
+OIDC_COOKIE_DOMAIN=.tudominio.com
+OIDC_COOKIE_PATH=/
+```
+
+**Resultado:**
+- Cookie compartida entre todos los subdominios
+- Usuario autenticado en api, app y admin
+- Sesión única para toda la aplicación
+
+---
+
+### Ejemplo 3: Aplicación con Sesiones Cortas
+
+**Requisitos:**
+- Sesiones de máximo 1 hora
+- Renovación cada 15 minutos
+- Máxima seguridad
+
+**Configuración:**
+```bash
+OIDC_COOKIE_NAME=oauth_session
+OIDC_COOKIE_SECURE=true
+OIDC_COOKIE_SAME_SITE=strict
+OIDC_COOKIE_MAX_AGE=3600000
+OIDC_TOKEN_REFRESH_WINDOW=900000
+OIDC_COOKIE_DOMAIN=
+OIDC_COOKIE_PATH=/
+```
+
+**Características:**
+- `maxAge: 1 hora` → Sesiones cortas
+- `refreshWindow: 15 minutos` → Renovación frecuente
+- `sameSite: strict` → Máxima protección CSRF
+- `domain: vacío` → Solo mismo origen
+
+---
+
+### Ejemplo 4: Aplicación con Sesiones Largas
+
+**Requisitos:**
+- Sesiones de 30 días
+- Renovación automática con `offline_access`
+- Mejor experiencia de usuario
+
+**Configuración:**
+```bash
+OIDC_COOKIE_NAME=oauth_session
+OIDC_COOKIE_SECURE=true
+OIDC_COOKIE_SAME_SITE=lax
+OIDC_COOKIE_MAX_AGE=2592000000
+OIDC_TOKEN_REFRESH_WINDOW=1800000
+OIDC_COOKIE_DOMAIN=.tudominio.com
+OIDC_COOKIE_PATH=/
+```
+
+**Características:**
+- `maxAge: 30 días` → Sesiones largas
+- `refreshWindow: 30 minutos` → Renovación automática
+- `sameSite: lax` → Permite redirects OAuth
+- `domain: .tudominio.com` → Compartida entre subdominios
+- Requiere `offline_access` configurado
+
+---
+
+## Referencias
+
+- [MDN Web Docs - HTTP Cookies](https://developer.mozilla.org/en-US/docs/Web/HTTP/Cookies)
+- [OWASP - Secure Cookie Attributes](https://owasp.org/www-community/HttpOnly)
+- [SameSite Cookie Attribute](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Set-Cookie/SameSite)
+- [RFC 6265 - HTTP State Management Mechanism](https://tools.ietf.org/html/rfc6265)
+
+---
+
+**Última Actualización:** 2024-XX-XX  
+**Versión del Documento:** 1.0  
+**Autor:** Sistema de Documentación OIDC

@@ -1,0 +1,10 @@
+# Ejecutar auditorías de seguridad antes de commit
+echo "🔒 Ejecutando auditorías de seguridad multi-tenant..."
+
+# Solo ejecutar si hay cambios en controllers o services
+if git diff --cached --name-only | grep -E "(\.controller\.ts|\.service\.ts)$" > /dev/null; then
+  echo "📋 Cambios detectados en controllers o services, ejecutando auditorías..."
+  pnpm audit:security
+else
+  echo "ℹ️  No hay cambios en controllers o services, omitiendo auditorías."
+fi

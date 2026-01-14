@@ -1,0 +1,581 @@
+# 🧪 Guía de Testing Funcional - Sistema OIDC
+
+## 📋 Introducción
+
+Esta guía proporciona un paso a paso completo para testear toda la suite OIDC desde un punto de vista funcional. El sistema consta de varios módulos que deben probarse en orden, considerando que el **OIDC Server** actúa como el gatekeeper (guardián) que permite el acceso a los demás módulos.
+
+## 🏗️ Arquitectura del Sistema
+
+El sistema está compuesto por 4 componentes principales:
+
+1. **Provider OIDC** (Puerto 5009) - Servidor de autenticación y autorización
+2. **Backend API** (Puerto 4009) - API protegida que requiere autenticación OIDC
+3. **Frontend** (Puerto 3008) - Interfaz web que consume el backend
+4. **PostgreSQL Database** (Puerto 5437) - Base de datos del sistema
+
+### Flujo de Autenticación
+
+```
+Usuario → Frontend → Backend → Provider OIDC → Database
+         (3008)      (4009)     (5009)         (5437)
+```
+
+## ✅ Pre-requisitos
+
+Antes de comenzar el testing, asegúrate de que:
+
+- [ ] Todos los servicios están corriendo (usar `docker compose ps` o `make status`)
+- [ ] La base de datos está inicializada y las migraciones ejecutadas
+- [ ] Tienes acceso a un navegador web moderno
+- [ ] Tienes herramientas de línea de comandos (`curl`, `jq` - opcional)
+
+## 📝 Paso a Paso - Testing Funcional
+
+### 🔴 Fase 1: Verificación de Salud de Servicios
+
+**Objetivo**: Confirmar que todos los servicios están corriendo y responden correctamente.
+
+#### 1.1 Verificar Provider OIDC (Puerto 5009)
+
+```bash
+# Health check
+curl http://localhost:5009/health
+
+# Verificar metadata OIDC
+curl http://localhost:5009/.well-known/openid-configuration | jq
+```
+
+**Resultado Esperado**:
+
+- ✅ Health check retorna `{"status":"ok",...}`
+- ✅ Metadata OIDC muestra configuración completa del provider
+
+#### 1.2 Verificar Backend API (Puerto 4009)
+
+```bash
+# Health check
+curl http://localhost:4009/health
+
+# Info endpoint
+curl http://localhost:4009/api/info | jq
+```
+
+**Resultado Esperado**:
+
+- ✅ Health check retorna `{"status":"ok","service":"backend-api",...}`
+- ✅ Info endpoint muestra endpoints disponibles y configuración OIDC
+
+#### 1.3 Verificar Frontend (Puerto 3008)
+
+```bash
+# Verificar que el frontend está servido
+curl -I http://localhost:3008/
+```
+
+**Resultado Esperado**:
+
+- ✅ Retorna `200 OK` y contenido HTML
+
+#### 1.4 Verificar Base de Datos
+
+```bash
+# Verificar conexión (si tienes psql instalado)
+psql -h localhost -p 5437 -U oidc_user -d oidc_db -c "SELECT COUNT(*) FROM users;"
+```
+
+**Resultado Esperado**:
+
+- ✅ Conexión exitosa y consulta retorna número de usuarios
+
+---
+
+### 🟡 Fase 2: Testing del Admin Panel
+
+**Objetivo**: Verificar que el panel de administración funciona correctamente para gestionar usuarios, empresas y clientes OIDC.
+
+#### 2.1 Acceder al Admin Panel
+
+1. Abrir navegador: `http://localhost:5009/admin-panel/`
+2. Debería mostrarse la página de login del admin panel
+
+**Resultado Esperado**:
+
+- ✅ Se muestra formulario de login del admin panel
+- ✅ No hay errores en la consola del navegador
+
+#### 2.2 Login como Administrador
+
+**Usuarios Admin Predefinidos**:
+
+- `admin` / `admin123`
+- `superadmin` / `super123`
+
+**Pasos**:
+
+1. Ingresar credenciales de admin
+2. Click en "Iniciar Sesión"
+
+**Resultado Esperado**:
+
+- ✅ Login exitoso
+- ✅ Redirección al dashboard del admin panel
+- ✅ Menú de navegación visible (Usuarios, Empresas, Clientes, etc.)
+
+#### 2.3 Verificar Gestión de Usuarios
+
+1. Navegar a la sección "Usuarios"
+2. Verificar que se muestran usuarios de prueba:
+   - `alice@example.com` (Company: COMP-001)
+   - `bob@example.com` (Company: COMP-002)
+3. Probar crear un nuevo usuario de prueba (opcional)
+
+**Resultado Esperado**:
+
+- ✅ Lista de usuarios se carga correctamente
+- ✅ Usuarios predefinidos están visibles
+- ✅ Puedes ver detalles de cada usuario
+
+#### 2.4 Verificar Gestión de Empresas
+
+1. Navegar a la sección "Empresas"
+2. Verificar que se muestran empresas:
+   - COMP-001
+   - COMP-002
+3. Verificar detalles de cada empresa
+
+**Resultado Esperado**:
+
+- ✅ Lista de empresas se carga correctamente
+- ✅ Empresas predefinidas están visibles
+
+#### 2.5 Verificar Gestión de Clientes OIDC
+
+1. Navegar a la sección "Clientes"
+2. Verificar que existe al menos un cliente OIDC configurado
+3. Verificar que el cliente tiene:
+   - `client_id` configurado
+   - `client_secret` configurado
+   - `redirect_uris` correctos
+   - `frontend_url` configurado
+
+**Resultado Esperado**:
+
+- ✅ Lista de clientes se carga correctamente
+- ✅ Cliente(s) predefinido(s) están visibles
+- ✅ Configuración del cliente es correcta
+
+---
+
+### 🟢 Fase 3: Testing del Flujo de Autenticación OIDC Completo
+
+**Objetivo**: Verificar que el flujo completo de autenticación funciona end-to-end desde el frontend hasta el provider y de vuelta.
+
+#### 3.1 Acceso Inicial al Frontend (Sin Autenticación)
+
+1. Abrir navegador en modo incógnito (para no tener cookies previas)
+2. Navegar a: `http://localhost:3008/`
+3. Observar el comportamiento
+
+**Resultado Esperado**:
+
+- ✅ Frontend carga correctamente
+- ✅ Muestra estado "Verificando autenticación..."
+- ✅ Después de 5 segundos, redirige automáticamente a: `http://localhost:4009/auth/login`
+
+#### 3.2 Flujo de Login - Paso a Paso
+
+**Paso 1: Redirección al Backend**
+
+- El frontend redirige a: `http://localhost:4009/auth/login`
+- El backend inicia el flujo OIDC
+
+**Paso 2: Redirección al Provider**
+
+- El backend redirige al provider a: `http://localhost:5009/auth?...`
+- El provider muestra el formulario de login
+
+**Paso 3: Ingresar Credenciales**
+
+Usuarios de Prueba:
+
+- **Usuario 1**: `alice@example.com` / `password123`
+- **Usuario 2**: `bob@example.com` / `password456`
+
+**Pasos**:
+
+1. En el formulario de login del provider, ingresar:
+   - Email: `alice@example.com`
+   - Password: `password123`
+2. Click en "Iniciar Sesión"
+
+**Resultado Esperado**:
+
+- ✅ Formulario de login se muestra correctamente
+- ✅ Al ingresar credenciales correctas, no hay errores
+- ✅ Redirección automática después del login
+
+#### 3.3 Verificar Callback OIDC
+
+**Flujo Automático después del Login**:
+
+1. Provider valida credenciales
+2. Provider genera tokens OIDC
+3. Provider redirige a: `http://localhost:4009/auth/callback?code=...&state=...`
+4. Backend intercambia `code` por tokens
+5. Backend crea sesión
+6. Backend redirige a: `http://localhost:3008/`
+
+**Resultado Esperado**:
+
+- ✅ Todo el flujo ocurre automáticamente
+- ✅ Llegas al frontend autenticado
+- ✅ No hay errores en consola del navegador
+
+#### 3.4 Verificar Información del Usuario en Frontend
+
+Una vez autenticado y en el frontend, deberías ver:
+
+**Información Mostrada**:
+
+- ✅ Nombre del usuario: "Alice User" (o el nombre configurado)
+- ✅ Email: "alice@example.com"
+- ✅ Company ID: "COMP-001" (o nombre de la empresa si está configurado)
+- ✅ Login Time: Timestamp de cuando se autenticó
+
+**Botones Disponibles**:
+
+- ✅ "🚪 Cerrar Sesión" (logout)
+- ✅ "🔄 Actualizar" (refresh)
+
+**Resultado Esperado**:
+
+- ✅ Toda la información del usuario se muestra correctamente
+- ✅ Los datos coinciden con lo configurado en la base de datos
+
+---
+
+### 🔵 Fase 4: Testing de API del Backend
+
+**Objetivo**: Verificar que los endpoints de la API funcionan correctamente con autenticación.
+
+#### 4.1 Verificar Endpoint `/api/me` (Sin Autenticación)
+
+```bash
+# Intentar acceder sin cookies/autenticación
+curl -v http://localhost:4009/api/me
+```
+
+**Resultado Esperado**:
+
+- ✅ Retorna `401 Unauthorized`
+- ✅ Body contiene: `{"error":"not_authenticated",...}`
+- ✅ Incluye `login_url` en la respuesta
+
+#### 4.2 Verificar Endpoint `/api/me` (Con Autenticación)
+
+**Opción A: Usando Cookies del Navegador**
+
+1. Abrir las Developer Tools del navegador (F12)
+2. Ir a la pestaña "Application" o "Storage" → "Cookies"
+3. Copiar las cookies del dominio `localhost:4009`
+4. Usar `curl` con cookies:
+
+```bash
+# Guardar cookies del navegador en un archivo
+# Luego usar:
+curl -b cookies.txt http://localhost:4009/api/me | jq
+```
+
+**Opción B: Usando Sesión Activa del Navegador**
+
+1. Con el navegador autenticado, abrir la consola (F12)
+2. Ejecutar en la consola:
+
+```javascript
+fetch("http://localhost:4009/api/me", {
+  credentials: "include",
+})
+  .then((r) => r.json())
+  .then((data) => console.log(data));
+```
+
+**Resultado Esperado**:
+
+- ✅ Retorna `200 OK`
+- ✅ JSON con información del usuario:
+  ```json
+  {
+    "name": "Alice User",
+    "email": "alice@example.com",
+    "companyId": "COMP-001",
+    "companyName": "Company One",
+    "login_time": "2024-...",
+    "authenticated": true,
+    "response_time": "..."
+  }
+  ```
+
+---
+
+### 🟣 Fase 5: Testing de Logout
+
+**Objetivo**: Verificar que el proceso de logout funciona correctamente y limpia todas las sesiones.
+
+#### 5.1 Logout desde el Frontend
+
+1. Estar autenticado en el frontend (`http://localhost:3008/`)
+2. Click en el botón "🚪 Cerrar Sesión"
+3. Observar el flujo
+
+**Flujo Esperado**:
+
+1. Frontend hace request a: `GET http://localhost:4009/auth/logout`
+2. Backend limpia sesión
+3. Backend redirige al provider para logout completo: `http://localhost:5009/session/end?...`
+4. Provider invalida sesiones OIDC
+5. Redirección final al frontend o backend
+
+**Resultado Esperado**:
+
+- ✅ Logout se completa sin errores
+- ✅ Redirección funciona correctamente
+- ✅ Al intentar acceder nuevamente a `/api/me`, retorna `401`
+
+#### 5.2 Verificar que la Sesión se Limpió
+
+Después del logout:
+
+1. Intentar acceder a `http://localhost:3008/` nuevamente
+2. Verificar comportamiento
+
+**Resultado Esperado**:
+
+- ✅ Frontend detecta que no hay sesión
+- ✅ Redirige automáticamente al login después de 5 segundos
+
+---
+
+### 🟠 Fase 6: Testing de Múltiples Usuarios
+
+**Objetivo**: Verificar que diferentes usuarios pueden autenticarse y sus datos se muestran correctamente.
+
+#### 6.1 Login con Usuario 1 (Alice)
+
+1. Logout si hay sesión activa
+2. Login con: `alice@example.com` / `password123`
+3. Verificar información mostrada
+
+**Resultado Esperado**:
+
+- ✅ Información de Alice se muestra correctamente
+- ✅ Company ID: "COMP-001"
+
+#### 6.2 Logout y Login con Usuario 2 (Bob)
+
+1. Hacer logout
+2. Login con: `bob@example.com` / `password456`
+3. Verificar información mostrada
+
+**Resultado Esperado**:
+
+- ✅ Información de Bob se muestra correctamente
+- ✅ Company ID: "COMP-002"
+- ✅ Los datos son diferentes a los de Alice
+
+---
+
+### 🔵 Fase 7: Testing de Seguridad y Edge Cases
+
+**Objetivo**: Verificar comportamientos de seguridad y casos límite.
+
+#### 7.1 Credenciales Inválidas
+
+1. Intentar login con credenciales incorrectas:
+   - Email: `alice@example.com`
+   - Password: `wrongpassword`
+
+**Resultado Esperado**:
+
+- ✅ Provider muestra mensaje de error: "❌ Credenciales Inválidas"
+- ✅ No se crea sesión
+- ✅ No redirige al callback
+
+#### 7.2 Acceso Directo a Endpoints Protegidos
+
+```bash
+# Intentar acceder directamente a endpoints protegidos sin autenticación
+curl -v http://localhost:4009/auth/callback
+curl -v http://localhost:5009/interaction/some-uid
+```
+
+**Resultado Esperado**:
+
+- ✅ Endpoints protegidos retornan `401` o redirigen a login
+- ✅ No se puede acceder sin autenticación válida
+
+#### 7.3 Verificar Rate Limiting (si está implementado)
+
+1. Intentar múltiples logins fallidos con el mismo usuario
+2. Verificar comportamiento
+
+**Resultado Esperado**:
+
+- ✅ Sistema bloquea múltiples intentos fallidos (si está configurado)
+- ✅ Mensajes de error apropiados
+
+---
+
+### 🔴 Fase 8: Testing de Integración Completa
+
+**Objetivo**: Verificar que todos los componentes trabajan juntos correctamente en un flujo completo.
+
+#### 8.1 Flujo Completo End-to-End
+
+**Escenario**: Usuario nuevo llega al sistema y necesita autenticarse.
+
+**Pasos**:
+
+1. ✅ Acceso a frontend → Redirección a login
+2. ✅ Login exitoso → Redirección al frontend autenticado
+3. ✅ Verificación de información del usuario
+4. ✅ Uso del botón "Actualizar" para refrescar datos
+5. ✅ Acceso a API `/api/me` desde el navegador
+6. ✅ Logout exitoso
+7. ✅ Verificación de que no hay sesión activa
+
+**Resultado Esperado**:
+
+- ✅ Todo el flujo funciona sin errores
+- ✅ No hay mensajes de error en consola
+- ✅ Las redirecciones son correctas
+- ✅ Los datos se muestran correctamente en cada paso
+
+---
+
+## 📊 Checklist de Testing Completo
+
+Usa este checklist para asegurarte de que probaste todo:
+
+### Infraestructura
+
+- [ ] Provider OIDC responde en puerto 5009
+- [ ] Backend API responde en puerto 4009
+- [ ] Frontend responde en puerto 3008
+- [ ] Base de datos PostgreSQL responde en puerto 5437
+- [ ] Metadata OIDC es accesible
+
+### Admin Panel
+
+- [ ] Admin panel accesible en `/admin-panel/`
+- [ ] Login de admin funciona
+- [ ] Gestión de usuarios funciona
+- [ ] Gestión de empresas funciona
+- [ ] Gestión de clientes OIDC funciona
+
+### Autenticación OIDC
+
+- [ ] Frontend redirige a login cuando no hay sesión
+- [ ] Login con usuario válido funciona
+- [ ] Información del usuario se muestra correctamente
+- [ ] Diferentes usuarios muestran diferentes datos
+
+### API Backend
+
+- [ ] Endpoints protegidos requieren autenticación
+- [ ] `/api/me` retorna información correcta cuando autenticado
+- [ ] `/api/me` retorna 401 cuando no autenticado
+
+### Logout
+
+- [ ] Logout limpia sesión en backend
+- [ ] Logout invalida sesión en provider
+- [ ] Después de logout, requiere login nuevamente
+
+### Seguridad
+
+- [ ] Credenciales inválidas son rechazadas
+- [ ] Endpoints protegidos no son accesibles sin autenticación
+- [ ] Rate limiting funciona (si está configurado)
+
+---
+
+## 🐛 Troubleshooting Durante Testing
+
+### Problema: Frontend no redirige a login
+
+**Posibles Causas**:
+
+- Backend no está corriendo
+- Configuración incorrecta de `FRONTEND_URL` en backend
+- Problema de CORS
+
+**Solución**:
+
+1. Verificar que backend está corriendo: `curl http://localhost:4009/health`
+2. Verificar logs del backend: `docker compose logs backend`
+3. Verificar configuración en `backend/.env`
+
+### Problema: Login funciona pero redirección falla
+
+**Posibles Causas**:
+
+- `OIDC_CALLBACK_URL` mal configurado
+- `FRONTEND_URL` incorrecto
+- Problema con cookies/dominios
+
+**Solución**:
+
+1. Verificar `OIDC_CALLBACK_URL` en `backend/.env`
+2. Verificar `FRONTEND_URL` en `backend/.env`
+3. Verificar que los dominios coinciden entre servicios
+
+### Problema: `/api/me` retorna 401 aunque estoy autenticado
+
+**Posibles Causas**:
+
+- Cookies no se están enviando
+- Sesión expirada
+- Problema de dominio de cookies
+
+**Solución**:
+
+1. Verificar cookies en navegador (F12 → Application → Cookies)
+2. Verificar que cookies tienen el dominio correcto
+3. Verificar logs del backend para ver por qué se rechaza la sesión
+
+### Problema: Admin panel no carga usuarios/empresas/clientes
+
+**Posibles Causas**:
+
+- Base de datos no está inicializada
+- Migraciones no se ejecutaron
+- Problema de conexión a BD
+
+**Solución**:
+
+1. Verificar logs del provider: `docker compose logs provider`
+2. Verificar conexión a BD: `psql -h localhost -p 5437 -U oidc_user -d oidc_db`
+3. Verificar que migraciones se ejecutaron correctamente
+
+---
+
+## 🎯 Resumen
+
+Para testear completamente el sistema OIDC, debes:
+
+1. **Verificar servicios**: Todos los servicios deben estar corriendo y saludables
+2. **Probar Admin Panel**: Gestionar usuarios, empresas y clientes
+3. **Probar Flujo OIDC**: Login completo desde frontend hasta provider y de vuelta
+4. **Probar API**: Endpoints protegidos con y sin autenticación
+5. **Probar Logout**: Asegurarse de que limpia sesiones correctamente
+6. **Probar Múltiples Usuarios**: Verificar que diferentes usuarios funcionan
+7. **Probar Seguridad**: Verificar que endpoints protegidos lo están realmente
+
+El orden sugerido es el presentado arriba, pero puedes adaptarlo según tus necesidades específicas.
+
+---
+
+## 📚 Referencias
+
+- [README.md](../README.md) - Documentación general del proyecto
+- [Archivo de Configuración de Producción](19-DEPLOYMENT-PRODUCCION-SIN-DOCKER.mdc) - Guía para deployment sin Docker

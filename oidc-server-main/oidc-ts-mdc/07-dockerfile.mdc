@@ -1,0 +1,24 @@
+# Title
+Dockerfile (Node.js 22 LTS + TypeScript build)
+
+# File
+## Dockerfile
+```dockerfile
+FROM node:22
+
+WORKDIR /app
+
+COPY provider ./provider
+COPY backend ./backend
+COPY frontend ./frontend
+
+WORKDIR /app/provider
+RUN npm install && npm run build
+WORKDIR /app/backend
+RUN npm install && npm run build
+
+EXPOSE 4000 5000
+VOLUME ["/app/provider"]
+
+CMD sh -c "node /app/provider/dist/server.js & node /app/backend/dist/server.js"
+```

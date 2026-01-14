@@ -1,0 +1,546 @@
+# Title
+
+Configuración del Servidor OIDC y Creación de Clientes
+
+# Summary
+
+Este documento cubre la configuración inicial del servidor OIDC y, críticamente, la creación de un nuevo cliente OIDC para proteger un módulo/sistema. Incluye setup de base de datos, configuración de variables de entorno, acceso al admin panel, creación de empresas y usuarios, y el proceso completo de creación de clientes OIDC.
+
+**IMPORTANTE**: Este es el PRIMER PASO obligatorio antes de cualquier integración. Sin completar este documento, no podrás proteger ningún módulo.
+
+# Prerequisites
+
+Antes de comenzar, asegúrate de tener:
+
+- [ ] Servidor OIDC desplegado y accesible
+- [ ] Acceso a PostgreSQL (base de datos del OIDC server)
+- [ ] Credenciales de administrador del OIDC server
+- [ ] Conocimiento de la URL del OIDC Provider (ej: `https://auth.test.acceleralia.com`)
+- [ ] Conocimiento de la URL del sistema que vas a proteger (para configurar redirect_uris)
+
+# TechnicalDetails
+
+## Paso 1: Verificar Configuración del Provider
+
+El servidor OIDC provider requiere estas variables de entorno:
+
+### Variables Obligatorias
+
+```bash
+PROVIDER_URL=https://auth.test.acceleralia.com
+DATABASE_URL=postgresql://user:password@host:port/database
+NODE_ENV=production
+```
+
+**Explicación**:
+
+- `PROVIDER_URL`: URL pública del OIDC Provider (usado para metadata OIDC y redirects)
+- `DATABASE_URL`: Connection string de PostgreSQL
+- `NODE_ENV`: Ambiente de ejecución (`production` o `development`)
+
+### Verificación Rápida
+
+Verifica que el provider está funcionando:
+
+```bash
+curl https://auth.test.acceleralia.com/.well-known/openid-configuration
+```
+
+Deberías recibir un JSON con la configuración OIDC.
+
+## Paso 2: Acceso al Admin Panel
+
+### URL del Admin Panel
+
+```
+https://auth.test.acceleralia.com/admin-panel/
+```
+
+### Login de Administrador
+
+1. Navega a la URL del admin panel
+2. Ingresa tus credenciales de administrador
+3. Verifica que puedas ver el dashboard con las siguientes pestañas:
+   - Companies
+   - OIDC Clients
+   - Users
+   - Access Control
+   - Audit Logs
+   - Statistics
+
+**Si no tienes credenciales de administrador**, contacta al administrador del sistema para obtener acceso.
+
+## Paso 3: Crear Empresa (Company)
+
+Antes de crear usuarios, necesitas crear una empresa. Las empresas agrupan usuarios y permiten control granular de acceso a clientes OIDC.
+
+### Desde el Admin Panel
+
+1. Ve a la pestaña **"Companies"**
+2. Haz clic en **"Add Company"**
+3. Completa el formulario:
+   - **Company Name**: Nombre descriptivo (ej: "Acme Corporation")
+   - **Active**: Debe estar marcado
+   - **Company ID**: Se genera automáticamente (formato numérico: `1`, `2`, `3`, etc.)
+4. Haz clic en **"Save Company"**
+
+**Nota**: El `company_id` se genera automáticamente. No necesitas proporcionarlo manualmente.
+
+### Desde API (Programático)
+
+```bash
+curl -X POST https://auth.test.acceleralia.com/admin/companies \
+  -H "Content-Type: application/json" \
+  -H "Cookie: admin_session=YOUR_SESSION_TOKEN" \
+  -d '{
+    "company_name": "Acme Corporation",
+    "is_active": true
+  }'
+```
+
+**Respuesta esperada**:
+
+```json
+{
+  "id": 1,
+  "company_id": "1",
+  "company_name": "Acme Corporation",
+  "is_active": true,
+  "created_at": "2024-01-15T10:00:00Z",
+  "updated_at": "2024-01-15T10:00:00Z"
+}
+```
+
+**Importante**: Guarda el `company_id` (ej: `"1"`). Lo necesitarás para crear usuarios y para el grant de acceso.
+
+## Paso 4: Crear Usuarios
+
+Una vez creada la empresa, puedes crear usuarios que pertenezcan a esa empresa.
+
+### Desde el Admin Panel
+
+1. Ve a la pestaña **"Companies"**
+2. Expande la empresa donde quieres agregar usuarios (click en el ícono ▶)
+3. Haz clic en **"Add User"** en la fila de la empresa
+4. Completa el formulario:
+   - **Email**: Email del usuario (ej: `user@example.com`)
+   - **Full Name**: Nombre completo (ej: `John Doe`)
+   - **Password**: Mínimo 8 caracteres, debe incluir:
+     - Al menos una mayúscula
+     - Al menos una minúscula
+     - Al menos un dígito
+     - Al menos un símbolo especial
+   - **Confirm Password**: Debe coincidir con Password
+   - **Company**: Selecciona la empresa creada anteriormente
+   - **Active**: Debe estar marcado
+5. Haz clic en **"Save User"**
+
+**Validaciones de Password (ENS - Esquema Nacional de Seguridad)**:
+
+- Mínimo 8 caracteres
+- Al menos una letra mayúscula (A-Z)
+- Al menos una letra minúscula (a-z)
+- Al menos un dígito (0-9)
+- Al menos un símbolo especial (!@#$%^&\*(),.?":{}|<>\_-+=[]\/;'`~)
+
+### Desde API (Programático)
+
+```bash
+curl -X POST https://auth.test.acceleralia.com/admin/users \
+  -H "Content-Type: application/json" \
+  -H "Cookie: admin_session=YOUR_SESSION_TOKEN" \
+  -d '{
+    "email": "user@example.com",
+    "name": "John Doe",
+    "password": "SecureP@ss123",
+    "company_id": 1
+  }'
+```
+
+**Nota**: `company_id` debe ser el ID numérico de la empresa (ej: `1`, no `"1"` como string).
+
+## Paso 5: [CRÍTICO] Crear Cliente OIDC
+
+Este es el paso MÁS IMPORTANTE. Cada módulo/sistema que quieres proteger necesita su propio cliente OIDC.
+
+### ¿Qué es un Cliente OIDC?
+
+Un cliente OIDC es la representación del sistema/módulo en el servidor OIDC. Define:
+
+- Cómo el sistema se autentica con el provider
+- Dónde redirigir después del login
+- Qué permisos tiene
+
+### Campos Requeridos
+
+| Campo                        | Descripción                             | Ejemplo                                                | Validación                                   |
+| ---------------------------- | --------------------------------------- | ------------------------------------------------------ | -------------------------------------------- |
+| `client_id`                  | Identificador único del cliente         | `write-mvp-api`                                        | Alphanumeric, underscores, hyphens           |
+| `client_name`                | Nombre descriptivo                      | `Write MVP API`                                        | 1-255 caracteres                             |
+| `client_secret`              | Secreto para autenticar el cliente      | `MySecureSecret123!`                                   | Mínimo 8 caracteres                          |
+| `redirect_uris`              | URLs donde redirigir después del login  | `https://write.test.acceleralia.com/api/auth/callback` | Debe ser URL válida                          |
+| `post_logout_redirect_uris`  | URLs donde redirigir después del logout | `https://write.test.acceleralia.com`                   | Opcional, URL válida                         |
+| `grant_types`                | Tipos de grant permitidos               | `authorization_code`                                   | Default: `authorization_code`                |
+| `token_endpoint_auth_method` | Método de autenticación                 | `client_secret_post`                                   | `client_secret_post` o `client_secret_basic` |
+| `frontend_url`               | URL del frontend (para logout)          | `https://write.test.acceleralia.com`                   | Opcional                                     |
+| `is_active`                  | Si el cliente está activo               | `true`                                                 | Boolean                                      |
+
+### Crear Cliente desde el Admin Panel
+
+1. Ve a la pestaña **"OIDC Clients"**
+2. Haz clic en **"Add Client"**
+3. Completa TODOS los campos requeridos:
+
+   **Client ID** (ej: `write-mvp-api`)
+   - Debe ser único
+   - Solo alfanumérico, guiones bajos y guiones
+   - Ejemplos válidos: `write-mvp-api`, `crm-system`, `dashboard_app`
+   - Ejemplos inválidos: `write.mvp` (punto no permitido), `Write MVP` (espacios no permitidos)
+
+   **Client Name** (ej: `Write MVP API`)
+   - Nombre descriptivo para identificar el sistema
+
+   **Client Secret** (ej: `MySecureSecret123!`)
+   - Mínimo 8 caracteres
+   - **IMPORTANTE**: Guarda este secreto de forma segura. Lo necesitarás para configurar el sistema protegido.
+
+   **Redirect URIs** (ej: `https://write.test.acceleralia.com/api/auth/callback`)
+   - Puedes ingresar múltiples URIs (una por línea o separadas por comas)
+   - Cada URI debe ser una URL válida (https://...)
+   - Esta es la URL donde el OIDC Provider redirigirá después del login exitoso
+   - **CRÍTICO**: Debe coincidir exactamente con la URL configurada en tu sistema protegido
+
+   **Post Logout Redirect URIs** (opcional)
+   - URL donde redirigir después del logout
+   - Puedes dejar vacío si no necesitas logout específico
+
+   **Grant Types** (default: `authorization_code`)
+   - Para la mayoría de casos, deja el valor por defecto
+
+   **Token Endpoint Auth Method** (default: `client_secret_post`)
+   - `client_secret_post`: El secreto se envía en el body del POST
+   - `client_secret_basic`: El secreto se envía en el header Authorization (Basic auth)
+   - Recomendado: `client_secret_post` (más simple)
+
+   **Frontend URL** (opcional)
+   - URL del frontend asociado (si aplica)
+   - Usado para redirecciones de logout
+
+   **Active**: Debe estar marcado
+
+4. Haz clic en **"Save Client"**
+
+### Ejemplo Completo de Configuración
+
+Para un sistema llamado "Write MVP" con:
+
+- Backend API en `https://write.test.acceleralia.com/api`
+- Frontend en `https://write.test.acceleralia.com`
+
+**Configuración del Cliente OIDC**:
+
+```
+Client ID: write-mvp-api
+Client Name: Write MVP API
+Client Secret: WriteMVP_Secret_2024!
+Redirect URIs:
+  https://write.test.acceleralia.com/api/auth/callback
+Post Logout Redirect URIs:
+  https://write.test.acceleralia.com
+Grant Types: authorization_code
+Token Endpoint Auth Method: client_secret_post
+Frontend URL: https://write.test.acceleralia.com
+Active: ✓
+```
+
+### Crear Cliente desde API (Programático)
+
+```bash
+curl -X POST https://auth.test.acceleralia.com/admin/clients \
+  -H "Content-Type: application/json" \
+  -H "Cookie: admin_session=YOUR_SESSION_TOKEN" \
+  -d '{
+    "client_id": "write-mvp-api",
+    "client_name": "Write MVP API",
+    "client_secret": "WriteMVP_Secret_2024!",
+    "redirect_uris": [
+      "https://write.test.acceleralia.com/api/auth/callback"
+    ],
+    "post_logout_redirect_uris": [
+      "https://write.test.acceleralia.com"
+    ],
+    "grant_types": "authorization_code",
+    "token_endpoint_auth_method": "client_secret_post",
+    "frontend_url": "https://write.test.acceleralia.com",
+    "is_active": true
+  }'
+```
+
+**Respuesta esperada**:
+
+```json
+{
+  "id": 1,
+  "client_id": "write-mvp-api",
+  "client_name": "Write MVP API",
+  "redirect_uris": ["https://write.test.acceleralia.com/api/auth/callback"],
+  "post_logout_redirect_uris": ["https://write.test.acceleralia.com"],
+  "grant_types": ["authorization_code"],
+  "token_endpoint_auth_method": "client_secret_post",
+  "frontend_url": "https://write.test.acceleralia.com",
+  "is_active": true,
+  "created_at": "2024-01-15T10:00:00Z"
+}
+```
+
+### Información Crítica para Guardar
+
+Después de crear el cliente, **DEBES guardar** esta información de forma segura:
+
+- ✅ `client_id`: `write-mvp-api`
+- ✅ `client_secret`: `WriteMVP_Secret_2024!` (guarda esto de forma segura, no se muestra de nuevo)
+- ✅ `redirect_uri`: `https://write.test.acceleralia.com/api/auth/callback`
+- ✅ `post_logout_redirect_uri`: `https://write.test.acceleralia.com`
+- ✅ `issuer_url`: `https://auth.test.acceleralia.com`
+
+Esta información la necesitarás en los siguientes pasos de integración.
+
+## Paso 6: Grant de Acceso Empresa-Cliente
+
+**IMPORTANTE**: Después de crear el cliente OIDC, debes otorgar acceso explícito a las empresas que pueden usar ese cliente.
+
+### ¿Por qué es necesario?
+
+El sistema OIDC tiene control granular: una empresa solo puede usar un cliente OIDC si se le ha otorgado acceso explícitamente. Esto permite que diferentes empresas tengan acceso a diferentes módulos.
+
+### Grant de Acceso desde el Admin Panel
+
+1. Ve a la pestaña **"Access Control"**
+2. Haz clic en **"Grant Access"**
+3. Selecciona:
+   - **Company**: La empresa que puede usar este cliente
+   - **Client**: El cliente OIDC creado anteriormente
+4. Haz clic en **"Grant Access"**
+
+### Grant de Acceso desde API (Programático)
+
+```bash
+curl -X POST https://auth.test.acceleralia.com/admin/access/company-client \
+  -H "Content-Type: application/json" \
+  -H "Cookie: admin_session=YOUR_SESSION_TOKEN" \
+  -d '{
+    "company_id": "1",
+    "client_id": "write-mvp-api"
+  }'
+```
+
+**Respuesta esperada**:
+
+```json
+{
+  "success": true,
+  "message": "Access granted successfully"
+}
+```
+
+**Nota**:
+
+- `company_id` debe ser el ID de la empresa (formato numérico string: `"1"`, `"2"`, etc.)
+- `client_id` debe ser el `client_id` del cliente OIDC (ej: `"write-mvp-api"`)
+
+### Verificar Acceso Otorgado
+
+En la pestaña **"Access Control"**, deberías ver una entrada mostrando:
+
+- Company Name y Company ID
+- Client Name y Client ID
+- Status: Active
+- Fecha de grant y quién lo otorgó
+
+# CodeExamples
+
+## Ejemplo Completo: Setup para Nuevo Módulo "CRM System"
+
+### 1. Crear Empresa
+
+```bash
+curl -X POST https://auth.test.acceleralia.com/admin/companies \
+  -H "Content-Type: application/json" \
+  -H "Cookie: admin_session=YOUR_SESSION_TOKEN" \
+  -d '{
+    "company_name": "Sales Company",
+    "is_active": true
+  }'
+```
+
+Respuesta: `{"company_id": "2", "company_name": "Sales Company", ...}`
+
+### 2. Crear Usuario para la Empresa
+
+```bash
+curl -X POST https://auth.test.acceleralia.com/admin/users \
+  -H "Content-Type: application/json" \
+  -H "Cookie: admin_session=YOUR_SESSION_TOKEN" \
+  -d '{
+    "email": "sales@example.com",
+    "name": "Sales Manager",
+    "password": "Sales2024!Secure",
+    "company_id": 2
+  }'
+```
+
+### 3. Crear Cliente OIDC
+
+```bash
+curl -X POST https://auth.test.acceleralia.com/admin/clients \
+  -H "Content-Type: application/json" \
+  -H "Cookie: admin_session=YOUR_SESSION_TOKEN" \
+  -d '{
+    "client_id": "crm-system",
+    "client_name": "CRM System API",
+    "client_secret": "CRM_Secret_2024!",
+    "redirect_uris": [
+      "https://crm.test.acceleralia.com/api/auth/callback"
+    ],
+    "post_logout_redirect_uris": [
+      "https://crm.test.acceleralia.com"
+    ],
+    "grant_types": "authorization_code",
+    "token_endpoint_auth_method": "client_secret_post",
+    "frontend_url": "https://crm.test.acceleralia.com",
+    "is_active": true
+  }'
+```
+
+### 4. Grant Acceso Empresa-Cliente
+
+```bash
+curl -X POST https://auth.test.acceleralia.com/admin/access/company-client \
+  -H "Content-Type: application/json" \
+  -H "Cookie: admin_session=YOUR_SESSION_TOKEN" \
+  -d '{
+    "company_id": "2",
+    "client_id": "crm-system"
+  }'
+```
+
+### 5. Información para Guardar
+
+```json
+{
+  "client_id": "crm-system",
+  "client_secret": "CRM_Secret_2024!",
+  "redirect_uri": "https://crm.test.acceleralia.com/api/auth/callback",
+  "post_logout_redirect_uri": "https://crm.test.acceleralia.com",
+  "issuer_url": "https://auth.test.acceleralia.com",
+  "company_id": "2"
+}
+```
+
+# Configuration
+
+## Checklist de Configuración Completa
+
+Usa este checklist para asegurarte de que completaste todos los pasos:
+
+- [ ] Servidor OIDC funcionando y accesible
+- [ ] Acceso al admin panel verificado
+- [ ] Empresa creada (company_id guardado)
+- [ ] Al menos un usuario creado para la empresa
+- [ ] Cliente OIDC creado con todos los campos requeridos
+- [ ] `client_id` y `client_secret` guardados de forma segura
+- [ ] `redirect_uris` configurados correctamente (deben coincidir con tu sistema)
+- [ ] Grant de acceso empresa-cliente realizado
+- [ ] Información del cliente guardada para uso en integración
+
+## Variables de Entorno del Cliente (para referencia futura)
+
+Una vez completada la integración, tu sistema protegido necesitará estas variables (documentadas en detalle en los documentos de integración):
+
+```
+OIDC_ISSUER_URL=https://auth.test.acceleralia.com
+OIDC_PUBLIC_URL=https://auth.test.acceleralia.com
+OIDC_CLIENT_ID=write-mvp-api
+OIDC_CLIENT_SECRET=WriteMVP_Secret_2024!
+OIDC_REDIRECT_URI=https://write.test.acceleralia.com/api/auth/callback
+OIDC_POST_LOGOUT_REDIRECT_URI=https://write.test.acceleralia.com
+OIDC_SCOPES=openid profile email
+```
+
+# Troubleshooting
+
+## Problema: "No puedo acceder al admin panel"
+
+**Causas posibles**:
+
+1. Credenciales incorrectas
+2. Servidor OIDC no está funcionando
+3. Problemas de red/firewall
+
+**Solución**:
+
+1. Verifica que el servidor OIDC esté funcionando: `curl https://auth.test.acceleralia.com/health`
+2. Verifica tus credenciales de administrador
+3. Contacta al administrador del sistema si no tienes credenciales
+
+## Problema: "Error al crear cliente: client_id already exists"
+
+**Causa**: El `client_id` ya está en uso.
+
+**Solución**: Usa un `client_id` diferente. Debe ser único en todo el sistema.
+
+## Problema: "Error al crear cliente: Invalid redirect URI format"
+
+**Causa**: Las `redirect_uris` no son URLs válidas.
+
+**Solución**:
+
+- Asegúrate de que sean URLs completas (ej: `https://example.com/callback`)
+- No uses URLs relativas (ej: `/callback`)
+- Cada URI debe ser válida (no contener espacios, caracteres especiales inválidos)
+
+## Problema: "Error al grant access: Company not found"
+
+**Causa**: El `company_id` proporcionado no existe.
+
+**Solución**:
+
+- Verifica que la empresa existe en la pestaña "Companies"
+- Usa el `company_id` exacto (formato numérico string: `"1"`, `"2"`, etc.)
+
+## Problema: "Error al grant access: Client not found"
+
+**Causa**: El `client_id` proporcionado no existe.
+
+**Solución**:
+
+- Verifica que el cliente existe en la pestaña "OIDC Clients"
+- Usa el `client_id` exacto (ej: `"write-mvp-api"`)
+
+## Problema: "Error al crear usuario: Password does not meet security requirements"
+
+**Causa**: El password no cumple con los requisitos ENS.
+
+**Solución**: Asegúrate de que el password tenga:
+
+- Mínimo 8 caracteres
+- Al menos una mayúscula (A-Z)
+- Al menos una minúscula (a-z)
+- Al menos un dígito (0-9)
+- Al menos un símbolo especial
+
+# NextSteps
+
+Una vez completado este documento, procede según el tipo de sistema que vas a proteger:
+
+- **Backend NestJS**: Continúa con `25-OIDC-BACKEND-NESTJS-INTEGRATION.mdc`
+- **Backend otro framework**: Continúa con `26-OIDC-BACKEND-OTHER-FRAMEWORKS.mdc`
+- **Frontend React**: Continúa con `27-OIDC-FRONTEND-REACT-INTEGRATION.mdc`
+- **Frontend Next.js**: Continúa con `28-OIDC-FRONTEND-NEXTJS-INTEGRATION.mdc`
+
+**IMPORTANTE**: Asegúrate de tener guardada toda la información del cliente OIDC antes de continuar, especialmente:
+
+- `client_id`
+- `client_secret`
+- `redirect_uri`
+- `issuer_url`

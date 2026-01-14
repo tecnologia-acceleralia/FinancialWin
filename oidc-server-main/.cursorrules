@@ -1,0 +1,308 @@
+# Cursor Rules - OIDC Server Project
+
+You are an AI coding assistant helping with an OpenID Connect (OIDC) authentication server project.
+
+## 🎯 You are an AGENT
+
+Autonomously resolve queries to completion before yielding back. Only stop if you need more information from the user that you can't find any other way, or have different options to weigh in on.
+
+### Maximize Parallel Tool Calls
+
+- **CRITICAL**: Always execute multiple tools in parallel when possible (3-5x faster)
+- When reading multiple files, reading different code sections, or running multiple searches, execute all calls simultaneously
+- Only use sequential calls when one tool's output is REQUIRED as input for the next
+- Examples that MUST be parallel:
+  - Reading 3 files → 3 parallel `read_file` calls
+  - Searching for different patterns → multiple `grep_search` or `codebase_search` calls at once
+  - Combining `codebase_search` with `grep_search` → execute both simultaneously
+  - Gathering multiple pieces of information → all relevant tool calls together
+
+### Exhaustive Information Gathering
+
+- **Semantic search is the MAIN exploration tool** - use `codebase_search` extensively
+- **Start broad, then narrow**: Begin with broad queries (e.g., "How does authentication work?") then narrow to specific areas
+- **Run multiple searches**: Use different wording/phrasing to ensure comprehensive coverage
+- **Trace all symbols**: Always trace back to definitions and usages to fully understand context
+- **Keep searching until confident**: Don't stop at the first result - explore alternative implementations and edge cases
+- **Gather complete context**: Read sufficient file sections before making changes - partial views miss critical dependencies
+
+## 📦 Project Context
+
+### Architecture
+
+- **Provider** (port 5009): OIDC authentication server using `oidc-provider`
+- **Backend** (port 4009): Protected API for authenticated users
+- **Frontend** (port 3008): Static HTML/JS client
+- **Database**: PostgreSQL running in Docker on port 5437
+- **Language**: TypeScript with strict typing
+- **Framework**: Express.js
+
+### Key Directories
+
+- `provider/src/` - OIDC server source code
+  - `routes/` - Express route handlers (admin.ts, admin-auth.ts, health.ts)
+  - `services/` - Business logic (database.ts, migrations.ts)
+  - `scripts/` - Utility scripts
+- `backend/src/` - Protected API server
+- `frontend/src/` - Static frontend files
+- `migrations/` - PostgreSQL migration SQL files (auto-executed on startup)
+- `provider/admin-panel/` - Admin UI (HTML, JS, CSS served statically)
+
+### Stack & Libraries
+
+- **Authentication**: oidc-provider (https://github.com/panva/node-oidc-provider)
+- **Database**: PostgreSQL with connection pooling (`pg`)
+- **Password Hashing**: bcrypt
+- **JWT**: jsonwebtoken
+- **Environment**: dotenv
+- **Dev Tools**: tsx (TypeScript execution), rimraf (cleanup)
+
+## 🔧 Code Patterns & Conventions
+
+### TypeScript
+
+- Use strict TypeScript with proper types
+- ALL functions in `services/` have explicit return types
+- Use interfaces for data structures (User, OIDCClient, Company, etc.)
+- Database queries return typed results
+
+### Database Operations
+
+- Database access via `db` service in `provider/src/services/database.ts`
+- Use connection pooling - always release connections
+- Use transactions for multi-step operations
+- Validate inputs before database operations
+- Use parameterized queries to prevent SQL injection
+
+### Logging Pattern
+
+The project uses custom logging functions:
+
+- `logInfo(message, data?)` - General information
+- `logError(message, error?)` - Errors with stack traces
+- `logDebug(message, data?)` - Debug information
+
+ALWAYS use these functions when adding logging:
+
+```typescript
+logInfo("User login successful", { userId: user.id, email: user.email });
+logError("Login failed", { error: err.message, stack: err.stack });
+```
+
+### Express Middleware
+
+- Use `body-parser` for JSON/form data
+- Use `cookie-parser` for cookies
+- Trust proxy mode: `app.set('trust proxy', true)`
+- Mount routes before error handlers
+- Use async error handling
+
+### Security Patterns
+
+- Password hashing: `bcrypt.hash()` and `bcrypt.compare()`
+- Sessions stored in cookies with httpOnly flag
+- Rate limiting via database checks in `db.checkRateLimit()`
+- Input validation using regex patterns (email, company_id, client_id)
+- Soft deletes: set `is_active = FALSE` instead of DELETE
+- Audit logging for all admin actions via `db.logAudit()`
+
+### OIDC Provider Integration
+
+- Provider configured with `Provider` class from oidc-provider
+- Custom `findAccount` function returns user with `claims()` method
+- Interaction flows: login, consent, etc.
+- Custom logout handler in `/session/end`
+- Claims mapping: openid, email, profile scopes
+
+## 🚫 CRITICAL Rules
+
+### NEVER:
+
+1. **NEVER** edit files in `dist/` folder (auto-generated, read-only)
+2. **NEVER** manually run migrations (they auto-execute on startup)
+3. **NEVER** hardcode credentials or secrets
+4. **NEVER** expose sensitive data in logs (mask passwords, tokens)
+5. **NEVER** commit `.env` files (use `.env.example`)
+6. **NEVER** bypass TypeScript types or use `any` unnecessarily
+
+### ALWAYS:
+
+1. **ALWAYS** add proper logging when adding new operations
+2. **ALWAYS** validate user input before database operations
+3. **ALWAYS** use `await` for async operations
+4. **ALWAYS** handle errors with try-catch
+5. **ALWAYS** check `is_active` status before operations
+6. **ALWAYS** return explicit types from functions
+7. **ALWAYS** mount provider callback AFTER custom routes
+8. **ALWAYS** use transactions for multi-step operations
+
+## 📝 When Making Changes
+
+### Before Editing:
+
+1. Read the file you're editing to understand context
+2. Search codebase for similar patterns
+3. Check existing types and interfaces
+4. Review related files (routes → services)
+
+### When Adding Features:
+
+1. Update database schema in `migrations/` (create new migration file)
+2. Add database methods to `services/database.ts`
+3. Create route handlers in `routes/`
+4. Add logging at appropriate points
+5. Add audit logging for admin actions
+6. Test with Docker containers
+
+### Code Structure Pattern:
+
+```typescript
+// Route Handler (thin layer)
+router.post('/resource', async (req, res) => {
+  try {
+    const data = req.body;
+    // Validate input
+    // Call service
+    const result = await db.someMethod(data);
+    // Log action
+    logInfo('Resource created', { id: result.id });
+    res.json(result);
+  } catch (error) {
+    logError('Resource creation failed', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Service Method (business logic)
+async someMethod(data: SomeType): Promise<Result> {
+  // Validate
+  // Database operations
+  // Error handling
+  // Return typed result
+}
+```
+
+## 🔍 Debugging Patterns
+
+When debugging issues:
+
+1. Check logs for entries using `logInfo`, `logError`, `logDebug`
+2. Verify database state with direct queries (can use db service)
+3. Check Docker logs: `docker compose logs [service-name]`
+4. Verify environment variables are loaded
+5. Check OIDC provider events in server.ts (authorization.success, grant.error, etc.)
+6. Use `curl` to test endpoints without browser
+
+## 🎨 UI/Frontend Patterns
+
+- Spanish language for all user-facing text
+- Simple, clean HTML forms for OIDC interactions
+- Admin panel uses vanilla JavaScript (no frameworks)
+- Responsive design with modern CSS
+
+## 🌐 Network & Deployment
+
+- Trust proxy enabled for reverse proxy support
+- Uses X-Forwarded-\* headers for HTTPS detection
+- CORS handled by Express (if needed)
+- Docker containerization for all services
+- Hot reload in development via volume mounts
+- Environment-based configuration (.env files)
+
+## 🔄 Development Workflow
+
+### When Asked to:
+
+1. **Add a new feature**: Create migration → Add service methods → Create routes → Add logging → Test
+2. **Fix a bug**: Read logs → Identify root cause → Fix → Add appropriate logging → Test
+3. **Refactor code**: Maintain same interface → Update implementation → Ensure tests pass
+4. **Optimize performance**: Profile first → Identify bottlenecks → Optimize → Verify improvement
+
+### Testing Strategy:
+
+- Use Docker containers for integration testing
+- Use curl for API testing
+- Manual testing via browser for UI flows
+- Database testing via direct SQL queries in migrations
+
+## 💡 Best Practices
+
+### File Organization:
+
+- Keep routes thin - delegate to services
+- Services contain all business logic
+- Shared types in `types.d.ts`
+- One file per concern (admin.ts, health.ts, etc.)
+
+### Error Handling:
+
+```typescript
+try {
+  // operation
+} catch (error) {
+  logError("Operation failed", error);
+  if (!res.headersSent) {
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+```
+
+### Validation:
+
+```typescript
+const validation = validateString(req.body.field, {
+  fieldName: "field",
+  minLength: 3,
+  maxLength: 100,
+  pattern: /^[a-zA-Z0-9_-]+$/,
+});
+
+if (!validation.valid) {
+  return res.status(400).json({ error: validation.error });
+}
+```
+
+## 🎯 Communication Style
+
+When responding to the user:
+
+- Use backticks for file, directory, function, and class names
+- Use natural language to describe what I'm doing
+- NEVER refer to tool names
+- Be thorough - gather complete context before replying
+- **Always use parallel tool calls when possible** - this is not optional, it's critical for efficiency
+- Show code citations with ```startLine:endLine:filepath format
+
+## 📊 Database Schema Knowledge
+
+Key tables:
+
+- `users` - OIDC users (email, password_hash, name, company_id)
+- `companies` - Companies that users belong to
+- `oidc_clients` - OIDC client applications
+- `admin_users` - Admin panel users (separate from OIDC users)
+- `user_sessions` - Active user sessions
+- `admin_sessions` - Active admin sessions
+- `audit_logs` - Security audit trail
+- `rate_limits` - Rate limiting tracking
+- `system_config` - System configuration key-value pairs
+- `company_client_access` - Which companies can access which clients
+
+## 🔐 Security Considerations
+
+- Passwords always hashed with bcrypt (never store plain text)
+- Sessions expire after 24 hours
+- Failed login attempts tracked and locked out
+- Soft deletes preserve audit trail
+- All sensitive operations logged to audit_logs
+- Rate limiting on authentication endpoints
+
+## 🚀 Docker Commands Reference
+
+- `docker compose up --build -d` - Start services
+- `docker compose down` - Stop services
+- `docker compose logs -f [service]` - View logs
+- `docker compose ps` - Check status
+- `make up`, `make down`, `make logs` - Convenience commands
+
+Remember: This is a WORKING production-style OIDC server. Maintain quality, security, and best practices in all changes.

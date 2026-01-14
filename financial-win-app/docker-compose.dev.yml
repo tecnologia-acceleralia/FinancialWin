@@ -1,0 +1,145 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:17-alpine
+    container_name: financial-win-postgres-dev
+    environment:
+      POSTGRES_DB: financial-win_dev
+      # NO establecer POSTGRES_USER - usar siempre 'postgres' como usuario base
+      # El script de inicialización creará el usuario específico desde POSTGRES_DB
+      POSTGRES_PASSWORD: financial-win
+      # Usar usuario postgres para inicialización (siempre existe)
+      POSTGRES_INITDB_ARGS: "-U postgres"
+    ports:
+      - "5555:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Script de inicialización que crea el usuario si no existe
+      - ./database/init-scripts:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - financial-win-network
+
+  # API Backend (Development with hot-reload)
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile.dev
+      args:
+        CACHE_BUST: ${CACHE_BUST:-$(date +%s)}
+    container_name: financial-win-api-dev
+    env_file:
+      - apps/api/.env.dev
+    environment:
+      # Database configuration - MUST override .env.dev values
+      # These environment variables take precedence over env_file
+      # IMPORTANT: DB_PORT siempre debe ser 5432 (puerto interno de PostgreSQL)
+      # El puerto del host (5555) solo se usa para conexiones desde fuera de Docker
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: financial-win
+      DB_PASSWORD: financial-win
+      DB_NAME: financial-win_dev
+      DATABASE_URL: postgresql://financial-win:financial-win@postgres:5432/financial-win_dev
+      NODE_ENV: development
+      LOG_LEVEL: debug
+      # OIDC Configuration (internal for HTTP calls from container)
+      OIDC_ISSUER_URL: http://host.docker.internal:5009
+      # OIDC Configuration (public for browser redirects)
+      OIDC_PUBLIC_URL: http://localhost:5009
+    ports:
+      - "6006:6006"
+    volumes:
+      # Hot-reload: montar código fuente
+      - ./apps/api/src:/app/apps/api/src
+      - ./apps/api/package.json:/app/apps/api/package.json
+      - ./apps/api/tsconfig.json:/app/apps/api/tsconfig.json
+      - ./apps/api/nest-cli.json:/app/apps/api/nest-cli.json
+      # Environment file (commented out to use environment variables from docker-compose instead)
+      # - ./apps/api/.env.dev:/app/apps/api/.env.dev
+      # Uploads
+      - ./apps/api/uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get('http://localhost:6006/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - financial-win-network
+
+  # Web Frontend (Development with hot-reload)
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile.dev
+    container_name: financial-win-web-dev
+    env_file:
+      - apps/web/.env.dev
+    ports:
+      - "3003:3003"
+    volumes:
+      # Hot-reload: montar código fuente
+      - ./apps/web/src:/app/apps/web/src
+      - ./apps/web/public:/app/apps/web/public
+      - ./apps/web/index.html:/app/apps/web/index.html
+      - ./apps/web/vite.config.ts:/app/apps/web/vite.config.ts
+      - ./apps/web/tsconfig.json:/app/apps/web/tsconfig.json
+      - ./apps/web/tsconfig.node.json:/app/apps/web/tsconfig.node.json
+      - ./apps/web/tailwind.config.js:/app/apps/web/tailwind.config.js
+      - ./apps/web/postcss.config.js:/app/apps/web/postcss.config.js
+    depends_on:
+      - api
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:3003/",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - financial-win-network
+
+  # Database Admin Tool
+  adminer:
+    image: adminer:latest
+    container_name: financial-win-adminer-dev
+    ports:
+      - "8880:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - financial-win-network
+
+volumes:
+  postgres_data:
+
+networks:
+  financial-win-network:
+    driver: bridge

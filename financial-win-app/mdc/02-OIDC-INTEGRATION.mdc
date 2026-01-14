@@ -1,0 +1,164 @@
+# Integración OIDC
+
+## Visión General
+
+Esta aplicación está integrado con **oidc-server** para autenticación y autorización multi-tenant.
+
+## Configuración
+
+### Variables de Entorno Requeridas
+
+En `apps/api/.env.dev`:
+
+```bash
+# OIDC Configuration
+OIDC_ISSUER_URL=http://host.docker.internal:5009
+OIDC_PUBLIC_URL=http://localhost:5009
+OIDC_CLIENT_ID=your-client-id
+OIDC_CLIENT_SECRET=your-client-secret
+OIDC_REDIRECT_URI=http://localhost:6000/api/auth/callback
+OIDC_POST_LOGOUT_REDIRECT_URI=http://localhost:3010
+# CRITICAL: offline_access is required for refresh tokens
+OIDC_SCOPES="openid email profile offline_access"
+
+# JWT Secret (debe coincidir con oidc-server)
+JWT_SECRET=your_jwt_secret_minimum_32_characters
+```
+
+En `apps/web/.env.dev`:
+
+```bash
+VITE_API_URL=http://localhost:6000
+```
+
+## Flujo de Autenticación
+
+1. **Usuario accede a aplicación protegida**
+2. **Frontend redirige a `/api/auth/login`**
+3. **Backend redirige a oidc-server**
+4. **Usuario se autentica en oidc-server**
+5. **oidc-server redirige a `/api/auth/callback`**
+6. **Backend crea sesión y cookie**
+7. **Usuario accede a aplicación**
+
+## Endpoints de Autenticación
+
+### Backend (`apps/api/src/auth/`)
+
+- `GET /api/auth/login` - Inicia flujo OIDC
+- `GET /api/auth/callback` - Callback desde OIDC provider
+- `GET /api/auth/logout` - Cierra sesión
+- `GET /api/auth/refresh` - Refresca token de sesión
+- `GET /api/auth/me` - Información del usuario actual
+
+### Frontend (`apps/web/src/contexts/AuthContext.tsx`)
+
+- `useAuth()` - Hook para acceder a estado de autenticación
+- `login()` - Inicia flujo de login
+- `logout()` - Cierra sesión
+- `user` - Información del usuario autenticado
+
+## Protección de Endpoints
+
+### Backend
+
+```typescript
+import { UseGuards } from '@nestjs/common';
+import { OIDCAuthGuard } from '../common/guards/oidc-auth.guard';
+
+@Controller('mi-recurso')
+export class MiController {
+  @Get()
+  @UseGuards(OIDCAuthGuard)
+  findAll() {
+    // Usuario autenticado disponible en request.user
+    // company_id disponible en request.user.company_id
+    return this.service.findAll();
+  }
+}
+```
+
+### Frontend
+
+```typescript
+import { ProtectedRoutes } from './components/auth/ProtectedRoutes';
+
+// En App.tsx
+<ProtectedRoutes>
+  {/* Rutas protegidas */}
+</ProtectedRoutes>
+```
+
+## Información del Usuario
+
+Después de autenticarse, el usuario tiene acceso a:
+
+```typescript
+interface User {
+  id: string;
+  email: string;
+  name?: string;
+  company_id: string;
+  // ... otros campos del token OIDC
+}
+```
+
+## Multi-Tenancy
+
+El sistema automáticamente filtra por `company_id`:
+
+- Todas las entidades incluyen `company_id`
+- Los guards verifican acceso por `company_id`
+- Los servicios filtran automáticamente por `company_id` del usuario
+
+## Troubleshooting
+
+### Error: "JWT_SECRET is not configured"
+
+Asegúrate de tener `JWT_SECRET` en `.env.dev` con mínimo 32 caracteres.
+
+### Error: "OIDC_CLIENT_ID not found"
+
+Verifica que el `OIDC_CLIENT_ID` exista en oidc-server y que la compañía tenga acceso.
+
+### Error: "Redirect loop"
+
+Verifica que `OIDC_REDIRECT_URI` coincida exactamente con la configuración en oidc-server.
+
+### Error: "Cookie not set"
+
+Verifica que `withCredentials: true` esté configurado en el cliente API (ya está configurado).
+
+### Error: "No refresh_token received" o "Refresh token not available"
+
+**Síntomas**:
+- El log muestra: `⚠️ WARNING: No refresh_token received`
+- El endpoint `/auth/refresh` retorna: `Refresh token not available`
+
+**Causas y Soluciones**:
+
+1. **Falta `offline_access` en `OIDC_SCOPES`**
+   - ✅ Verifica que `OIDC_SCOPES` incluya `offline_access`
+   - Ejemplo correcto: `OIDC_SCOPES="openid email profile offline_access"`
+
+2. **Cliente no tiene `offline_access` en `allowed_scopes`**
+   - En el admin panel de oidc-server, verifica que el cliente tenga `offline_access` en sus scopes permitidos
+   - Debe incluir: `openid`, `email`, `profile`, `offline_access`
+
+3. **Cliente no tiene `refresh_token` en `grant_types`**
+   - En el admin panel de oidc-server, verifica que el cliente tenga `refresh_token` en sus grant types
+   - Debe incluir: `authorization_code`, `refresh_token`
+
+4. **Verificar logs del backend**
+   - Busca el mensaje: `⚠️ WARNING: offline_access scope is not included in OIDC_SCOPES`
+   - Si aparece, actualiza `OIDC_SCOPES` para incluir `offline_access`
+
+**Documentación completa**: Ver `mdc/04-REFRESH_TOKEN-OFFLINE-ACCESS.mdc` para checklist detallado.
+
+## Próximos Pasos
+
+1. Configurar oidc-server con tu cliente
+2. Configurar variables de entorno
+3. Probar flujo de autenticación
+4. Crear endpoints protegidos
+5. Implementar lógica multi-tenant

@@ -1,0 +1,161 @@
+# Title
+Referencia Rápida de Variables de Entorno
+
+# Summary
+Referencia rápida de todas las variables de entorno necesarias para
+desarrollo local y producción, con valores de ejemplo y validaciones críticas.
+
+# TechnicalDetails
+
+## Archivos de Configuración
+
+| Servicio      | Archivo    | Ubicación                     |
+| ------------- | ---------- | ----------------------------- |
+| OIDC Provider | `.env`     | `oidc-server/provider/.env`   |
+| OIDC Backend  | `.env`     | `oidc-server/backend/.env`    |
+| Write-mvp API | `.env.dev` | `Write-mvp/apps/api/.env.dev` |
+| Write-mvp Web | `.env.dev` | `Write-mvp/apps/web/.env.dev` |
+
+## Variables por Servicio
+
+### OIDC Provider (`provider/.env`)
+
+| Variable       | Requerido | Valor Ejemplo                                                     | Descripción              |
+| -------------- | --------- | ----------------------------------------------------------------- | ------------------------ |
+| `PROVIDER_URL` | ✅        | `http://localhost:5009`                                           | URL pública del Provider |
+| `DATABASE_URL` | ✅        | `postgresql://oidc_user:oidc_password_dev@localhost:5437/oidc_db` | Conexión PostgreSQL      |
+| `NODE_ENV`     | ⚠️        | `development`                                                     | Ambiente de ejecución    |
+| `PORT`         | ❌        | `8080`                                                            | Puerto interno           |
+
+### OIDC Backend (`backend/.env`)
+
+| Variable                | Requerido | Valor Ejemplo                                                               | Descripción         |
+| ----------------------- | --------- | --------------------------------------------------------------------------- | ------------------- |
+| `PROVIDER_EXTERNAL_URL` | ✅        | `http://localhost:5009`                                                     | URL del Provider    |
+| `OIDC_CLIENT_ID`        | ✅        | `writehub-client`                                                           | ID del cliente OIDC |
+| `OIDC_CLIENT_SECRET`    | ✅        | `writehub-secret-super-seguro-al-azar-32chars`                              | Secreto del cliente |
+| `OIDC_CALLBACK_URL`     | ✅        | `http://localhost:4009/auth/callback`                                       | URL de callback     |
+| `FRONTEND_URL`          | ✅        | `http://localhost:3008`                                                     | URL del frontend    |
+| `BACKEND_URL`           | ✅        | `http://localhost:4009`                                                     | URL del backend     |
+| `SESSION_SECRET`        | ✅        | `session-secret-muy-largo-y-aleatorio-para-desarrollo-minimo-32-caracteres` | Secreto de sesión   |
+
+### Write-mvp API (`apps/api/.env.dev`)
+
+| Variable                        | Requerido | Valor Ejemplo                                               | Descripción              |
+| ------------------------------- | --------- | ----------------------------------------------------------- | ------------------------ |
+| `OIDC_ISSUER_URL`               | ✅        | `http://host.docker.internal:5009`                          | URL interna del Provider |
+| `OIDC_PUBLIC_URL`               | ✅        | `http://localhost:5009`                                     | URL pública del Provider |
+| `OIDC_CLIENT_ID`                | ✅        | `writehub-client`                                           | ID del cliente OIDC      |
+| `OIDC_CLIENT_SECRET`            | ✅        | `writehub-secret-super-seguro-al-azar-32chars`              | Secreto del cliente      |
+| `OIDC_REDIRECT_URI`             | ✅        | `http://localhost:5008/auth/callback`                       | URL de callback          |
+| `OIDC_POST_LOGOUT_REDIRECT_URI` | ✅        | `http://localhost:3010`                                     | URL post-logout          |
+| `OIDC_SCOPES`                   | ✅        | `openid email profile`                                      | Scopes OIDC              |
+| `OIDC_COOKIE_NAME`              | ❌        | `oauth_session`                                             | Nombre de cookie         |
+| `OIDC_COOKIE_SECURE`            | ❌        | `false`                                                     | Cookie segura            |
+| `OIDC_COOKIE_SAME_SITE`         | ❌        | `lax`                                                       | SameSite policy          |
+| `DATABASE_URL`                  | ✅        | `postgresql://writehub:writehub@postgres:5432/writehub_dev` | Conexión PostgreSQL      |
+| `PORT`                          | ❌        | `5008`                                                      | Puerto del servidor      |
+| `NODE_ENV`                      | ❌        | `development`                                               | Ambiente de ejecución    |
+
+### Write-mvp Web (`apps/web/.env.dev`)
+
+| Variable            | Requerido | Valor Ejemplo           | Descripción      |
+| ------------------- | --------- | ----------------------- | ---------------- |
+| `VITE_API_URL`      | ✅        | `http://localhost:5008` | URL del API      |
+| `VITE_FRONTEND_URL` | ✅        | `http://localhost:3010` | URL del frontend |
+
+## Validaciones Críticas
+
+### Consistencia de Credenciales
+
+Las siguientes variables **DEBEN** coincidir exactamente entre archivos:
+
+- `OIDC_CLIENT_ID`:
+  - `oidc-server/backend/.env`
+  - `Write-mvp/apps/api/.env.dev`
+  - Base de datos `oidc_clients.client_id`
+
+- `OIDC_CLIENT_SECRET`:
+  - `oidc-server/backend/.env`
+  - `Write-mvp/apps/api/.env.dev`
+  - Base de datos `oidc_clients.client_secret` (hash bcrypt)
+
+### Consistencia de URLs
+
+Las siguientes URLs **DEBEN** coincidir:
+
+- `PROVIDER_URL` (provider/.env) = `PROVIDER_EXTERNAL_URL` (backend/.env) = `OIDC_PUBLIC_URL` (api/.env.dev)
+- Valor esperado: `http://localhost:5009`
+
+### URLs de Redirect
+
+- `OIDC_REDIRECT_URI` en `Write-mvp/apps/api/.env.dev` debe estar en `redirect_uris` del cliente en BD
+- `OIDC_POST_LOGOUT_REDIRECT_URI` debe estar en `post_logout_redirect_uris` del cliente en BD
+
+## Puertos del Sistema
+
+| Servicio             | Puerto Externo | Puerto Interno | Descripción             |
+| -------------------- | -------------- | -------------- | ----------------------- |
+| OIDC Provider        | 5009           | 8080           | Provider OIDC           |
+| OIDC Backend         | 4009           | 8080           | Backend de ejemplo      |
+| OIDC Frontend        | 3008           | 80             | Frontend de ejemplo     |
+| OIDC PostgreSQL      | 5437           | 5437           | Base de datos OIDC      |
+| Write-mvp API        | 5008           | 5008           | API Backend             |
+| Write-mvp Web        | 3010           | 3010           | Frontend                |
+| Write-mvp PostgreSQL | 5432           | 5432           | Base de datos Write-mvp |
+
+## Comandos Útiles
+
+### Verificar Configuración
+
+```bash
+cd /Users/r1go/Documents/CODE/APPLICA/Acceleralia/oidc-server
+./verify-env.sh
+```
+
+### Crear Archivos desde Ejemplos
+
+```bash
+# OIDC Provider
+cd oidc-server/provider && cp .env.example .env
+
+# OIDC Backend
+cd oidc-server/backend && cp .env.example .env
+
+# Write-mvp API
+cd Write-mvp/apps/api && cp .env.dev.example .env.dev
+
+# Write-mvp Web
+cd Write-mvp/apps/web && cp .env.dev.example .env.dev
+```
+
+### Verificar Cliente OIDC en Base de Datos
+
+```bash
+# Conectar a PostgreSQL de oidc-server
+psql -h localhost -p 5437 -U oidc_user -d oidc_db
+
+# Verificar cliente
+SELECT client_id, client_name, redirect_uris, post_logout_redirect_uris, is_active
+FROM oidc_clients
+WHERE client_id = 'writehub-client';
+```
+
+### Verificar Servicios
+
+```bash
+# OIDC Server
+curl http://localhost:5009/.well-known/openid-configuration
+
+# Write-mvp API
+curl http://localhost:5008/health
+
+# Write-mvp Web
+curl http://localhost:3010/
+```
+
+# Notes
+- Para configuración detallada de desarrollo local, ver [02-env.mdc](02-env.mdc)
+- Para producción, ver [20-ENV-PROVIDER-PRODUCCION.mdc](20-ENV-PROVIDER-PRODUCCION.mdc) y [21-ENV-BACKEND-PRODUCCION.mdc](21-ENV-BACKEND-PRODUCCION.mdc)
+- Para troubleshooting, ver [13-troubleshooting.mdc](13-troubleshooting.mdc)
+- Script de verificación: `verify-env.sh` en la raíz del proyecto

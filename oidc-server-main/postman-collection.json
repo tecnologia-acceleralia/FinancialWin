@@ -1,0 +1,400 @@
+{
+  "info": {
+    "name": "Sistema OIDC Local",
+    "description": "Colección de Postman para probar el sistema OIDC completo",
+    "version": "1.0.0",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url_provider",
+      "value": "http://localhost:5009",
+      "type": "string"
+    },
+    {
+      "key": "base_url_backend",
+      "value": "http://localhost:4009",
+      "type": "string"
+    },
+    {
+      "key": "base_url_frontend",
+      "value": "http://localhost:3008",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Provider OIDC",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url_provider}}/health",
+              "host": ["{{base_url_provider}}"],
+              "path": ["health"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "OIDC Configuration",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url_provider}}/.well-known/openid-configuration",
+              "host": ["{{base_url_provider}}"],
+              "path": [".well-known", "openid-configuration"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "JWKS",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url_provider}}/jwks",
+              "host": ["{{base_url_provider}}"],
+              "path": ["jwks"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Admin - List Users (DEV)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url_provider}}/_admin/users",
+              "host": ["{{base_url_provider}}"],
+              "path": ["_admin", "users"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Admin - Create User (DEV)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"test123\",\n  \"name\": \"Test User\",\n  \"company_id\": \"TEST-001\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url_provider}}/_admin/users/create",
+              "host": ["{{base_url_provider}}"],
+              "path": ["_admin", "users", "create"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Backend API",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url_backend}}/health",
+              "host": ["{{base_url_backend}}"],
+              "path": ["health"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "API Info",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url_backend}}/api/info",
+              "host": ["{{base_url_backend}}"],
+              "path": ["api", "info"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login (Redirect)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url_backend}}/auth/login",
+              "host": ["{{base_url_backend}}"],
+              "path": ["auth", "login"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get User Info (Protected)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url_backend}}/api/me",
+              "host": ["{{base_url_backend}}"],
+              "path": ["api", "me"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url_backend}}/auth/logout",
+              "host": ["{{base_url_backend}}"],
+              "path": ["auth", "logout"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Frontend",
+      "item": [
+        {
+          "name": "Home Page",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url_frontend}}/",
+              "host": ["{{base_url_frontend}}"],
+              "path": [""]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Flujo Completo de Autenticación",
+      "item": [
+        {
+          "name": "1. Verificar Frontend",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url_frontend}}/",
+              "host": ["{{base_url_frontend}}"],
+              "path": [""]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "2. Intentar acceder a API protegida (sin auth)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url_backend}}/api/me",
+              "host": ["{{base_url_backend}}"],
+              "path": ["api", "me"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "3. Iniciar proceso de login",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url_backend}}/auth/login",
+              "host": ["{{base_url_backend}}"],
+              "path": ["auth", "login"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "4. Verificar configuración OIDC",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url_provider}}/.well-known/openid-configuration",
+              "host": ["{{base_url_provider}}"],
+              "path": [".well-known", "openid-configuration"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Tests de Integración",
+      "item": [
+        {
+          "name": "Test 1: Verificar todos los servicios",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Provider health check', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.status).to.eql('ok');",
+                  "    pm.expect(jsonData.service).to.eql('oidc-provider');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url_provider}}/health",
+              "host": ["{{base_url_provider}}"],
+              "path": ["health"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Test 2: Verificar configuración OIDC",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('OIDC Configuration is valid', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.issuer).to.eql('http://localhost:5009');",
+                  "    pm.expect(jsonData.authorization_endpoint).to.exist;",
+                  "    pm.expect(jsonData.token_endpoint).to.exist;",
+                  "    pm.expect(jsonData.userinfo_endpoint).to.exist;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url_provider}}/.well-known/openid-configuration",
+              "host": ["{{base_url_provider}}"],
+              "path": [".well-known", "openid-configuration"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Test 3: Verificar backend API",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Backend API is running', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.status).to.eql('ok');",
+                  "    pm.expect(jsonData.service).to.eql('backend-api');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url_backend}}/health",
+              "host": ["{{base_url_backend}}"],
+              "path": ["health"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Test 4: Verificar API protegida sin auth",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Protected API returns 401 without auth', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.error).to.eql('not_authenticated');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url_backend}}/api/me",
+              "host": ["{{base_url_backend}}"],
+              "path": ["api", "me"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Test 5: Verificar frontend",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Frontend is accessible', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.text()).to.include('Sistema OIDC Local');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url_frontend}}/",
+              "host": ["{{base_url_frontend}}"],
+              "path": [""]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,164 @@
+# Resumen Ejecutivo - Deployment Multi-Tenant OIDC System
+
+**Fecha:** 2025-01-16  
+**Estado:** ✅ LISTO PARA DEPLOYMENT
+
+---
+
+## ✅ Implementaciones Completadas
+
+### 1. Correcciones Críticas de Seguridad
+
+#### Logout con Domain/Path Correctos
+- **Archivo:** `Write-mvp/apps/api/src/auth/auth.controller.ts`
+- **Cambio:** Función `buildCookieOptions()` creada para construir opciones de cookie consistentes
+- **Impacto:** Las cookies se eliminan correctamente incluso si fueron configuradas con `domain` o `path` específicos
+- **Estado:** ✅ Completado
+
+#### Validación de Token Antes de Refresh
+- **Archivo:** `Write-mvp/apps/api/src/auth/auth.controller.ts`
+- **Cambio:** Validación del token usando endpoint centralizado `/api/token/validate` antes de proceder con refresh
+- **Impacto:** El token se valida (firma, expiración, acceso de compañía) antes de refrescar
+- **Estado:** ✅ Completado
+
+#### Validaciones de JWT_SECRET
+- **Archivos:** 
+  - `oidc-server/provider/src/routes/token-validation.ts`
+  - `oidc-server/provider/src/server.ts`
+- **Cambio:** Advertencias al inicio si `JWT_SECRET` no está configurado
+- **Impacto:** Los administradores verán advertencias claras si falta `JWT_SECRET`
+- **Estado:** ✅ Completado
+
+#### Protección de Tabla Legacy Template
+- **Archivo:** `Write-mvp/apps/api/src/modules/document-workspace/services/document-workspace.service.ts`
+- **Cambio:** Validación adicional para solo usar tabla legacy si `document_template` está vacía
+- **Impacto:** Reduce riesgo de data leak desde tabla legacy
+- **Estado:** ✅ Completado
+
+### 2. Documentación Creada
+
+- **Checklist de Deployment:** `oidc-server/oidc-ts-mdc/33-DEPLOYMENT-CHECKLIST.mdc`
+  - Variables de entorno requeridas
+  - Validaciones pre-deploy
+  - Testing multi-tenant
+  - Troubleshooting
+  - Comandos útiles
+
+---
+
+## 🚀 Pasos para Deployment
+
+### Paso 1: Configurar Variables de Entorno
+
+#### oidc-server/provider
+
+```bash
+PROVIDER_URL=https://auth.test.acceleralia.com
+DATABASE_URL=postgresql://user:password@host:port/database?sslmode=require
+NODE_ENV=production
+JWT_SECRET=your_jwt_secret_for_file_access_development_1758720469  # ⚠️ CRÍTICO
+```
+
+#### write-mvp/backend
+
+```bash
+NODE_ENV=production
+DATABASE_URL=postgresql://user:password@host:port/database?sslmode=require
+OIDC_ISSUER_URL=https://auth.test.acceleralia.com
+OIDC_PUBLIC_URL=https://auth.test.acceleralia.com
+OIDC_CLIENT_ID=writehub-client
+OIDC_CLIENT_SECRET=write-mvp-secret-change-in-production
+OIDC_REDIRECT_URI=https://write.test.acceleralia.com/api/auth/callback
+OIDC_POST_LOGOUT_REDIRECT_URI=https://write.test.acceleralia.com
+OIDC_SCOPES="openid profile email"
+JWT_SECRET=your_jwt_secret_for_file_access_development_1758720469  # ⚠️ DEBE SER IGUAL A OIDC-SERVER
+JWT_EXPIRES_IN=24h
+OIDC_COOKIE_NAME=oauth_session
+OIDC_COOKIE_SECURE=true
+OIDC_COOKIE_SAME_SITE=strict
+OIDC_COOKIE_DOMAIN=""  # ⚠️ VACÍO por defecto (seguro para multi-tenant)
+OIDC_COOKIE_PATH=/api
+OIDC_COOKIE_MAX_AGE=1800000
+OIDC_TOKEN_REFRESH_WINDOW=300000
+CORS_ORIGIN=https://write.test.acceleralia.com,https://auth.test.acceleralia.com
+ENABLE_DEBUG_ENDPOINT=false
+ENABLE_REAL_TIME_ACCESS_CHECK=true
+```
+
+### Paso 2: Verificar Base de Datos
+
+#### oidc-server
+- [ ] Migraciones ejecutadas
+- [ ] Cliente OIDC `writehub-client` existe
+- [ ] Compañías tienen acceso al cliente en `company_client_access`
+
+#### write-mvp
+- [ ] Todas las tablas tienen `company_id`
+- [ ] Índices en `company_id` creados
+- [ ] Datos existentes tienen `company_id` asignado
+
+### Paso 3: Deploy
+
+1. Deploy oidc-server/provider primero
+2. Verificar que health check responde: `curl https://auth.test.acceleralia.com/health`
+3. Verificar que endpoint de validación funciona: `curl -X POST https://auth.test.acceleralia.com/api/token/validate -H "Content-Type: application/json" -d '{"token": "test"}'`
+4. Deploy write-mvp/backend
+5. Verificar que health check responde: `curl https://write.test.acceleralia.com/api/health`
+
+### Paso 4: Testing Multi-Tenant
+
+1. **Login Company A**
+   - Acceder a `https://write.test.acceleralia.com`
+   - Login con usuario de Company A
+   - Verificar que solo ve proyectos de Company A
+
+2. **Login Company B (mismo navegador)**
+   - Logout de Company A
+   - Login con usuario de Company B
+   - Verificar que solo ve proyectos de Company B (no de Company A)
+
+3. **Verificar Cookies**
+   - Inspeccionar cookies en DevTools
+   - Verificar `domain` vacío o correcto
+   - Verificar `httpOnly`, `secure`, `sameSite`
+
+4. **Verificar Logout**
+   - Hacer logout
+   - Verificar que cookies se eliminan
+   - Verificar que no se puede acceder a endpoints protegidos
+
+---
+
+## ⚠️ Puntos Críticos
+
+1. **JWT_SECRET:** Debe ser exactamente el mismo en oidc-server y write-mvp
+2. **OIDC_COOKIE_DOMAIN:** Dejar vacío (`""`) por defecto para multi-tenancy seguro
+3. **Testing Multi-Tenant:** Es crítico probar que usuarios de diferentes compañías no pueden acceder a datos de otras
+
+---
+
+## 📊 Monitoreo Post-Deploy
+
+### Logs a Monitorear
+
+**oidc-server:**
+- `⚠️ JWT_SECRET not configured` - CRÍTICO
+- `🚫 Access denied for company` - Verificar acceso
+- `❌ Token validation failed` - Verificar configuración
+
+**write-mvp:**
+- `❌ [ProjectsService] SECURITY ISSUE: Found projects with different company_ids` - CRÍTICO
+- `❌ [OIDCAuthGuard] Token validation failed` - Verificar conexión
+- `🚫 [OIDCAuthGuard] Access denied` - Verificar acceso
+
+---
+
+## 📚 Documentación de Referencia
+
+- [Checklist de Deployment](./33-DEPLOYMENT-CHECKLIST.mdc)
+- [Guía de Integración de Módulos Satélite](./31-SATELLITE-MODULE-INTEGRATION.mdc)
+- [Variables de Entorno - Provider](./20-ENV-PROVIDER-PRODUCCION.mdc)
+
+---
+
+**Sistema listo para deployment en producción** ✅

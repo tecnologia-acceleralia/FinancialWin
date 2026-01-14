@@ -1,0 +1,26 @@
+# Title
+docker-compose (provider + backend + frontend)
+
+# File
+## docker-compose.yml
+```yaml
+version: "3.8"
+services:
+  app:
+    build: .
+    ports: ["4000:4000","5000:5000"]
+    env_file: [".env"]
+    volumes:
+      - ./provider:/app/provider
+      - ./backend:/app/backend
+      - ./frontend:/app/frontend
+    environment: [ "NODE_ENV=development" ]
+    restart: unless-stopped
+
+  frontend:
+    image: nginx:alpine
+    ports: ["3000:80"]
+    volumes:
+      - ./frontend:/usr/share/nginx/html:ro
+    restart: unless-stopped
+```

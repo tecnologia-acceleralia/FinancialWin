@@ -1,0 +1,178 @@
+# Title
+Provider OIDC en TypeScript (SQLite + bcrypt)
+
+# Summary
+Crea un OpenID Provider local con `oidc-provider`, login por interacción (email+password), usuarios en SQLite (hashed con bcrypt). Node **22 LTS** + TypeScript.
+
+# Steps
+1) Crear carpeta `provider/` con `package.json` y `tsconfig.json` (ver abajo).
+2) Crear `src/server.ts` con el servidor OIDC y rutas de interacción.
+3) Compilar con `npm run build` / ejecutar con `npm run dev` en desarrollo.
+
+# Files
+## provider/package.json
+{
+  "name": "local-openid-provider",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -b",
+    "clean": "rimraf dist",
+    "start": "node dist/server.js",
+    "dev": "tsx watch src/server.ts"
+  },
+  "dependencies": {
+    "bcrypt": "^5.1.1",
+    "better-sqlite3": "^9.4.0",
+    "body-parser": "^1.20.2",
+    "express": "^4.19.2",
+    "oidc-provider": "^7.16.1"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^5.0.2",
+    "@types/body-parser": "^1.19.5",
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.5.4",
+    "rimraf": "^6.0.1",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.3"
+  }
+}
+
+## provider/tsconfig.json
+{
+  "compilerOptions": {
+    "target": "ES2021",
+    "module": "ES2022",
+    "moduleResolution": "Bundler",
+    "outDir": "dist",
+    "rootDir": "src",
+    "strict": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true
+  },
+  "include": ["src"]
+}
+
+## provider/src/server.ts
+```ts
+import express, { Request, Response } from "express";
+import bodyParser from "body-parser";
+import { Provider, KoaContextWithOIDC } from "oidc-provider";
+import bcrypt from "bcrypt";
+import Database from "better-sqlite3";
+
+const issuer = "http://provider:5000";
+
+// --- DB ---
+const db = new Database("./users.db");
+db.prepare(`
+  CREATE TABLE IF NOT EXISTS users (
+    email TEXT PRIMARY KEY,
+    password_hash TEXT NOT NULL,
+    name TEXT NOT NULL,
+    company_id TEXT NOT NULL
+  )
+`).run();
+
+const count = (db.prepare("SELECT COUNT(*) as c FROM users").get() as { c: number }).c;
+if (count === 0) {
+  const insert = db.prepare("INSERT INTO users (email, password_hash, name, company_id) VALUES (?, ?, ?, ?)");
+  insert.run("alice@example.com", bcrypt.hashSync("password123", 10), "Alice Example", "COMP-001");
+  insert.run("bob@example.com", bcrypt.hashSync("password456", 10), "Bob Example", "COMP-002");
+  console.log("Seeded example users into SQLite");
+}
+
+// --- OIDC ---
+const clients = [
+  {
+    client_id: "local-client",
+    client_secret: "local-secret",
+    redirect_uris: ["http://backend:4000/auth/callback"],
+    response_types: ["code"],
+    grant_types: ["authorization_code"],
+  },
+];
+
+type Account = {
+  accountId: string;
+  claims: () => Promise<Record<string, any>>;
+};
+
+const configuration = {
+  clients,
+  features: { devInteractions: { enabled: false } },
+  async findAccount(_ctx: KoaContextWithOIDC, id: string): Promise<Account | undefined> {
+    const user = db.prepare("SELECT * FROM users WHERE email = ?").get(id) as any;
+    if (!user) return undefined;
+    return {
+      accountId: user.email,
+      async claims() {
+        return { sub: user.email, name: user.name, email: user.email, company_id: user.company_id };
+      },
+    };
+  },
+};
+
+const provider = new Provider(issuer, configuration as any);
+const app = express();
+app.use(bodyParser.urlencoded({ extended: true }));
+
+// Interacción: login
+app.get("/interaction/:uid", async (req: Request, res: Response) => {
+  const { uid, prompt } = await provider.interactionDetails(req, res);
+  if (prompt.name !== "login") {
+    await provider.interactionFinished(req, res, { login: { accountId: "anonymous" } }, { mergeWithLastSubmission: false });
+    return;
+  }
+  res.send(`
+    <html>
+      <body style="font-family:sans-serif; margin:40px; max-width:420px;">
+        <h2>OpenID Login Local</h2>
+        <form method="post" action="/interaction/${uid}/login">
+          <label>Email</label><br/>
+          <input type="email" name="email" required style="width:100%;padding:8px;margin:6px 0"/><br/>
+          <label>Password</label><br/>
+          <input type="password" name="password" required style="width:100%;padding:8px;margin:6px 0"/><br/>
+          <button type="submit" style="padding:8px 14px;">Login</button>
+        </form>
+      </body>
+    </html>
+  `);
+});
+
+app.post("/interaction/:uid/login", async (req: Request, res: Response) => {
+  const { uid } = req.params;
+  const { email, password } = req.body as { email?: string; password?: string };
+  if (!email || !password) return res.status(400).send("email/password requeridos");
+
+  const user = db.prepare("SELECT * FROM users WHERE email = ?").get(email) as any;
+  const ok = user && (await bcrypt.compare(password, user.password_hash));
+  if (!ok) return res.status(401).send("<p>Invalid credentials. <a href='javascript:history.back()'>Try again</a></p>");
+
+  const result = { login: { accountId: user.email } };
+  await provider.interactionFinished(req, res, result, { mergeWithLastSubmission: false });
+});
+
+// Admin (DEV)
+app.get("/_admin/users", (_req: Request, res: Response) => {
+  const users = db.prepare("SELECT email, name, company_id FROM users").all();
+  res.json(users);
+});
+app.post("/_admin/users/create", bodyParser.json(), async (req: Request, res: Response) => {
+  const { email, password, name, company_id } = req.body || {};
+  if (!email || !password || !name || !company_id) return res.status(400).json({ error: "missing_fields" });
+  const exists = db.prepare("SELECT 1 FROM users WHERE email = ?").get(email);
+  if (exists) return res.status(409).json({ error: "user_exists" });
+  const password_hash = await bcrypt.hash(password, 10);
+  db.prepare("INSERT INTO users (email, password_hash, name, company_id) VALUES (?, ?, ?, ?)").run(email, password_hash, name, company_id);
+  res.status(201).json({ ok: true });
+});
+
+// Montar provider
+app.use(provider.callback());
+
+app.listen(5000, () => console.log("✅ OIDC Provider (SQLite) en http://provider:5000"));
+```

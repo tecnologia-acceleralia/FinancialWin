@@ -1,0 +1,608 @@
+# Resumen Técnico Ejecutivo - financial-win Base
+
+## 🎯 Propósito de Este Documento
+
+Este documento proporciona un resumen técnico ejecutivo del **financial-win Base** para que ChatGPT comprenda la infraestructura técnica existente sobre la cual debe construir el nuevo sistema satelite. El objetivo es que ChatGPT se enfoque **únicamente en la lógica de producto** y no en la configuración técnica base, ya que esta ya existe y está funcionando.
+
+---
+
+## 📐 Arquitectura General
+
+### Stack Tecnológico
+
+**Backend:**
+- **Framework**: NestJS 11.x (LTS) con TypeScript 5.5+
+- **ORM**: TypeORM 0.3.x con PostgreSQL 17
+- **Validación**: Zod 3.x (single source of truth) + class-validator
+- **Autenticación**: OIDC integrado con oidc-server externo
+- **Testing**: Jest + Supertest (E2E)
+- **Node.js**: 22.0.0+
+
+**Frontend:**
+- **Framework**: React 19.x con TypeScript 5.5+
+- **Build Tool**: Vite 7.x
+- **Estado Remoto**: TanStack Query 5.x
+- **Estado Local**: Zustand 4.x
+- **Routing**: React Router DOM 6.x
+- **Styling**: Tailwind CSS 3.x
+- **Testing**: Vitest 4.x + Testing Library
+
+**Infraestructura:**
+- **Containerización**: Docker + Docker Compose
+- **Base de Datos**: PostgreSQL 17-alpine
+- **Package Manager**: pnpm 10.x (workspace monorepo)
+- **Hot-reload**: Configurado para desarrollo
+
+---
+
+## 🏗️ Estructura del Proyecto
+
+### Monorepo Workspace
+
+```
+financial-win/
+├── apps/
+│   ├── api/              # Backend NestJS
+│   └── web/              # Frontend React
+├── packages/
+│   ├── shared-types/     # Tipos TypeScript y schemas Zod compartidos
+│   └── shared-config/    # Utilidades de configuración y validación
+├── scripts/              # Scripts de automatización
+├── docker-compose.dev.yml # Configuración Docker para desarrollo
+└── package.json          # Workspace root
+```
+
+### Backend (`apps/api/`)
+
+**Estructura de Módulos:**
+```
+apps/api/src/
+├── common/               # Infraestructura compartida
+│   ├── config/          # Configuraciones (app, database, oidc)
+│   ├── guards/          # Guards de autenticación (OIDCAuthGuard)
+│   ├── interceptors/    # Interceptores (logging, metrics, tracing, request-id)
+│   ├── filters/         # Filtros de excepciones
+│   ├── decorators/      # Decoradores personalizados (@CompanyId)
+│   ├── middleware/      # Middleware (debug, rate-limit, monitoring)
+│   ├── modules/         # Módulos comunes (Storage, Observability)
+│   ├── services/        # Servicios compartidos (OIDC, Storage, Metrics)
+│   └── controllers/     # Controladores comunes (webhook, metrics, file-access)
+├── modules/             # Módulos de negocio (vacío - listo para agregar)
+│   └── example/         # Módulo de ejemplo con CRUD completo
+├── auth/                # Módulo de autenticación OIDC
+├── entities/            # Entidades TypeORM (vacío - listo para agregar)
+└── migrations/          # Migraciones de base de datos
+```
+
+**Patrón de Módulo:**
+- Cada módulo tiene: `*.module.ts`, `*.controller.ts`, `*.service.ts`
+- Entidades en `entities/` o dentro del módulo
+- DTOs con Zod schemas en `packages/shared-types/src/dto/`
+- Validación con `ZodValidationPipe` desde `@financial-win/shared-config`
+
+### Frontend (`apps/web/`)
+
+**Estructura:**
+```
+apps/web/src/
+├── pages/              # Páginas/rutas de la aplicación
+├── components/         # Componentes UI organizados por módulo
+│   ├── common/        # Componentes comunes (Layout, ErrorBoundary)
+│   └── auth/          # Componentes de autenticación
+├── api/               # Clientes API (axios configurado)
+├── contexts/          # Contextos React (AuthContext)
+├── hooks/             # Custom hooks (useRequireAuth)
+├── store/             # Zustand stores (vacío - listo para agregar)
+└── utils/             # Utilidades
+```
+
+---
+
+## 🔐 Autenticación y Seguridad
+
+### OIDC Integration
+
+**Arquitectura:**
+- **OIDC Server**: Servicio externo independiente (puerto 5009)
+- **financial-win**: Sistema satelite que consume OIDC
+- **Flujo**: Frontend → Backend → OIDC Server (validación centralizada)
+
+**Configuración Requerida:**
+```env
+OIDC_ISSUER_URL=http://host.docker.internal:5009
+OIDC_PUBLIC_URL=http://localhost:5009
+OIDC_CLIENT_ID=your-client-id
+OIDC_CLIENT_SECRET=your-client-secret
+OIDC_REDIRECT_URI=http://localhost:6000/api/auth/callback
+JWT_SECRET=your_jwt_secret_minimum_32_characters
+```
+
+**Endpoints de Autenticación:**
+- `GET /api/auth/login` - Inicia flujo OIDC
+- `GET /api/auth/callback` - Callback desde OIDC provider
+- `GET /api/auth/logout` - Cierra sesión
+- `GET /api/auth/refresh` - Refresca token de sesión
+- `GET /api/auth/me` - Información del usuario actual
+
+**Guard de Autenticación:**
+- `OIDCAuthGuard`: Valida tokens llamando a endpoint centralizado en oidc-server
+- **Filosofía "Dumb"**: El financial-win NO valida tokens localmente, delega todo a oidc-server
+- Extrae token de cookie `oauth_session` o header `Authorization: Bearer <token>`
+- Inyecta `request.user` con información del usuario autenticado
+
+**Usuario Autenticado:**
+```typescript
+interface AuthenticatedUser {
+  id: string;
+  email: string;
+  name?: string;
+  company_id: string; // CRÍTICO para multi-tenancy
+  // ... otros campos del token OIDC
+}
+```
+
+### Multi-Tenancy
+
+**Patrón Obligatorio:**
+- **Todas las entidades** deben incluir `company_id: string`
+- **Todos los endpoints** tenant-scoped deben usar `@CompanyId()` decorator
+- **Todos los servicios** deben filtrar automáticamente por `company_id`
+- **Auditoría automática**: Scripts de pre-commit validan seguridad multi-tenant
+
+**Decorador `@CompanyId()`:**
+```typescript
+@Get()
+@UseGuards(OIDCAuthGuard)
+findAll(@CompanyId() companyId: string) {
+  return this.service.findAll(companyId);
+}
+```
+
+**Filtrado Automático:**
+- Los guards inyectan `company_id` del usuario autenticado
+- Los servicios reciben `companyId` y filtran automáticamente
+- **NUNCA** hacer queries sin filtrar por `company_id`
+
+---
+
+## 🗄️ Base de Datos
+
+### PostgreSQL Configuration
+
+**Desarrollo:**
+- Puerto host: `5555` (configurable)
+- Puerto interno Docker: `5432` (fijo)
+- Base de datos: `{app_name}_dev`
+- Usuario: `{app_name}`
+- Contraseña: `{app_name}`
+
+**Producción:**
+- Compatible con Digital Ocean PostgreSQL
+- SSL habilitado automáticamente
+- Variables de entorno: `DATABASE_URL` o individuales (`DB_HOST`, `DB_PORT`, etc.)
+
+### TypeORM Configuration
+
+**Configuración:**
+- `synchronize: false` (SIEMPRE - usar migraciones)
+- `logging: true` en desarrollo, `false` en producción
+- Entities: Auto-discovery desde `src/**/*.entity{.ts,.js}`
+- Migrations: `src/migrations/*{.ts,.js}`
+
+**Patrón de Entidad:**
+```typescript
+@Entity('mi_tabla')
+export class MiEntidad {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column('varchar', { length: 255 })
+  company_id: string; // OBLIGATORIO para multi-tenancy
+
+  @CreateDateColumn()
+  created_at: Date;
+
+  @UpdateDateColumn()
+  updated_at: Date;
+}
+```
+
+### Migraciones
+
+**Comandos Disponibles:**
+- `pnpm migration:generate` - Generar desde cambios de entidades
+- `pnpm migration:create` - Crear migración vacía
+- `pnpm migration:run` - Ejecutar migraciones pendientes
+- `pnpm migration:dev:reset` - Reset completo DB local
+- `pnpm migration:prod` - Ejecutar migraciones en producción
+- `pnpm migration:prod:status` - Ver estado de migraciones
+
+**IMPORTANTE:**
+- `synchronize` está **SIEMPRE deshabilitado**
+- **SIEMPRE** usar migraciones, incluso en desarrollo
+- Las migraciones se ejecutan manualmente (no automáticas)
+
+---
+
+## 📦 Packages Compartidos
+
+### `@financial-win/shared-types`
+
+**Propósito:** Tipos TypeScript y schemas Zod compartidos entre frontend y backend.
+
+**Estructura:**
+```
+packages/shared-types/src/
+├── dto/                # Schemas Zod para validación
+│   └── *.schema.ts     # Ejemplo: example.schema.ts
+├── api/                # Tipos de API
+└── errors/             # Tipos de errores
+```
+
+**Uso:**
+```typescript
+// Definir schema en shared-types
+export const createMiEntidadSchema = z.object({
+  nombre: z.string().min(1).max(255),
+});
+
+// Usar en backend
+import { ZodValidationPipe } from '@financial-win/shared-config';
+@Post()
+@UsePipes(new ZodValidationPipe(createMiEntidadSchema))
+create(@Body() data: CreateMiEntidad) { ... }
+
+// Usar en frontend
+import { createMiEntidadSchema } from '@financial-win/shared-types';
+```
+
+### `@financial-win/shared-config`
+
+**Propósito:** Utilidades de configuración y validación compartidas.
+
+**Contenido:**
+- `ZodValidationPipe`: Pipe de validación para NestJS usando Zod
+- Utilidades de validación de entorno
+
+---
+
+## 🔧 Configuración y Variables de Entorno
+
+### Backend (`apps/api/.env.dev`)
+
+**Variables Críticas:**
+```env
+# Database
+DB_HOST=postgres
+DB_PORT=5432
+DB_USERNAME={app_name}
+DB_PASSWORD={app_name}
+DB_NAME={app_name}_dev
+DATABASE_URL=postgresql://{app_name}:{app_name}@postgres:5432/{app_name}_dev
+
+# OIDC
+OIDC_ISSUER_URL=http://host.docker.internal:5009
+OIDC_PUBLIC_URL=http://localhost:5009
+OIDC_CLIENT_ID=your-client-id
+OIDC_CLIENT_SECRET=your-client-secret
+OIDC_REDIRECT_URI=http://localhost:6000/api/auth/callback
+JWT_SECRET=your_jwt_secret_minimum_32_characters
+
+# App
+PORT=6006
+NODE_ENV=development
+LOG_LEVEL=debug
+```
+
+### Frontend (`apps/web/.env.dev`)
+
+**Variables Críticas:**
+```env
+VITE_API_URL=http://localhost:6006
+```
+
+---
+
+## 🐳 Docker y Desarrollo
+
+### Docker Compose
+
+**Servicios:**
+- `postgres`: PostgreSQL 17-alpine (puerto 5555:5432)
+- `api`: Backend NestJS (puerto 6006:6006)
+- `web`: Frontend React (puerto 3003:3003)
+- `adminer`: Admin de base de datos (puerto 8880:8080)
+
+**Características:**
+- Hot-reload configurado (volúmenes montados)
+- Health checks en todos los servicios
+- Red Docker dedicada (`{app_name}-network`)
+- Volúmenes persistentes para datos
+
+### Scripts de Automatización
+
+**Scripts Disponibles:**
+- `./scripts/dev.sh` - Desarrollo local con Docker
+- `./scripts/dev-robust.sh` - Desarrollo con limpieza completa
+- `./scripts/change-app-name.sh` - Cambiar nombre de la aplicación
+- `./scripts/change-ports.sh` - Cambiar puertos de módulos
+- `./scripts/clean.sh` - Limpieza profunda del ambiente
+
+**Comandos pnpm:**
+- `pnpm docker:dev` - Iniciar desarrollo
+- `pnpm docker:dev:robust` - Desarrollo robusto
+- `pnpm docker:stop` - Detener servicios
+- `pnpm docker:logs` - Ver logs
+- `pnpm audit:security` - Auditoría de seguridad multi-tenant
+
+---
+
+## 🧪 Testing
+
+### Backend
+
+**Configuración:**
+- Jest + ts-jest
+- Supertest para E2E
+- Tests unitarios: `*.spec.ts`
+- Tests E2E: `test/**/*.e2e-spec.ts`
+
+**Ejemplo de Módulo con Tests:**
+- `modules/example/` incluye tests unitarios y E2E completos
+
+### Frontend
+
+**Configuración:**
+- Vitest + Testing Library
+- Test utilities en `test-utils.tsx`
+- Tests de componentes: `*.test.tsx`
+
+---
+
+## 📊 Observabilidad
+
+### Logging
+
+**Patrón:**
+- Logs estructurados con contexto
+- Request ID tracking automático (`RequestIdInterceptor`)
+- Niveles: `debug`, `info`, `warn`, `error`
+
+### Métricas
+
+**Infraestructura:**
+- Endpoint: `GET /metrics` (Prometheus format)
+- `MetricsService`: Esqueleto listo para implementar
+- `MetricsInterceptor`: Captura métricas HTTP automáticamente
+
+### Tracing
+
+**Infraestructura:**
+- `TracingInterceptor`: Esqueleto listo para OpenTelemetry
+- Preparado para distributed tracing
+
+---
+
+## 🔒 Seguridad Multi-Tenant
+
+### Auditoría Automática
+
+**Scripts de Pre-commit:**
+- `audit-controllers.ts`: Valida uso correcto de `@CompanyId()` en controllers
+- `audit-services.ts`: Valida filtrado por `company_id` en servicios
+- **Bloquea commits** si encuentra problemas de seguridad
+
+**Validaciones:**
+- ✅ Endpoints tenant-scoped deben usar `@CompanyId()` decorator
+- ✅ `companyId` debe pasarse correctamente a servicios
+- ✅ Queries SQL deben filtrar por `company_id`
+- ✅ Detecta queries raw sin filtro de tenant
+
+**Ejecución Manual:**
+```bash
+pnpm audit:security  # Auditoría completa
+pnpm audit:controllers  # Solo controllers
+pnpm audit:services  # Solo servicios
+```
+
+---
+
+## 🎯 Patrones de Desarrollo
+
+### Crear un Nuevo Módulo
+
+**Backend:**
+1. Generar estructura: `nest generate module modules/mi-modulo`
+2. Crear entidad con `company_id` obligatorio
+3. Crear DTOs con Zod schemas en `packages/shared-types`
+4. Implementar servicio con filtrado por `company_id`
+5. Implementar controller con `@UseGuards(OIDCAuthGuard)` y `@CompanyId()`
+6. Registrar en `AppModule`
+
+**Frontend:**
+1. Crear componente en `components/mi-modulo/`
+2. Crear página en `pages/mi-modulo/`
+3. Crear cliente API en `api/mi-modulo.ts`
+4. Agregar ruta en `App.tsx`
+
+### Validación
+
+**Patrón:**
+- **Single Source of Truth**: Zod schemas en `packages/shared-types`
+- Backend: `ZodValidationPipe` para validar requests
+- Frontend: Usar mismos schemas para validación de formularios
+
+### Manejo de Errores
+
+**Backend:**
+- `HttpExceptionFilter`: Filtro global de excepciones
+- Respuestas estructuradas con códigos HTTP apropiados
+- Logging automático de errores
+
+**Frontend:**
+- `ErrorBoundary`: Captura errores de React
+- Manejo de errores de API con toast notifications
+
+---
+
+## 🚀 Flujo de Desarrollo
+
+### Inicio Rápido
+
+```bash
+# 1. Configurar variables de entorno
+cd apps/api && cp .env.example .env.dev
+cd apps/web && cp .env.example .env.dev
+
+# 2. Iniciar desarrollo
+./scripts/dev.sh
+
+# 3. Acceder a servicios
+# API: http://localhost:6006
+# Web: http://localhost:3003
+# Adminer: http://localhost:8880
+```
+
+### Crear Migración
+
+```bash
+cd apps/api
+pnpm migration:generate src/migrations/CreateMiTabla
+pnpm migration:run
+```
+
+### Ejecutar Tests
+
+```bash
+# Backend
+cd apps/api && pnpm test
+
+# Frontend
+cd apps/web && pnpm test
+```
+
+---
+
+## 📝 Convenciones y Reglas
+
+### Naming Conventions
+
+- **Entidades**: PascalCase (`MiEntidad`)
+- **Tablas**: snake_case (`mi_tabla`)
+- **Módulos**: kebab-case (`mi-modulo`)
+- **Variables**: camelCase (`miVariable`)
+- **Constantes**: UPPER_SNAKE_CASE (`MI_CONSTANTE`)
+
+### Código
+
+- **TypeScript strict mode**: Habilitado
+- **ESLint + Prettier**: Configurado con pre-commit hooks
+- **Imports**: Organizados automáticamente
+- **Comentarios**: En español para código de negocio
+
+### Base de Datos
+
+- **IDs**: UUID v4 (`@PrimaryGeneratedColumn('uuid')`)
+- **Timestamps**: `created_at` y `updated_at` obligatorios
+- **Multi-tenancy**: `company_id` obligatorio en todas las entidades
+- **Soft deletes**: No implementado (usar `is_active` si se necesita)
+
+---
+
+## ⚠️ Reglas Críticas
+
+### NUNCA Hacer
+
+1. ❌ Habilitar `synchronize: true` en TypeORM
+2. ❌ Crear entidades sin `company_id` (si es tenant-scoped)
+3. ❌ Hacer queries sin filtrar por `company_id`
+4. ❌ Validar tokens OIDC localmente (delegar a oidc-server)
+5. ❌ Hardcodear credenciales o secrets
+6. ❌ Bypassear guards de autenticación
+7. ❌ Crear endpoints sin `@UseGuards(OIDCAuthGuard)` (si requiere auth)
+
+### SIEMPRE Hacer
+
+1. ✅ Usar migraciones para cambios de esquema
+2. ✅ Incluir `company_id` en entidades tenant-scoped
+3. ✅ Filtrar queries por `company_id` del usuario autenticado
+4. ✅ Usar `@CompanyId()` decorator en endpoints tenant-scoped
+5. ✅ Validar inputs con Zod schemas
+6. ✅ Usar `OIDCAuthGuard` para endpoints protegidos
+7. ✅ Agregar logging en operaciones importantes
+8. ✅ Ejecutar `pnpm audit:security` antes de commits importantes
+
+---
+
+## 🎓 Resumen para ChatGPT
+
+### Lo que YA EXISTE y NO debes modificar:
+
+1. **Infraestructura de Autenticación OIDC**
+   - Guard `OIDCAuthGuard` funcionando
+   - Módulo `auth/` con endpoints de login/logout/callback
+   - Integración con oidc-server externo
+   - Contexto de autenticación en frontend (`AuthContext`)
+
+2. **Configuración de Base de Datos**
+   - TypeORM configurado con PostgreSQL
+   - Sistema de migraciones funcionando
+   - Configuración de desarrollo y producción
+
+3. **Infraestructura de Desarrollo**
+   - Docker Compose con hot-reload
+   - Scripts de automatización
+   - Packages compartidos (shared-types, shared-config)
+
+4. **Observabilidad Base**
+   - Logging estructurado
+   - Interceptores de métricas y tracing (esqueletos)
+   - Request ID tracking
+
+5. **Seguridad Multi-Tenant**
+   - Decorador `@CompanyId()`
+   - Auditoría automática de seguridad
+   - Patrones de filtrado por `company_id`
+
+### Lo que DEBES construir (lógica de producto):
+
+1. **Módulos de Negocio**
+   - Entidades específicas del dominio
+   - Servicios con lógica de negocio
+   - Controllers con endpoints REST
+   - DTOs con validación Zod
+
+2. **Frontend**
+   - Componentes UI específicos del producto
+   - Páginas y rutas
+   - Clientes API para nuevos endpoints
+   - Stores Zustand si se necesita estado global
+
+3. **Migraciones**
+   - Crear migraciones para nuevas entidades
+   - Seguir patrones existentes
+
+### Patrones a Seguir:
+
+1. **Multi-Tenancy**: Siempre incluir `company_id` y usar `@CompanyId()`
+2. **Validación**: Usar Zod schemas en `packages/shared-types`
+3. **Autenticación**: Usar `@UseGuards(OIDCAuthGuard)` en endpoints protegidos
+4. **Migraciones**: Siempre usar migraciones, nunca `synchronize`
+5. **Testing**: Seguir ejemplos en `modules/example/`
+
+---
+
+## 📚 Documentación Adicional
+
+Para más detalles, consultar:
+- `mdc/00-financial-win-GUIDE.mdc` - Guía de uso del financial-win
+- `mdc/01-ARCHITECTURE.mdc` - Arquitectura detallada
+- `mdc/02-OIDC-INTEGRATION.mdc` - Integración OIDC completa
+- `docs/Code/CODE_QUALITY.md` - Calidad de código
+- `docs/Code/TESTING.md` - Estrategia de testing
+- `docs/Code/VALIDATION_STRATEGY.md` - Estrategia de validación
+- `docs/Code/OBSERVABILITY.md` - Observabilidad
+
+---
+
+**Última actualización**: Este documento refleja el estado del financial-win base. ChatGPT debe usar esta información como contexto para construir la lógica de producto sin preocuparse por la infraestructura técnica base.

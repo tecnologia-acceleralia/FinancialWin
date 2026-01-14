@@ -1,0 +1,451 @@
+# Cursor Rules - Base de Datos (TypeORM + PostgreSQL)
+
+## Stack Tecnológico
+- **ORM**: TypeORM 0.3.x
+- **Base de Datos**: PostgreSQL
+- **Migraciones**: TypeORM Migrations
+- **Configuración**: NestJS + TypeORM Module
+
+## Arquitectura
+
+### Estructura de Migraciones
+```
+apps/api/src/migrations/
+├── [timestamp]-[Description].ts    # Migraciones individuales
+└── utils/
+    └── migration-helpers.ts        # Helpers reutilizables
+```
+
+### Data Source
+- Configuración en `data-source.cjs`
+- Usa variables de entorno o `DATABASE_URL`
+- Soporta SSL para producción (Digital Ocean, etc.)
+
+## Entidades TypeORM
+
+### Estructura Estándar de Entidad
+```typescript
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  Index,
+} from 'typeorm';
+
+/**
+ * EntityName Entity
+ *
+ * Descripción del propósito de la entidad.
+ * 
+ * Patrones clave:
+ * - UUID primary key
+ * - company_id para multi-tenancy
+ * - Timestamps automáticos
+ * - Soft delete con is_active
+ */
+@Entity('table_name')
+@Index(['company_id'])
+@Index(['company_id', 'status'])  // Índices compuestos cuando sea necesario
+export class EntityName {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column('varchar', { length: 255 })
+  @Index('IDX_entity_company_id')
+  company_id: string;
+
+  // Campos de negocio...
+  @Column('varchar', { length: 255 })
+  name: string;
+
+  @Column('text', { nullable: true })
+  description?: string;
+
+  @Column('varchar', { length: 50, default: 'active' })
+  status: 'active' | 'inactive' | 'pending';
+
+  @Column('jsonb', { nullable: true })
+  metadata?: Record<string, unknown>;
+
+  @Column('boolean', { default: true })
+  @Index('IDX_entity_is_active')
+  is_active: boolean;
+
+  @CreateDateColumn()
+  created_at: Date;
+
+  @UpdateDateColumn()
+  updated_at: Date;
+}
+```
+
+### Reglas para Entidades
+
+#### Primary Keys
+- **SIEMPRE** usar UUID: `@PrimaryGeneratedColumn('uuid')`
+- **NUNCA** usar auto-increment integers
+- UUID proporciona mejor soporte para multi-tenancy y distribución
+
+#### Multi-tenancy
+- **SIEMPRE** incluir campo `company_id: string`
+- **SIEMPRE** crear índice en `company_id`
+- **SIEMPRE** filtrar consultas por `company_id`
+- Tipo: `@Column('varchar', { length: 255 })`
+
+#### Soft Deletes
+- **SIEMPRE** incluir campo `is_active: boolean` con default `true`
+- **SIEMPRE** crear índice en `is_active`
+- **SIEMPRE** filtrar por `is_active = true` en consultas normales
+- No usar `@DeleteDateColumn` - usar `is_active` para más control
+
+#### Timestamps
+- **SIEMPRE** incluir `created_at` y `updated_at`
+- Usar `@CreateDateColumn()` para `created_at`
+- Usar `@UpdateDateColumn()` para `updated_at`
+- TypeORM maneja estos automáticamente
+
+#### Tipos de Datos
+- **Strings**: `@Column('varchar', { length: N })` - especificar length apropiado
+- **Textos largos**: `@Column('text', { nullable: true })`
+- **Números**: `@Column('integer')` o `@Column('decimal', { precision: 10, scale: 2 })`
+- **Booleanos**: `@Column('boolean', { default: true/false })`
+- **JSON**: `@Column('jsonb', { nullable: true })` - usar jsonb, no json
+- **Fechas**: `@Column('timestamp')` o `@CreateDateColumn()` / `@UpdateDateColumn()`
+- **Enums**: `@Column('varchar', { length: N })` con tipo TypeScript union
+
+#### Índices
+- **SIEMPRE** crear índice en `company_id`
+- **SIEMPRE** crear índice en `is_active`
+- Crear índices en campos de búsqueda frecuente
+- Crear índices compuestos para consultas multi-campo
+- Usar `@Index()` decorator o definirlos en migraciones
+
+#### Nullable
+- **Explícito**: Siempre especificar `nullable: true` o `nullable: false`
+- Por defecto, campos son `nullable: false`
+- Usar `?` en TypeScript para campos opcionales
+
+## Migraciones
+
+### Estructura de Migración
+```typescript
+import { MigrationInterface, QueryRunner, Table, TableIndex } from 'typeorm';
+import {
+  createTableIfNotExists,
+  dropTableIfExists,
+} from '../utils/migration-helpers';
+
+/**
+ * [Description] Migration
+ *
+ * Descripción de lo que hace esta migración.
+ * 
+ * Para ejecutar:
+ *   pnpm migration:run
+ *
+ * Para revertir:
+ *   pnpm migration:revert
+ */
+export class [Description][timestamp] implements MigrationInterface {
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    const table = new Table({
+      name: 'table_name',
+      columns: [
+        {
+          name: 'id',
+          type: 'uuid',
+          isPrimary: true,
+          generationStrategy: 'uuid',
+          default: 'uuid_generate_v4()',
+        },
+        {
+          name: 'company_id',
+          type: 'varchar',
+          length: '255',
+          isNullable: false,
+        },
+        {
+          name: 'name',
+          type: 'varchar',
+          length: '255',
+          isNullable: false,
+        },
+        {
+          name: 'is_active',
+          type: 'boolean',
+          default: true,
+          isNullable: false,
+        },
+        {
+          name: 'created_at',
+          type: 'timestamp',
+          default: 'CURRENT_TIMESTAMP',
+          isNullable: false,
+        },
+        {
+          name: 'updated_at',
+          type: 'timestamp',
+          default: 'CURRENT_TIMESTAMP',
+          isNullable: false,
+        },
+      ],
+      indices: [
+        new TableIndex({
+          name: 'IDX_table_name_company_id',
+          columnNames: ['company_id'],
+        }),
+        new TableIndex({
+          name: 'IDX_table_name_is_active',
+          columnNames: ['is_active'],
+        }),
+        new TableIndex({
+          name: 'IDX_table_name_company_id_status',
+          columnNames: ['company_id', 'status'],
+        }),
+      ],
+    });
+
+    await createTableIfNotExists(queryRunner, table);
+  }
+
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    await dropTableIfExists(queryRunner, 'table_name');
+  }
+}
+```
+
+### Reglas para Migraciones
+
+#### Nombres de Archivos
+- Formato: `[timestamp]-[Description].ts`
+- Timestamp: `YYYYMMDDHHmmss` (ej: `1733000000000`)
+- Description: PascalCase sin espacios (ej: `CreateUserTable`)
+- Ejemplo: `1733000000000-CreateUserTable.ts`
+
+#### Helpers
+- **SIEMPRE** usar `createTableIfNotExists()` en lugar de `createTable()`
+- **SIEMPRE** usar `dropTableIfExists()` en lugar de `dropTable()`
+- Esto hace las migraciones idempotentes
+
+#### Métodos
+- **up()**: Aplicar cambios (crear tabla, agregar columna, etc.)
+- **down()**: Revertir cambios (eliminar tabla, remover columna, etc.)
+- **SIEMPRE** implementar `down()` para poder revertir
+
+#### Índices en Migraciones
+- Crear índices junto con la tabla
+- Usar nombres descriptivos: `IDX_table_name_column_name`
+- Para índices compuestos: `IDX_table_name_col1_col2`
+
+#### Modificar Migraciones Existentes
+- **NUNCA** modificar migraciones que ya fueron ejecutadas
+- **SIEMPRE** crear una nueva migración para cambios adicionales
+- Las migraciones deben ser inmutables una vez ejecutadas
+
+### Tipos de Migraciones Comunes
+
+#### Crear Tabla
+```typescript
+public async up(queryRunner: QueryRunner): Promise<void> {
+  const table = new Table({ /* ... */ });
+  await createTableIfNotExists(queryRunner, table);
+}
+```
+
+#### Agregar Columna
+```typescript
+public async up(queryRunner: QueryRunner): Promise<void> {
+  await queryRunner.addColumn('table_name', new TableColumn({
+    name: 'new_column',
+    type: 'varchar',
+    length: '255',
+    isNullable: true,
+  }));
+}
+```
+
+#### Agregar Índice
+```typescript
+public async up(queryRunner: QueryRunner): Promise<void> {
+  await queryRunner.createIndex('table_name', new TableIndex({
+    name: 'IDX_table_name_column',
+    columnNames: ['column'],
+  }));
+}
+```
+
+#### Modificar Columna
+```typescript
+public async up(queryRunner: QueryRunner): Promise<void> {
+  await queryRunner.changeColumn('table_name', 'column_name', new TableColumn({
+    name: 'column_name',
+    type: 'varchar',
+    length: '500',  // Cambiado de 255 a 500
+    isNullable: false,
+  }));
+}
+```
+
+## Consultas y Repositorios
+
+### Patrones de Consulta
+
+#### Búsqueda con Filtros
+```typescript
+async findAll(companyId: string, query: QueryParams) {
+  const queryBuilder = this.repository
+    .createQueryBuilder('entity')
+    .where('entity.company_id = :companyId', { companyId })
+    .andWhere('entity.is_active = :isActive', { isActive: true });
+  
+  // Filtros adicionales...
+  if (query.status) {
+    queryBuilder.andWhere('entity.status = :status', { status: query.status });
+  }
+  
+  // Paginación
+  const page = query.page || 1;
+  const limit = query.limit || 10;
+  queryBuilder
+    .skip((page - 1) * limit)
+    .take(limit);
+  
+  const [data, total] = await queryBuilder.getManyAndCount();
+  
+  return { data, total, page, limit };
+}
+```
+
+#### Búsqueda por ID
+```typescript
+async findOne(companyId: string, id: string) {
+  return this.repository.findOne({
+    where: {
+      id,
+      company_id: companyId,
+      is_active: true,
+    },
+  });
+}
+```
+
+### Reglas para Consultas
+
+#### Multi-tenancy
+- **SIEMPRE** filtrar por `company_id` en TODAS las consultas
+- **NUNCA** confiar en que el usuario no puede acceder a datos de otros companies
+- Usar parámetros en lugar de concatenación de strings
+
+#### Soft Deletes
+- **SIEMPRE** filtrar por `is_active = true` en consultas normales
+- Solo incluir registros inactivos en consultas administrativas explícitas
+- Documentar cuando se incluyen registros inactivos
+
+#### Seguridad
+- **NUNCA** usar interpolación de strings en queries
+- **SIEMPRE** usar parámetros con QueryBuilder
+- Prevenir SQL injection usando parámetros nombrados
+
+#### Performance
+- Usar `select()` explícito cuando solo se necesiten ciertos campos
+- Usar índices apropiados
+- Evitar `N+1` queries usando `relations` o joins apropiados
+- Usar paginación para listas grandes
+
+## Transacciones
+
+### Uso de Transacciones
+```typescript
+import { DataSource } from 'typeorm';
+
+async createWithTransaction(data: CreateData) {
+  return this.dataSource.transaction(async (manager) => {
+    const entity1 = manager.create(Entity1, data1);
+    await manager.save(entity1);
+    
+    const entity2 = manager.create(Entity2, { ...data2, entity1_id: entity1.id });
+    await manager.save(entity2);
+    
+    return { entity1, entity2 };
+  });
+}
+```
+
+### Reglas para Transacciones
+- Usar transacciones para operaciones atómicas
+- Agrupar operaciones relacionadas en una transacción
+- Manejar rollback apropiadamente
+- Evitar transacciones largas (lock de base de datos)
+
+## Configuración
+
+### Database Config
+- Configuración en `common/config/database.config.ts`
+- Variables de entorno:
+  - `DATABASE_URL` (preferido en producción)
+  - O individuales: `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_NAME`
+- SSL configurado automáticamente para producción
+
+### TypeORM Module
+```typescript
+TypeOrmModule.forRootAsync({
+  useFactory: (databaseConfig: DatabaseConfigValues) => ({
+    type: 'postgres',
+    host: databaseConfig.host,
+    port: databaseConfig.port,
+    username: databaseConfig.username,
+    password: databaseConfig.password,
+    database: databaseConfig.database,
+    url: databaseConfig.url,
+    entities: [__dirname + '/**/*.entity{.ts,.js}'],
+    synchronize: false,  // NUNCA true en producción
+    logging: databaseConfig.logging,
+  }),
+  inject: [DatabaseConfig.KEY],
+})
+```
+
+### Reglas de Configuración
+- **NUNCA** usar `synchronize: true` en producción
+- **SIEMPRE** usar migraciones para cambios de esquema
+- Usar `logging: true` solo en desarrollo
+- Validar configuración de base de datos al inicio
+
+## Comandos de Migración
+
+```bash
+# Generar migración (analiza cambios en entidades)
+pnpm --filter financial-win-api migration:generate src/migrations/MigrationName
+
+# Crear migración vacía
+pnpm --filter financial-win-api migration:create src/migrations/MigrationName
+
+# Ejecutar migraciones pendientes
+pnpm --filter financial-win-api migration:run
+
+# Revertir última migración
+pnpm --filter financial-win-api migration:revert
+
+# Ver estado de migraciones
+pnpm --filter financial-win-api migration:show
+
+# Producción
+pnpm migrate:prod        # Ejecutar migraciones en producción
+pnpm migrate:prod:status # Ver estado
+pnpm migrate:prod:revert # Revertir
+```
+
+## Buenas Prácticas
+
+1. **Migraciones Inmutables**: Nunca modificar migraciones ejecutadas
+2. **Índices**: Crear índices para consultas frecuentes
+3. **Multi-tenancy**: Siempre filtrar por company_id
+4. **Soft Deletes**: Usar is_active en lugar de eliminar físicamente
+5. **UUIDs**: Usar UUIDs para primary keys
+6. **Validación**: Validar datos antes de guardar
+7. **Transacciones**: Usar para operaciones atómicas
+8. **Performance**: Optimizar consultas y usar índices
+9. **Seguridad**: Usar parámetros, nunca interpolación de strings
+10. **Documentación**: Documentar entidades y migraciones complejas

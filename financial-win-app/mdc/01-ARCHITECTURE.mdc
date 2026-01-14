@@ -1,0 +1,244 @@
+# Arquitectura del financial-win
+
+## Visión General
+
+Esta aplicación sigue una arquitectura modular y escalable:
+
+- **Backend**: NestJS con módulos por dominio
+- **Frontend**: React con componentes organizados
+- **Base de Datos**: PostgreSQL con TypeORM
+- **Autenticación**: OIDC multi-tenant
+
+## Backend
+
+### Estructura de Módulos
+
+```
+apps/api/src/
+├── common/           # Infraestructura compartida
+│   ├── config/      # Configuraciones
+│   ├── guards/      # Guards de autenticación
+│   ├── interceptors/# Interceptores
+│   ├── filters/     # Filtros de excepciones
+│   └── modules/     # Módulos comunes (Storage)
+├── modules/         # Módulos de negocio (vacío - listo para agregar)
+├── auth/            # Módulo de autenticación OIDC
+└── migrations/      # Migraciones de base de datos
+```
+
+### Crear un Nuevo Módulo
+
+1. **Generar estructura básica**:
+   ```bash
+   nest generate module modules/mi-modulo
+   nest generate controller modules/mi-modulo
+   nest generate service modules/mi-modulo
+   ```
+
+2. **Crear entidad**:
+   ```typescript
+   // src/modules/mi-modulo/entities/mi-entidad.entity.ts
+   @Entity('mi_tabla')
+   export class MiEntidad {
+     @PrimaryGeneratedColumn('uuid')
+     id: string;
+
+     @Column('varchar', { length: 255 })
+     company_id: string;
+
+     @Column('varchar', { length: 255 })
+     nombre: string;
+
+     @CreateDateColumn()
+     created_at: Date;
+
+     @UpdateDateColumn()
+     updated_at: Date;
+   }
+   ```
+
+3. **Crear DTOs con Zod** (single source of truth):
+   ```typescript
+   // packages/shared-types/src/dto/mi-modulo.schema.ts
+   import { z } from 'zod';
+   
+   export const createMiEntidadSchema = z.object({
+     nombre: z.string().min(1).max(255),
+   });
+   
+   export type CreateMiEntidad = z.infer<typeof createMiEntidadSchema>;
+   
+   // En el controller, usar ZodValidationPipe
+   @Post()
+   @UsePipes(new ZodValidationPipe(createMiEntidadSchema))
+   create(@Body() data: CreateMiEntidad) {
+     return this.service.create(data);
+   }
+   ```
+   
+   Ver `docs/VALIDATION_STRATEGY.md` para guía completa.
+
+4. **Registrar en AppModule**:
+   ```typescript
+   // app.module.ts
+   import { MiModuloModule } from './modules/mi-modulo/mi-modulo.module';
+
+   @Module({
+     imports: [
+       // ... otros módulos
+       MiModuloModule,
+     ],
+   })
+   ```
+
+### Migraciones
+
+#### Crear Migración
+
+```bash
+cd apps/api
+
+# Generar automáticamente desde cambios de entidades
+pnpm migration:generate src/migrations/CreateMiTabla
+
+# O crear migración vacía
+pnpm migration:create src/migrations/CreateMiTabla
+```
+
+#### Ejecutar Migraciones
+
+**IMPORTANTE**: `synchronize` está deshabilitado siempre. Siempre usar migraciones.
+
+```bash
+# Desarrollo - Reset completo de base de datos local
+pnpm migration:dev:reset
+
+# Desarrollo - Ejecutar migraciones pendientes
+pnpm migration:run
+
+# Producción (manual)
+pnpm migration:prod
+pnpm migration:prod:status
+pnpm migration:prod:check
+```
+
+Ver `apps/api/src/migrations/1733000000000-CreateExampleTable.ts` para ejemplo completo.
+
+## Frontend
+
+### Estructura
+
+```
+apps/web/src/
+├── components/      # Componentes UI
+│   ├── common/     # Componentes comunes (Layout, ErrorBoundary)
+│   └── auth/       # Componentes de autenticación
+├── pages/          # Páginas/rutas
+├── api/            # Clientes API
+├── contexts/       # Contextos React (AuthContext)
+├── hooks/          # Custom hooks
+└── utils/          # Utilidades
+```
+
+### Crear una Nueva Página
+
+1. **Crear componente de página**:
+   ```typescript
+   // src/pages/mi-modulo/MiPagina.tsx
+   export function MiPagina() {
+     return <div>Mi Página</div>;
+   }
+   ```
+
+2. **Agregar ruta en App.tsx**:
+   ```typescript
+   import { MiPagina } from './pages/mi-modulo/MiPagina';
+
+   <Route path="/mi-ruta" element={<MiPagina />} />
+   ```
+
+### Cliente API
+
+```typescript
+// src/api/mi-modulo.ts
+import apiClient from './client';
+
+export const miModuloApi = {
+  getAll: () => apiClient.get('/mi-modulo'),
+  getById: (id: string) => apiClient.get(`/mi-modulo/${id}`),
+  create: (data: CreateDto) => apiClient.post('/mi-modulo', data),
+};
+```
+
+## Multi-Tenancy
+
+Todas las entidades deben incluir `company_id`:
+
+```typescript
+@Column('varchar', { length: 255 })
+company_id: string;
+```
+
+Los guards OIDC automáticamente filtran por `company_id` del usuario autenticado.
+
+## Seguridad
+
+- **Autenticación**: OIDC con oidc-server
+- **Autorización**: Guards que verifican acceso por company_id
+- **Validación**: Zod schemas como single source of truth (ver `docs/VALIDATION_STRATEGY.md`)
+- **Sanitización**: Inputs validados antes de procesar
+- **Headers de Seguridad**: Helmet middleware configurado
+
+## Escalabilidad
+
+- **Módulos**: Separación por dominio facilita escalar
+- **Base de Datos**: Índices en `company_id` para performance
+- **Caché**: Infraestructura lista para agregar Redis
+- **Queue**: Infraestructura lista para agregar Bull/Redis
+
+## Testing
+
+Ver `docs/TESTING.md` para estrategia completa de testing.
+
+### Backend
+- **Unit Tests**: Jest + ts-jest (`*.spec.ts`)
+- **E2E Tests**: Jest + Supertest (`test/**/*.e2e-spec.ts`)
+- **Ejemplo completo**: Módulo `example` con tests unitarios y e2e
+
+### Frontend
+- **Component Tests**: Vitest + Testing Library (`*.test.tsx`)
+- **Test Utilities**: `test-utils.tsx` con wrappers para providers
+- **Ejemplo completo**: Página `example` con tests
+
+## Observabilidad
+
+Ver `docs/OBSERVABILITY.md` para guía completa.
+
+### Métricas (Prometheus)
+- **Endpoint**: `GET /metrics`
+- **Service**: `MetricsService` (esqueleto listo para implementar)
+- **Interceptor**: `MetricsInterceptor` para capturar métricas HTTP
+
+### Tracing (OpenTelemetry)
+- **Interceptor**: `TracingInterceptor` (esqueleto listo para implementar)
+- **Distributed Tracing**: Preparado para OpenTelemetry
+
+### Logging
+- **Request ID**: Tracking automático via `RequestIdInterceptor`
+- **Structured Logs**: Logs estructurados con contexto
+
+## Packages Compartidos
+
+El financial-win incluye packages compartidos para código reutilizable:
+
+```
+packages/
+├── shared-types/     # Tipos TypeScript y schemas Zod compartidos
+└── shared-config/    # Utilidades de configuración y validación
+```
+
+**Uso**:
+- Importar tipos: `import { CreateExample } from '@financial-win/shared-types'`
+- Importar validación: `import { ZodValidationPipe } from '@financial-win/shared-config'`
+
+Ver `docs/VALIDATION_STRATEGY.md` para más detalles.

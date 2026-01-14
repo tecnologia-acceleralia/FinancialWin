@@ -1,0 +1,12 @@
+# Title
+.gitignore mínimo
+
+# File
+## .gitignore
+```
+node_modules
+dist
+.env
+provider/users.db
+.DS_Store
+```

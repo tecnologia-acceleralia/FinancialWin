@@ -1,0 +1,1065 @@
+# Cursor Rules - Frontend (React)
+
+## ⚠️ REGLAS ESTRICTAS - RESUMEN EJECUTIVO
+
+### 🚫 PROHIBIDO
+1. **Inline Styles** (excepto valores dinámicos calculados en tiempo real)
+2. **"Class Soup"** - Cadenas largas de clases Tailwind en JSX
+3. **JSX Repetitivo** - Si se usa más de una vez, debe ser componente
+4. **Lógica de Negocio** en componentes presentacionales
+
+### ✅ OBLIGATORIO
+1. **Componentización**: Elementos repetitivos → `components/common/`
+2. **Clases Semánticas**: Definir en `apps/web/src/styles/index.css` con `@apply`
+3. **Separación**: Lógica en hooks, presentación en componentes
+4. **Clases Centralizadas**: Cambios estéticos desde CSS, no componente por componente
+
+### 📁 Ubicaciones Clave
+- **Estilos**: `apps/web/src/styles/index.css` (usar `@apply` de Tailwind)
+- **Componentes Comunes**: `apps/web/src/components/common/`
+- **Hooks**: `apps/web/src/hooks/` o junto al feature en `pages/[feature]/`
+
+---
+
+## Stack Tecnológico
+- **Framework**: React 19.x
+- **Lenguaje**: TypeScript 5.5+
+- **Bundler**: Vite 7.x
+- **Estilos**: Tailwind CSS 3.4+
+- **Estado**: Zustand 4.x + TanStack Query 5.x
+- **Routing**: React Router 6.x
+- **HTTP Client**: Axios
+- **Testing**: Vitest 4.x + Testing Library
+- **Formateo**: Prettier + ESLint
+
+## Arquitectura y Estructura
+
+### Organización de Archivos
+```
+apps/web/src/
+├── api/                    # Cliente HTTP y configuración de API
+│   └── client.ts           # Axios instance y interceptors
+├── components/             # Componentes reutilizables
+│   ├── auth/              # Componentes específicos de autenticación
+│   │   ├── ProtectedRoutes.tsx
+│   │   └── UserInfo.tsx
+│   └── common/            # Componentes comunes reutilizables (OBLIGATORIO para elementos repetitivos)
+│       ├── Button.tsx     # Botones reutilizables
+│       ├── Card.tsx       # Cards reutilizables
+│       ├── Badge.tsx      # Badges reutilizables
+│       ├── Input.tsx      # Inputs reutilizables
+│       ├── Modal.tsx      # Modales reutilizables
+│       ├── LoadingSpinner.tsx
+│       ├── ErrorMessage.tsx
+│       ├── Layout.tsx
+│       ├── ErrorBoundary.tsx
+│       └── index.ts       # Exports centralizados
+├── contexts/              # React Contexts
+│   ├── AuthContext.tsx
+│   └── authConstants.ts
+├── hooks/                 # Custom hooks (lógica de negocio, APIs)
+│   └── use[Feature]Query.ts
+├── pages/                 # Páginas/Vistas (route components)
+│   └── [feature]/         # Agrupadas por feature
+│       ├── [Feature]Page.tsx    # Página principal (coordina datos + layout)
+│       ├── [Feature]Form.tsx    # Formularios específicos del feature
+│       ├── use[Feature]Query.ts # Hooks específicos del feature (pueden estar en hooks/ si son compartidos)
+│       └── [Feature]Page.test.tsx
+├── config/                # Configuración de la app
+├── styles/                # Estilos globales
+│   ├── index.css          # ⚠️ ARCHIVO PRINCIPAL - Todas las clases semánticas aquí
+│   └── textSelection.css
+├── utils/                 # Utilidades puras
+├── App.tsx                # Componente raíz de la app
+├── main.tsx               # Punto de entrada
+└── test-utils.tsx         # Utilidades para testing
+```
+
+### Estructura de `components/common/`
+
+**Todos los elementos visuales que se usan más de una vez deben estar aquí:**
+
+```
+components/common/
+├── Button.tsx              # Botones reutilizables
+├── Card.tsx                # Cards reutilizables  
+├── Badge.tsx               # Badges de estado
+├── Input.tsx               # Inputs de formulario
+├── Textarea.tsx            # Textareas
+├── Select.tsx              # Selects
+├── Modal.tsx               # Modales/Dialogs
+├── Popover.tsx             # Popovers
+├── Dropdown.tsx            # Dropdowns
+├── Menu.tsx                # Menús
+├── MenuItem.tsx            # Items de menú
+├── LoadingSpinner.tsx      # Spinners de carga
+├── ErrorMessage.tsx        # Mensajes de error
+├── EmptyState.tsx          # Estados vacíos
+├── PageHeader.tsx          # Headers de página
+├── DataTable.tsx           # Tablas de datos
+├── Pagination.tsx          # Paginación
+├── Layout.tsx              # Layout principal
+├── ErrorBoundary.tsx       # Error boundary
+└── index.ts                # Exports: export * from './Button'; etc.
+```
+
+### Patrones de Componentes
+
+#### Componentización Obligatoria (Atomic Design) - REGLA ESTRICTA
+
+**PROHIBIDO escribir estructuras JSX repetitivas dentro de páginas.**
+
+1. **Si un elemento visual se usa o se prevé usar más de una vez**, debe extraerse como componente en `apps/web/src/components/common/`
+2. **Componentes comunes**: Card, Button, Badge, Pop-up, Menu item, Input, Modal, etc.
+3. **Ubicación**: `apps/web/src/components/common/[ComponentName].tsx`
+4. **Principio**: Componentes pequeños con una única responsabilidad
+
+```typescript
+// ❌ PROHIBIDO - Estructura repetitiva en página
+export function UserPage() {
+  return (
+    <div>
+      <div className="card">
+        <h2>Usuario 1</h2>
+        <p>Descripción...</p>
+      </div>
+      <div className="card">
+        <h2>Usuario 2</h2>
+        <p>Descripción...</p>
+      </div>
+    </div>
+  );
+}
+
+// ✅ CORRECTO - Extraer como componente
+// apps/web/src/components/common/UserCard.tsx
+export function UserCard({ user }: { user: User }) {
+  return (
+    <div className="card">
+      <h2>{user.name}</h2>
+      <p>{user.description}</p>
+    </div>
+  );
+}
+
+// UserPage.tsx
+export function UserPage() {
+  return (
+    <div>
+      {users.map(user => (
+        <UserCard key={user.id} user={user} />
+      ))}
+    </div>
+  );
+}
+```
+
+#### Separación de Responsabilidades
+
+- **Páginas**: Componentes de ruta, coordinan datos y layout (`[Feature]Page.tsx`)
+- **Componentes Comunes**: UI pura reutilizable (`components/common/[Component].tsx`)
+- **Custom Hooks**: Lógica de negocio, llamadas API, estado (`hooks/use[Feature]Query.ts`)
+- **Utils**: Funciones puras de utilidad
+
+#### Componentes Puros (Presentacionales)
+
+```typescript
+// ✅ CORRECTO - Componente puro sin lógica de negocio
+interface ButtonProps {
+  label: string;
+  onClick: () => void;
+  variant?: 'primary' | 'secondary';
+  disabled?: boolean;
+}
+
+export function Button({ label, onClick, variant = 'primary', disabled }: ButtonProps) {
+  return (
+    <button 
+      className={clsx('btn', `btn-${variant}`)}
+      onClick={onClick}
+      disabled={disabled}
+    >
+      {label}
+    </button>
+  );
+}
+
+// ✅ CORRECTO - Lógica en hook, componente usa el hook
+export function UserListPage() {
+  const { data, isLoading, error } = useUsersQuery();
+  
+  if (isLoading) return <LoadingSpinner />;
+  if (error) return <ErrorMessage error={error} />;
+  
+  return (
+    <div>
+      {data.map(user => (
+        <UserCard key={user.id} user={user} />
+      ))}
+    </div>
+  );
+}
+```
+
+#### Checklist de Componentización
+
+Antes de escribir JSX repetitivo, preguntar:
+- [ ] ¿Este elemento se usa más de una vez?
+- [ ] ¿Puede ser reutilizado en otra página?
+- [ ] ¿Tiene una responsabilidad única?
+- [ ] ¿Está en `components/common/` si es genérico?
+- [ ] ¿La lógica de negocio está en un hook separado?
+
+## Convenciones de Código
+
+### Nombres de Archivos
+- **Componentes**: `PascalCase.tsx` (ej: `UserProfile.tsx`)
+- **Hooks**: `camelCase.ts` con prefijo `use` (ej: `useUserQuery.ts`)
+- **Utils**: `camelCase.ts` (ej: `dateUtils.ts`)
+- **Tests**: `*.test.tsx` o `*.spec.tsx` junto al archivo fuente
+- **Tipos**: `*.types.ts` o inline en el mismo archivo
+
+### Nombres de Componentes
+- Usar PascalCase para componentes: `UserProfile`, `LoginForm`
+- Usar camelCase para funciones y variables: `getUserData`, `userId`
+- Usar UPPER_SNAKE_CASE para constantes: `API_BASE_URL`
+
+### Estructura de Componentes
+
+#### Página (Con lógica de negocio)
+```typescript
+// pages/users/UserPage.tsx
+import { useUsersQuery } from './useUsersQuery';
+import { UserCard } from '@/components/common/UserCard';
+import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+
+export function UserPage() {
+  // ✅ Lógica de negocio y datos en hook
+  const { data, isLoading, error } = useUsersQuery();
+  
+  // Estados locales solo para UI (modales, dropdowns, etc.)
+  const [isModalOpen, setIsModalOpen] = React.useState(false);
+  
+  // Handlers simples
+  const handleCreateUser = () => {
+    setIsModalOpen(true);
+  };
+  
+  // Render
+  if (isLoading) return <LoadingSpinner />;
+  if (error) return <ErrorMessage error={error} />;
+  
+  return (
+    <div className="container">
+      <div className="page-header">
+        <h1>Usuarios</h1>
+        <button className="btn btn-primary" onClick={handleCreateUser}>
+          Crear Usuario
+        </button>
+      </div>
+      
+      <div className="user-list">
+        {data.map(user => (
+          <UserCard key={user.id} user={user} />
+        ))}
+      </div>
+    </div>
+  );
+}
+```
+
+#### Componente Común (Puro/Presentacional)
+```typescript
+// components/common/UserCard.tsx
+interface UserCardProps {
+  user: User;
+  onEdit?: (user: User) => void;
+  onDelete?: (userId: string) => void;
+}
+
+export function UserCard({ user, onEdit, onDelete }: UserCardProps) {
+  // ❌ NO llamadas API aquí
+  // ❌ NO lógica de negocio compleja
+  // ✅ Solo lógica de presentación
+  
+  return (
+    <div className="card card-financial">
+      <div className="card-header">
+        <h3 className="card-title">{user.name}</h3>
+        <p className="card-description">{user.email}</p>
+      </div>
+      
+      <div className="card-footer">
+        {onEdit && (
+          <button className="btn btn-secondary" onClick={() => onEdit(user)}>
+            Editar
+          </button>
+        )}
+        {onDelete && (
+          <button className="btn btn-danger" onClick={() => onDelete(user.id)}>
+            Eliminar
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+```
+
+#### Custom Hook (Lógica de negocio)
+```typescript
+// hooks/useUsersQuery.ts o pages/users/useUsersQuery.ts
+import { useQuery } from '@tanstack/react-query';
+import { apiClient } from '@/api/client';
+
+export function useUsersQuery() {
+  return useQuery({
+    queryKey: ['users'],
+    queryFn: async () => {
+      const { data } = await apiClient.get('/users');
+      return data;
+    },
+  });
+}
+```
+
+#### Reglas de Estructura
+
+1. **Páginas**: Coordinan datos (hooks) + layout + componentes comunes
+2. **Componentes Comunes**: Solo presentación, props claras, sin lógica de negocio
+3. **Hooks**: Llamadas API, estado complejo, lógica de negocio
+4. **Separación**: Lógica separada de presentación siempre
+
+## React Query (TanStack Query)
+
+### Configuración
+- Configurado en `main.tsx` con QueryClient
+- Retry configurado para no reintentar en errores 4xx
+- Stale time: 5 minutos por defecto
+
+### Uso de Queries
+```typescript
+// hooks/useExampleQuery.ts
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiClient } from '../api/client';
+
+export const useExampleQuery = (companyId: string, query?: QueryParams) => {
+  return useQuery({
+    queryKey: ['examples', companyId, query],
+    queryFn: () => apiClient.get('/example', { params: query }),
+    staleTime: 5 * 60 * 1000, // 5 minutos
+  });
+};
+
+export const useCreateExample = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: (data: CreateExample) => apiClient.post('/example', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['examples'] });
+    },
+  });
+};
+```
+
+### Reglas para React Query
+- **SIEMPRE** usar query keys estructuradas: `['resource', id, params]`
+- Invalidar queries después de mutaciones exitosas
+- Usar `staleTime` apropiado según la naturaleza de los datos
+- Manejar estados de loading y error apropiadamente
+- No hacer refetch innecesario - confiar en cache
+
+### Query Keys
+- Estructura: `['resource', identifier?, params?]`
+- Ejemplos:
+  - `['examples', companyId]`
+  - `['example', companyId, exampleId]`
+  - `['examples', companyId, { page: 1, limit: 10 }]`
+
+## Estado Local
+
+### useState
+- Usar para estado local del componente
+- Preferir tipos específicos en lugar de `any`
+- Agrupar estado relacionado cuando tenga sentido
+
+### Zustand (si se necesita estado global)
+```typescript
+import { create } from 'zustand';
+
+interface Store {
+  count: number;
+  increment: () => void;
+}
+
+export const useStore = create<Store>((set) => ({
+  count: 0,
+  increment: () => set((state) => ({ count: state.count + 1 })),
+}));
+```
+
+### Reglas de Estado
+- **Preferir React Query** para estado del servidor
+- **Preferir useState** para estado local del componente
+- **Usar Zustand** solo para estado global compartido que no viene del servidor
+- **Evitar prop drilling** - usar Context o Zustand si es necesario
+
+## Routing
+
+### React Router
+```typescript
+// App.tsx o main router
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+
+<BrowserRouter>
+  <Routes>
+    <Route path="/" element={<HomePage />} />
+    <Route path="/example" element={<ExamplePage />} />
+    <Route path="/protected" element={<ProtectedRoute><ProtectedPage /></ProtectedRoute>} />
+  </Routes>
+</BrowserRouter>
+```
+
+### Rutas Protegidas
+- Usar `ProtectedRoutes` o `AuthGuard` para proteger rutas
+- Verificar autenticación antes de renderizar
+- Redirigir a login si no está autenticado
+
+### Navegación
+```typescript
+import { useNavigate } from 'react-router-dom';
+
+const navigate = useNavigate();
+navigate('/path');
+```
+
+## Styling con Tailwind CSS - REGLAS ESTRICTAS
+
+### Configuración
+- Archivo principal: `apps/web/src/styles/index.css`
+- Todas las clases semánticas deben definirse aquí usando `@apply`
+- Configurado en `tailwind.config.js`
+- Usar `clsx` para combinar clases condicionalmente (raramente necesario)
+
+### Zero Inline Styles - PROHIBIDO
+```typescript
+// ❌ PROHIBIDO - Estilos inline
+<div style={{ padding: '20px', backgroundColor: '#1a1a1a' }}>
+
+// ✅ PERMITIDO SOLO para valores dinámicos calculados
+<div style={{ 
+  left: `${position.x}px`, 
+  top: `${position.y}px`,
+  transform: `translate(${offsetX}px, ${offsetY}px)`
+}}>
+```
+
+**Regla estricta**: 
+- **NUNCA** usar `style={{...}}` salvo para valores puramente dinámicos calculados en tiempo real (posición, dimensiones calculadas, transformaciones dinámicas)
+- Todos los estilos estáticos deben estar en CSS
+
+### No "Class Soup" - Clases CSS Centralizadas
+
+```typescript
+// ❌ PROHIBIDO - "Class Soup" en componentes
+<button className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-white bg-primary-500 text-white hover:bg-primary-600 h-10 py-2 px-4">
+
+// ✅ CORRECTO - Clase semántica en CSS
+<button className="btn btn-primary btn-md">
+```
+
+### Definir Clases en `apps/web/src/styles/index.css`
+
+Todas las clases semánticas deben estar definidas en `index.css` usando `@apply`:
+
+```css
+/* apps/web/src/styles/index.css */
+
+@layer components {
+  /* Botones */
+  .btn {
+    @apply inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-white;
+  }
+
+  .btn-primary {
+    @apply bg-primary-500 text-white hover:bg-primary-600;
+  }
+
+  .btn-secondary {
+    @apply bg-gray-200 text-gray-900 hover:bg-gray-300;
+  }
+
+  .btn-accept {
+    @apply bg-green-500 text-white hover:bg-green-600;
+  }
+
+  /* Cards */
+  .card {
+    @apply rounded-lg border border-gray-200 bg-white text-gray-900 shadow-sm;
+  }
+
+  .card-financial {
+    @apply card border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-white;
+  }
+
+  /* Navegación */
+  .nav-link {
+    @apply flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-medium transition-colors;
+  }
+
+  .nav-link-active {
+    @apply nav-link bg-blue-100 text-blue-700;
+  }
+
+  .nav-link-inactive {
+    @apply nav-link text-gray-500 hover:text-gray-700;
+  }
+
+  /* Inputs */
+  .input {
+    @apply flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  /* Badges */
+  .badge {
+    @apply inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2;
+  }
+
+  .badge-status-active {
+    @apply badge border-green-200 bg-green-100 text-green-800;
+  }
+
+  .badge-status-pending {
+    @apply badge border-yellow-200 bg-yellow-100 text-yellow-800;
+  }
+}
+```
+
+### Uso de Clases en Componentes
+
+```typescript
+// ✅ CORRECTO - Clases semánticas simples
+<button className="btn btn-primary btn-md">Guardar</button>
+
+// ✅ CORRECTO - Combinar clases semánticas cuando sea necesario
+<button className={clsx('btn btn-primary', isLoading && 'opacity-50')}>
+
+// ❌ PROHIBIDO - Cadenas largas de clases de Tailwind directamente
+<button className="inline-flex items-center justify-center rounded-md...">
+```
+
+### Reglas Estrictas de Styling
+
+1. **Todas las clases visuales** deben estar definidas en `apps/web/src/styles/index.css`
+2. **Nombres semánticos**: `.btn-accept`, `.card-financial`, `.nav-link-active` (no `.blue-button-20px`)
+3. **Usar `@apply`**: Definir estilos con `@apply` de Tailwind dentro de `index.css`
+4. **Cambios globales**: Cualquier cambio estético se hace desde CSS, no componente por componente
+5. **No "class soup"**: Máximo 3-4 clases semánticas combinadas en JSX
+6. **Zero inline styles**: Prohibido salvo valores dinámicos calculados
+
+### Responsive Design
+- Definir variantes responsive en CSS usando `@apply` con breakpoints
+- Ejemplo:
+```css
+.card-responsive {
+  @apply card p-4;
+  @apply md:p-6;
+  @apply lg:p-8;
+}
+```
+
+### Responsive Design en Componentes
+- Preferir clases responsive definidas en CSS
+- Si necesitas responsive dinámico, usar máximo 1-2 clases breakpoint por elemento
+- Ejemplo aceptable: `className="card md:card-large"`
+
+## API Client (Axios)
+
+### Configuración
+- Instancia configurada en `api/client.ts`
+- Interceptors para auth, errores, y logging
+- Base URL desde variables de entorno
+
+### Uso
+```typescript
+import { apiClient } from '../api/client';
+
+// GET
+const { data } = await apiClient.get('/endpoint', { params });
+
+// POST
+const { data } = await apiClient.post('/endpoint', body);
+
+// Con React Query
+useQuery({
+  queryKey: ['key'],
+  queryFn: () => apiClient.get('/endpoint'),
+});
+```
+
+### Manejo de Errores
+- Los interceptors de Axios manejan errores globalmente
+- React Query maneja estados de error automáticamente
+- Usar `ErrorBoundary` para errores de renderizado
+
+## Autenticación
+
+### AuthContext
+- Proporciona estado de autenticación global
+- Métodos: `login`, `logout`, `user`
+- Estado persistido (localStorage/sessionStorage)
+
+### Uso
+```typescript
+import { useAuth } from '../contexts/AuthContext';
+
+const { user, isAuthenticated, login, logout } = useAuth();
+```
+
+### Guards
+- Usar `AuthGuard` o `ProtectedRoutes` para proteger componentes
+- Verificar autenticación antes de renderizar contenido protegido
+
+## Testing
+
+### Configuración
+- Vitest + Testing Library
+- Configurado en `vitest.config.ts`
+- Environment: jsdom para simular DOM
+
+### Test Wrapper
+```typescript
+// test-utils.tsx
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { BrowserRouter } from 'react-router-dom';
+
+export const TestWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+  
+  return (
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        {children}
+      </BrowserRouter>
+    </QueryClientProvider>
+  );
+};
+```
+
+### Ejemplo de Test
+```typescript
+import { render, screen, waitFor } from '@testing-library/react';
+import { TestWrapper } from '../test-utils';
+import { Component } from './Component';
+
+describe('Component', () => {
+  it('should render correctly', async () => {
+    render(
+      <TestWrapper>
+        <Component />
+      </TestWrapper>
+    );
+    
+    await waitFor(() => {
+      expect(screen.getByText('Expected Text')).toBeInTheDocument();
+    });
+  });
+});
+```
+
+### Reglas de Testing
+- **SIEMPRE** usar `TestWrapper` para componentes que usan React Query o Router
+- Mockear llamadas API en tests
+- Probar comportamiento, no implementación
+- Usar `waitFor` para operaciones asíncronas
+- Usar queries accesibles (`getByRole`, `getByLabelText`)
+
+## TypeScript
+
+### Tipos
+- Tipos compartidos desde `@financial-win/shared-types`
+- Tipos locales cuando sea necesario
+- Evitar `any` - usar `unknown` si el tipo es desconocido
+
+### Props
+```typescript
+interface ComponentProps {
+  required: string;
+  optional?: number;
+  children?: React.ReactNode;
+}
+
+export const Component: React.FC<ComponentProps> = ({ required, optional, children }) => {
+  // ...
+};
+```
+
+### Reglas TypeScript
+- **SIEMPRE** tipar props de componentes
+- **SIEMPRE** tipar funciones y handlers
+- Usar tipos compartidos cuando estén disponibles
+- Evitar type assertions innecesarias
+- Usar `as const` para literales cuando sea apropiado
+
+## Performance
+
+### Optimizaciones
+- Usar `React.memo` para componentes costosos
+- Usar `useMemo` y `useCallback` cuando sea necesario (evitar premature optimization)
+- Code splitting con React.lazy y Suspense
+- Optimistic updates en mutaciones cuando sea apropiado
+
+### Code Splitting
+```typescript
+import { lazy, Suspense } from 'react';
+
+const LazyComponent = lazy(() => import('./LazyComponent'));
+
+<Suspense fallback={<Loading />}>
+  <LazyComponent />
+</Suspense>
+```
+
+## Manejo de Errores
+
+### Error Boundaries
+- Usar `ErrorBoundary` para capturar errores de renderizado
+- Configurado globalmente en `main.tsx`
+- Mostrar UI de error amigable
+
+### Errores de API
+- Manejados por interceptors de Axios
+- React Query maneja estados de error
+- Mostrar mensajes de error apropiados al usuario
+
+## Accesibilidad
+
+### Reglas
+- Usar elementos semánticos HTML
+- Labels apropiados para formularios
+- ARIA attributes cuando sea necesario
+- Navegación por teclado
+- Contraste de colores apropiado
+
+## Reglas de Validación Estrictas
+
+### ❌ PROHIBIDO
+
+1. **Inline Styles** (excepto valores dinámicos calculados):
+   ```typescript
+   ❌ <div style={{ padding: '20px', backgroundColor: '#fff' }}>
+   ✅ <div className="container">
+   ```
+
+2. **"Class Soup"** - Cadenas largas de clases Tailwind en JSX:
+   ```typescript
+   ❌ <button className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none...">
+   ✅ <button className="btn btn-primary">
+   ```
+
+3. **JSX Repetitivo** en páginas:
+   ```typescript
+   ❌ {items.map(item => (
+        <div className="card"><h2>{item.name}</h2></div>
+      ))}
+   ✅ {items.map(item => <ItemCard key={item.id} item={item} />)}
+   ```
+
+4. **Lógica de Negocio** en componentes presentacionales:
+   ```typescript
+   ❌ export function Card() {
+        const { data } = useQuery(...); // Lógica en componente
+        return <div>{data}</div>;
+      }
+   ✅ export function CardPage() {
+        const { data } = useCardQuery(); // Lógica en hook
+        return <Card data={data} />; // Componente puro
+      }
+   ```
+
+5. **Clases Tailwind directas** para elementos comunes:
+   ```typescript
+   ❌ <button className="bg-blue-500 text-white px-4 py-2 rounded">
+   ✅ <button className="btn btn-primary">
+   ```
+
+### ✅ OBLIGATORIO
+
+1. **Extraer elementos repetitivos** a `components/common/`
+2. **Definir clases semánticas** en `apps/web/src/styles/index.css` con `@apply`
+3. **Separar lógica** de presentación (hooks vs componentes)
+4. **Usar clases semánticas** en lugar de "class soup"
+5. **Componentes puros** para UI reutilizable
+
+### Checklist de Validación
+
+Antes de hacer commit, verificar:
+
+#### Componentización
+- [ ] ¿Hay elementos JSX repetitivos que deberían ser componentes?
+- [ ] ¿Los componentes están en `components/common/` si son reutilizables?
+- [ ] ¿Cada componente tiene una única responsabilidad?
+
+#### Estilos
+- [ ] ¿Hay estilos inline que deberían estar en CSS?
+- [ ] ¿Hay "class soup" que deberían ser clases semánticas?
+- [ ] ¿Las nuevas clases están en `index.css` con `@apply`?
+- [ ] ¿Los nombres de clases son semánticos (`.btn-accept`, no `.blue-button-20px`)?
+
+#### Separación de Responsabilidades
+- [ ] ¿La lógica de negocio está en hooks, no en componentes?
+- [ ] ¿Los componentes son presentacionales (puros)?
+- [ ] ¿Las llamadas API están en hooks, no en componentes?
+
+## Comandos Útiles
+
+```bash
+# Desarrollo
+pnpm --filter financial-win-web dev
+
+# Build
+pnpm --filter financial-win-web build
+
+# Tests
+pnpm --filter financial-win-web test
+pnpm --filter financial-win-web test:watch
+
+# Type checking
+pnpm --filter financial-win-web typecheck
+
+# Linting
+pnpm --filter financial-win-web lint
+
+# Formateo
+pnpm --filter financial-win-web format
+```
+
+## Resumen Rápido de Principios
+
+1. **Componentización Obligatoria**: Extraer elementos repetitivos → `components/common/`
+2. **Zero Inline Styles**: Solo valores dinámicos calculados permitidos
+3. **No "Class Soup"**: Clases semánticas en `index.css` con `@apply`
+4. **Separación Lógica**: Hooks para negocio, componentes para presentación
+5. **Clases Centralizadas**: Cambios estéticos desde CSS, no componente por componente
+
+## Buenas Prácticas - Principios Estrictos
+
+### Arquitectura y Mantenibilidad
+
+1. **Componentización Obligatoria**: 
+   - Extraer elementos repetitivos a `components/common/`
+   - Componentes pequeños con una única responsabilidad
+   - No escribir JSX repetitivo en páginas
+
+2. **Separación de Responsabilidades**:
+   - **Páginas**: Coordinan datos y layout
+   - **Componentes**: UI pura, presentacionales
+   - **Hooks**: Lógica de negocio y llamadas API
+   - Mantener lógica de negocio fuera del JSX
+
+3. **Styling Centralizado**:
+   - **Zero inline styles** (solo valores dinámicos calculados)
+   - **No "class soup"**: Clases semánticas en `apps/web/src/styles/index.css`
+   - Usar `@apply` de Tailwind para definir estilos
+   - Cambios estéticos globales desde CSS, no componente por componente
+
+4. **Type Safety**: Usar TypeScript estrictamente
+
+5. **Performance**: Optimizar cuando sea necesario, no prematuramente
+
+6. **Testing**: Mantener cobertura de tests
+
+7. **Accesibilidad**: Considerar accesibilidad desde el inicio
+
+8. **Error Handling**: Manejar errores apropiadamente
+
+9. **Loading States**: Mostrar estados de carga apropiados
+
+10. **Responsive**: Diseño mobile-first
+
+11. **Clean Code**: Código legible y mantenible
+
+### Checklist Antes de Commit
+
+- [ ] ¿Elementos repetitivos extraídos a componentes?
+- [ ] ¿Lógica de negocio está en hooks, no en componentes?
+- [ ] ¿Sin estilos inline (excepto valores dinámicos)?
+- [ ] ¿Sin "class soup" - usando clases semánticas de CSS?
+- [ ] ¿Clases nuevas definidas en `index.css` si son reutilizables?
+- [ ] ¿Componentes comunes en `components/common/`?
+- [ ] ¿Separación clara entre presentación y lógica?
+
+### Archivos de Referencia
+
+- **Estilos principales**: `apps/web/src/styles/index.css`
+- **Componentes comunes**: `apps/web/src/components/common/`
+- **Ejemplo de Layout**: `apps/web/src/components/common/Layout.tsx`
+
+## Ejemplos de Refactorización
+
+### Ejemplo 1: Eliminar "Class Soup"
+
+```typescript
+// ❌ ANTES - "Class Soup"
+<button className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-white bg-primary-500 text-white hover:bg-primary-600 h-10 py-2 px-4">
+  Guardar
+</button>
+
+// ✅ DESPUÉS - Clase semántica
+// 1. Agregar a apps/web/src/styles/index.css:
+.btn {
+  @apply inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-white;
+}
+
+.btn-primary {
+  @apply bg-primary-500 text-white hover:bg-primary-600;
+}
+
+.btn-md {
+  @apply h-10 py-2 px-4;
+}
+
+// 2. Usar en componente:
+<button className="btn btn-primary btn-md">Guardar</button>
+```
+
+### Ejemplo 2: Extraer Componente Repetitivo
+
+```typescript
+// ❌ ANTES - Estructura repetitiva en página
+export function UserListPage() {
+  const { data } = useUsersQuery();
+  
+  return (
+    <div>
+      {data.map(user => (
+        <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+          <h3 className="text-2xl font-semibold">{user.name}</h3>
+          <p className="text-sm text-gray-600">{user.email}</p>
+          <button className="btn btn-secondary" onClick={() => editUser(user)}>
+            Editar
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ✅ DESPUÉS - Componente extraído
+// 1. Crear apps/web/src/components/common/UserCard.tsx:
+interface UserCardProps {
+  user: User;
+  onEdit?: (user: User) => void;
+}
+
+export function UserCard({ user, onEdit }: UserCardProps) {
+  return (
+    <div className="card">
+      <div className="card-header">
+        <h3 className="card-title">{user.name}</h3>
+        <p className="card-description">{user.email}</p>
+      </div>
+      {onEdit && (
+        <div className="card-footer">
+          <button className="btn btn-secondary" onClick={() => onEdit(user)}>
+            Editar
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// 2. Usar en página:
+export function UserListPage() {
+  const { data } = useUsersQuery();
+  
+  return (
+    <div>
+      {data.map(user => (
+        <UserCard key={user.id} user={user} onEdit={editUser} />
+      ))}
+    </div>
+  );
+}
+```
+
+### Ejemplo 3: Eliminar Inline Styles
+
+```typescript
+// ❌ ANTES - Inline styles
+<div style={{ 
+  padding: '20px', 
+  backgroundColor: '#1a1a1a', 
+  color: 'white',
+  minHeight: '100vh'
+}}>
+  <h1>Contenido</h1>
+</div>
+
+// ✅ DESPUÉS - Clases en CSS
+// 1. Agregar a apps/web/src/styles/index.css:
+.page-container {
+  @apply p-5 bg-gray-900 text-white min-h-screen;
+}
+
+// 2. Usar en componente:
+<div className="page-container">
+  <h1>Contenido</h1>
+</div>
+```
+
+### Ejemplo 4: Separar Lógica de Presentación
+
+```typescript
+// ❌ ANTES - Lógica mezclada con presentación
+export function ProductList() {
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  
+  useEffect(() => {
+    fetch('/api/products')
+      .then(res => res.json())
+      .then(data => {
+        setProducts(data);
+        setLoading(false);
+      });
+  }, []);
+  
+  if (loading) return <div>Cargando...</div>;
+  
+  return (
+    <div>
+      {products.map(p => <ProductCard key={p.id} product={p} />)}
+    </div>
+  );
+}
+
+// ✅ DESPUÉS - Lógica en hook, componente puro
+// 1. Crear hook apps/web/src/hooks/useProductsQuery.ts:
+export function useProductsQuery() {
+  return useQuery({
+    queryKey: ['products'],
+    queryFn: () => apiClient.get('/products').then(res => res.data),
+  });
+}
+
+// 2. Componente puro:
+export function ProductList() {
+  const { data: products, isLoading } = useProductsQuery();
+  
+  if (isLoading) return <LoadingSpinner />;
+  
+  return (
+    <div>
+      {products.map(p => <ProductCard key={p.id} product={p} />)}
+    </div>
+  );
+}
+```

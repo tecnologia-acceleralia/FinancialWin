@@ -1,0 +1,231 @@
+# Title
+
+Testing y Validación de Integración OIDC
+
+# Summary
+
+Este documento proporciona checklists completos y guías paso a paso para validar que la integración OIDC funciona correctamente, incluyendo escenarios de éxito, errores comunes, y troubleshooting.
+
+# TechnicalDetails
+
+## Checklist de Validación Completa
+
+### Backend
+
+- [ ] Endpoint `/auth/login` redirige al OIDC Provider
+- [ ] Endpoint `/auth/callback` intercambia código por tokens
+- [ ] Endpoint `/auth/callback` crea sesión JWT interna
+- [ ] Endpoint `/auth/me` retorna usuario cuando hay sesión
+- [ ] Endpoint `/auth/me` retorna `{ authenticated: false }` sin sesión
+- [ ] Endpoint `/auth/logout` limpia sesión y redirige al provider
+- [ ] `OIDCAuthGuard` protege rutas correctamente
+- [ ] `request.user` está disponible en rutas protegidas
+- [ ] Claims del usuario (sub, email, name, company_id) están presentes
+
+### Frontend
+
+- [ ] Redirección a login cuando no hay sesión
+- [ ] Redirección desde callback después del login
+- [ ] `AuthContext` detecta sesión correctamente
+- [ ] `UserInfo` muestra información del usuario
+- [ ] Botón de logout funciona
+- [ ] Redirección automática en 401 errors
+- [ ] `ErrorBoundary` maneja errores de autenticación
+- [ ] Cookies se envían correctamente (withCredentials)
+
+## Testing Manual Paso a Paso
+
+### Test 1: Flujo de Login Completo
+
+1. **Acceder a la aplicación sin sesión**
+   - Navega a la URL del frontend
+   - **Esperado**: Redirección automática a `/auth/login`
+
+2. **Redirección al OIDC Provider**
+   - Deberías ser redirigido al OIDC Provider
+   - **Esperado**: Página de login del OIDC Provider
+
+3. **Ingresar credenciales**
+   - Ingresa email y password válidos
+   - **Esperado**: Redirección a `/auth/callback?code=...&state=...`
+
+4. **Callback y creación de sesión**
+   - El backend debería intercambiar el código por tokens
+   - **Esperado**: Redirección al frontend con token en URL o cookie establecida
+
+5. **Verificación de sesión**
+   - El frontend debería verificar la sesión con `/auth/me`
+   - **Esperado**: Usuario autenticado, `UserInfo` visible
+
+### Test 2: Acceso a Rutas Protegidas
+
+1. **Sin autenticación**
+   - Accede directamente a una ruta protegida (ej: `/api/projects`)
+   - **Esperado**: `401 Unauthorized` o redirección a login
+
+2. **Con autenticación**
+   - Inicia sesión primero
+   - Accede a la misma ruta protegida
+   - **Esperado**: Respuesta exitosa con datos
+
+3. **Claims del usuario**
+   - En una ruta protegida, verifica que `request.user` contenga:
+     - `sub`: ID del usuario
+     - `email`: Email del usuario
+     - `name`: Nombre del usuario
+     - `company_id`: ID de la empresa
+   - **Esperado**: Todos los campos presentes y válidos
+
+### Test 3: Flujo de Logout
+
+1. **Iniciar logout**
+   - Haz clic en el botón de logout
+   - **Esperado**: Redirección a `/auth/logout`
+
+2. **Logout del backend**
+   - El backend debería limpiar la cookie de sesión
+   - **Esperado**: Redirección al logout del OIDC Provider
+
+3. **Logout del OIDC Provider**
+   - El provider debería limpiar su sesión
+   - **Esperado**: Redirección al frontend sin sesión
+
+4. **Verificación post-logout**
+   - Intenta acceder a una ruta protegida
+   - **Esperado**: Redirección a login (no hay sesión)
+
+### Test 4: Expiración de Sesión
+
+1. **Esperar expiración**
+   - Espera 24 horas (o tiempo de expiración configurado)
+   - O simula expiración modificando el token JWT
+
+2. **Intento de acceso**
+   - Intenta acceder a una ruta protegida
+   - **Esperado**: `401 Unauthorized` y redirección a login
+
+### Test 5: Errores Comunes
+
+1. **State mismatch**
+   - Simula un state incorrecto en el callback
+   - **Esperado**: Error `invalid_state` y redirección con error
+
+2. **Token inválido**
+   - Intenta usar un token inválido o modificado
+   - **Esperado**: `401 Unauthorized`
+
+3. **Cliente OIDC inactivo**
+   - Desactiva el cliente en el admin panel
+   - Intenta hacer login
+   - **Esperado**: Error del provider `invalid_client`
+
+## Testing con curl
+
+### Test de Login
+
+```bash
+# 1. Iniciar login (obtener URL de redirección)
+curl -I https://your-api.com/api/auth/login
+
+# Debería retornar 302 con Location al OIDC Provider
+```
+
+### Test de Callback
+
+```bash
+# 2. Simular callback (necesitas código real del provider)
+curl "https://your-api.com/api/auth/callback?code=REAL_CODE&state=REAL_STATE" \
+  -H "Cookie: oidc_state=REAL_STATE" \
+  -c cookies.txt \
+  -L
+
+# Debería retornar cookie oauth_session
+```
+
+### Test de /auth/me
+
+```bash
+# 3. Verificar sesión
+curl https://your-api.com/api/auth/me \
+  -H "Cookie: oauth_session=TOKEN_FROM_STEP_2" \
+  -v
+
+# Esperado: { "authenticated": true, "user": {...} }
+```
+
+### Test de Ruta Protegida
+
+```bash
+# 4. Acceder a ruta protegida
+curl https://your-api.com/api/projects \
+  -H "Authorization: Bearer TOKEN" \
+  -v
+
+# Esperado: Datos del recurso o 401 si token inválido
+```
+
+## Validación de Claims
+
+Verifica que el token JWT interno contenga:
+
+```javascript
+// Decodificar token (sin verificar firma)
+const token = "tu-token-jwt";
+const payload = JSON.parse(atob(token.split(".")[1]));
+
+console.log("Claims:", {
+  sub: payload.sub, // ✅ Debe estar presente
+  email: payload.email, // ✅ Debe estar presente
+  name: payload.name, // ✅ Debe estar presente
+  company_id: payload.company_id, // ✅ Debe estar presente
+  exp: payload.exp, // ✅ Debe estar presente (expiración)
+});
+```
+
+# Troubleshooting
+
+## Problema: "Redirect URI mismatch"
+
+**Causa**: La `redirect_uri` no coincide exactamente con la del cliente.
+
+**Solución**:
+
+1. Verifica `OIDC_REDIRECT_URI` en el backend
+2. Verifica `redirect_uris` en el cliente OIDC (admin panel)
+3. Asegúrate de que coincidan exactamente (protocolo, dominio, puerto, path)
+
+## Problema: "Invalid state"
+
+**Causa**: El state no coincide o la cookie expiró.
+
+**Solución**:
+
+1. Verifica que `cookie-parser` esté configurado
+2. Verifica configuración de cookies (secure, sameSite)
+3. Verifica que el state se guarde correctamente antes de redirigir
+
+## Problema: "Token missing required claims"
+
+**Causa**: El id_token del provider no incluye todos los claims.
+
+**Solución**:
+
+1. Verifica que los scopes incluyan `profile` (para `name` y `company_id`)
+2. Verifica en el admin panel que los claims estén configurados
+3. Verifica que el usuario tenga `company_id` asignado
+
+## Problema: "401 en todas las rutas protegidas"
+
+**Causa**: El guard no puede acceder a `JwtService` o `ConfigService`.
+
+**Solución**:
+
+1. Verifica que `AuthModule` exporte `JwtModule` y `ConfigModule`
+2. Verifica que el módulo que usa el guard importe `AuthModule`
+3. Verifica que `JWT_SECRET` esté configurado
+
+# NextSteps
+
+1. **Deployment**: `30-OIDC-DEPLOYMENT-CONSIDERATIONS.mdc`
+2. **Monitoreo**: Configurar logging y alertas
+3. **Documentación**: Documentar flujos específicos de tu aplicación

@@ -1,0 +1,366 @@
+# Cursor Rules - Backend (NestJS)
+
+## Stack Tecnológico
+- **Framework**: NestJS 11.x
+- **Lenguaje**: TypeScript 5.5+
+- **ORM**: TypeORM 0.3.x
+- **Base de Datos**: PostgreSQL
+- **Validación**: Zod + class-validator
+- **Autenticación**: OIDC + Passport + JWT
+- **Documentación**: Swagger/OpenAPI
+- **Testing**: Jest + ts-jest
+
+## Arquitectura y Estructura
+
+### Organización de Módulos
+```
+apps/api/src/
+├── modules/          # Módulos de negocio (feature modules)
+│   └── example/      # Ejemplo de estructura de módulo
+│       ├── entities/           # Entidades TypeORM
+│       ├── dto/                # DTOs (opcional, se usan shared-types)
+│       ├── *.controller.ts     # Controladores REST
+│       ├── *.service.ts        # Lógica de negocio
+│       ├── *.module.ts         # Módulo NestJS
+│       └── *.spec.ts           # Tests unitarios
+├── common/           # Código compartido entre módulos
+│   ├── config/       # Configuraciones
+│   ├── controllers/  # Controladores comunes
+│   ├── decorators/   # Decoradores personalizados
+│   ├── filters/      # Exception filters
+│   ├── guards/       # Guards de autenticación/autorización
+│   ├── interceptors/ # Interceptores
+│   ├── middleware/   # Middleware
+│   ├── modules/      # Módulos comunes
+│   ├── pipes/        # Pipes de validación
+│   ├── services/     # Servicios comunes
+│   └── utils/        # Utilidades
+├── migrations/       # Migraciones TypeORM
+└── main.ts          # Punto de entrada
+```
+
+### Patrones de Módulos
+- Cada módulo debe tener su propio directorio bajo `modules/`
+- Un módulo debe incluir: entity, service, controller, module
+- Usar el módulo `example` como referencia de implementación
+
+## Convenciones de Código
+
+### Nombres de Archivos
+- **Entidades**: `*.entity.ts` (ej: `user.entity.ts`)
+- **Controladores**: `*.controller.ts` (ej: `user.controller.ts`)
+- **Servicios**: `*.service.ts` (ej: `user.service.ts`)
+- **Módulos**: `*.module.ts` (ej: `user.module.ts`)
+- **Tests unitarios**: `*.spec.ts` (ej: `user.service.spec.ts`)
+- **Tests E2E**: `*.e2e-spec.ts` en `test/`
+- **Migraciones**: `[timestamp]-[Description].ts` (ej: `1733000000000-CreateUserTable.ts`)
+
+### Nombres de Clases
+- **Controladores**: `[Entity]Controller` (ej: `UserController`)
+- **Servicios**: `[Entity]Service` (ej: `UserService`)
+- **Módulos**: `[Entity]Module` (ej: `UserModule`)
+- **Entidades**: `[Entity]` (ej: `User`)
+- **DTOs**: Usar tipos de `@financial-win/shared-types`
+
+### Decoradores NestJS
+- Siempre usar decoradores de Swagger (`@ApiTags`, `@ApiOperation`, `@ApiResponse`)
+- Todos los endpoints protegidos deben usar `@UseGuards(OIDCAuthGuard)`
+- Usar `@ApiBearerAuth('JWT-auth')` para endpoints autenticados
+- Documentar todos los endpoints con `@ApiOperation` y `@ApiResponse`
+
+### Multi-tenancy
+- **SIEMPRE** usar el decorador `@CompanyId()` para obtener el company_id del usuario autenticado
+- **NUNCA** confiar en company_id del body/query params - siempre usar el decorador
+- Todos los servicios deben recibir `companyId` como primer parámetro
+- Todas las consultas a base de datos deben filtrar por `company_id`
+
+### Validación
+- **Usar Zod schemas** de `@financial-win/shared-types` para validación
+- Usar `ZodValidationPipe` en los controladores
+- Ejemplo: `@Body(new ZodValidationPipe(createUserSchema)) createUserDto: CreateUser`
+- Validar TODOS los inputs de usuario (body, query params, path params cuando sea necesario)
+
+### Manejo de Errores
+- Usar `HttpException` de NestJS con códigos de estado apropiados
+- El `HttpExceptionFilter` global maneja el formato de errores
+- No crear errores personalizados sin extender `HttpException`
+- Usar códigos HTTP estándar:
+  - `400`: Bad Request (validación fallida)
+  - `401`: Unauthorized (no autenticado)
+  - `403`: Forbidden (sin permisos)
+  - `404`: Not Found
+  - `500`: Internal Server Error
+
+## Entidades TypeORM
+
+### Estructura Estándar
+```typescript
+@Entity('table_name')
+export class EntityName {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column('varchar', { length: 255 })
+  company_id: string;
+
+  // Campos de negocio...
+
+  @Column('boolean', { default: true })
+  is_active: boolean;
+
+  @CreateDateColumn()
+  created_at: Date;
+
+  @UpdateDateColumn()
+  updated_at: Date;
+}
+```
+
+### Reglas para Entidades
+- **SIEMPRE** usar UUID como primary key: `@PrimaryGeneratedColumn('uuid')`
+- **SIEMPRE** incluir `company_id` para multi-tenancy
+- **SIEMPRE** incluir `is_active` para soft deletes
+- **SIEMPRE** incluir `created_at` y `updated_at` con `@CreateDateColumn()` y `@UpdateDateColumn()`
+- Usar `jsonb` para campos flexibles/estructurados cuando sea necesario
+- Documentar entidades con JSDoc explicando su propósito
+
+### Relaciones
+- Preferir relaciones explícitas con decoradores TypeORM
+- Evitar relaciones circulares entre módulos
+- Usar `@JoinColumn` explícitamente cuando sea necesario
+
+## Servicios
+
+### Patrón Estándar
+```typescript
+@Injectable()
+export class EntityService {
+  constructor(
+    @InjectRepository(Entity)
+    private readonly entityRepository: Repository<Entity>
+  ) {}
+
+  async create(companyId: string, data: unknown): Promise<Entity> {
+    // Validar con Zod
+    const validatedData = validate(schema, data);
+    
+    // Crear entidad
+    const entity = this.entityRepository.create({
+      ...validatedData,
+      company_id: companyId,
+    });
+    
+    // Guardar y retornar
+    const saved = await this.entityRepository.save(entity);
+    return Array.isArray(saved) ? saved[0] : saved;
+  }
+}
+```
+
+### Reglas para Servicios
+- **SIEMPRE** recibir `companyId` como primer parámetro
+- **SIEMPRE** validar inputs con Zod antes de procesar
+- **SIEMPRE** filtrar consultas por `company_id`
+- Usar transacciones (`@Transaction()`) para operaciones atómicas
+- No exponer repositorios directamente - encapsular lógica en servicios
+- Retornar entidades o DTOs, nunca repositorios
+
+### Métodos Comunes
+- `create(companyId, data)`: Crear nueva entidad
+- `findAll(companyId, query)`: Listar con paginación
+- `findOne(companyId, id)`: Buscar por ID
+- `update(companyId, id, data)`: Actualizar entidad
+- `remove(companyId, id)`: Soft delete (marcar `is_active = false`)
+
+## Controladores
+
+### Patrón Estándar
+```typescript
+@ApiTags('entity')
+@Controller('entity')
+@UseGuards(OIDCAuthGuard)
+@ApiBearerAuth('JWT-auth')
+export class EntityController {
+  constructor(private readonly entityService: EntityService) {}
+
+  @Post()
+  @ApiOperation({ summary: 'Create entity' })
+  @ApiResponse({ status: 201, description: 'Created' })
+  create(
+    @CompanyId() companyId: string,
+    @Body(new ZodValidationPipe(createSchema)) dto: CreateDto
+  ) {
+    return this.entityService.create(companyId, dto);
+  }
+}
+```
+
+### Reglas para Controladores
+- **SIEMPRE** usar `@UseGuards(OIDCAuthGuard)` y `@ApiBearerAuth('JWT-auth')` en endpoints protegidos
+- **SIEMPRE** usar `@CompanyId()` para obtener el company_id
+- **SIEMPRE** documentar endpoints con Swagger decorators
+- Mantener controladores delgados - lógica en servicios
+- Usar `ZodValidationPipe` en todos los inputs
+- Retornar entidades directamente (NestJS serializa automáticamente)
+
+## Migraciones TypeORM
+
+### Estructura
+```typescript
+export class CreateEntityTable[timestamp] implements MigrationInterface {
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    const table = new Table({
+      name: 'entity_name',
+      columns: [
+        {
+          name: 'id',
+          type: 'uuid',
+          isPrimary: true,
+          generationStrategy: 'uuid',
+          default: 'uuid_generate_v4()',
+        },
+        {
+          name: 'company_id',
+          type: 'varchar',
+          length: '255',
+          isNullable: false,
+        },
+        // más columnas...
+        {
+          name: 'created_at',
+          type: 'timestamp',
+          default: 'CURRENT_TIMESTAMP',
+          isNullable: false,
+        },
+      ],
+      indices: [
+        new TableIndex({
+          name: 'IDX_entity_name_company_id',
+          columnNames: ['company_id'],
+        }),
+      ],
+    });
+
+    await createTableIfNotExists(queryRunner, table);
+  }
+
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    await dropTableIfExists(queryRunner, 'entity_name');
+  }
+}
+```
+
+### Reglas para Migraciones
+- **SIEMPRE** usar helpers `createTableIfNotExists` y `dropTableIfExists`
+- **SIEMPRE** crear índices para `company_id` y campos de búsqueda frecuente
+- **SIEMPRE** incluir método `down()` para revertir migraciones
+- Usar timestamp en formato: `[YYYYMMDDHHmmss]-[Description].ts`
+- Documentar migraciones con JSDoc
+- Nunca modificar migraciones existentes - crear nuevas migraciones
+
+## Testing
+
+### Unit Tests
+- Ubicación: `*.spec.ts` junto al archivo fuente
+- Framework: Jest + ts-jest
+- Mockear todas las dependencias
+- Probar lógica de negocio, no implementación
+- Estructura: Arrange-Act-Assert
+
+### E2E Tests
+- Ubicación: `test/**/*.e2e-spec.ts`
+- Framework: Jest + Supertest
+- Usar base de datos de test
+- Probar flujos completos incluyendo autenticación
+- Limpiar datos después de cada test
+
+## Configuración
+
+### Variables de Entorno
+- Usar `@nestjs/config` para gestionar configuración
+- Definir schemas Zod en `common/config/*.config.ts`
+- Cargar configuración en `app.module.ts`
+- Nunca acceder directamente a `process.env` - usar ConfigService
+
+### Base de Datos
+- Configuración en `common/config/database.config.ts`
+- Usar TypeORM con PostgreSQL
+- `synchronize: false` siempre en producción
+- Usar migraciones para cambios de esquema
+
+## Observabilidad
+
+### Logging
+- Usar `Logger` de NestJS
+- Contexto apropiado: `this.logger.log('message', 'Context')`
+- Niveles: `log`, `error`, `warn`, `debug`, `verbose`
+
+### Métricas
+- Usar `MetricsInterceptor` para métricas automáticas
+- Exponer métricas en `/metrics` endpoint
+- Tracking de requests, errores, latencia
+
+### Tracing
+- Usar `TracingInterceptor` para request IDs
+- Incluir request ID en logs
+- Facilitar debugging distribuido
+
+## Seguridad
+
+### Autenticación
+- Usar `OIDCAuthGuard` en todos los endpoints protegidos
+- Validar tokens JWT
+- Extraer información del usuario del token
+
+### Rate Limiting
+- Configurado globalmente con `@nestjs/throttler`
+- Aplicado automáticamente a todos los endpoints
+
+### Validación de Inputs
+- **SIEMPRE** validar con Zod schemas
+- Sanitizar inputs cuando sea necesario
+- Nunca confiar en datos del cliente
+
+## Dependencias Compartidas
+
+### Packages
+- `@financial-win/shared-types`: Tipos y schemas Zod compartidos
+- `@financial-win/shared-config`: Configuración compartida (pipes, utils)
+
+### Uso
+- Importar tipos desde `@financial-win/shared-types`
+- Usar `ZodValidationPipe` desde `@financial-win/shared-config`
+- No duplicar tipos entre frontend y backend
+
+## Comandos Útiles
+
+```bash
+# Desarrollo
+pnpm --filter financial-win-api start:dev
+
+# Tests
+pnpm --filter financial-win-api test
+pnpm --filter financial-win-api test:watch
+pnpm --filter financial-win-api test:cov
+
+# Migraciones
+pnpm --filter financial-win-api migration:generate
+pnpm --filter financial-win-api migration:run
+pnpm --filter financial-win-api migration:revert
+
+# Build
+pnpm --filter financial-win-api build
+```
+
+## Buenas Prácticas
+
+1. **Separación de Responsabilidades**: Lógica en servicios, controladores delgados
+2. **DRY**: Reutilizar código común en `common/`
+3. **SOLID**: Seguir principios SOLID
+4. **Testing**: Mantener cobertura mínima del 70%
+5. **Documentación**: Documentar código complejo con JSDoc
+6. **Type Safety**: Usar TypeScript estrictamente, evitar `any`
+7. **Error Handling**: Manejar errores apropiadamente
+8. **Performance**: Optimizar consultas, usar índices
+9. **Security**: Validar todo, nunca confiar en inputs
+10. **Observability**: Logging, métricas y tracing apropiados

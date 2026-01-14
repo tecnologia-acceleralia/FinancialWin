@@ -1,0 +1,1357 @@
+# Plan de Implementación: offline_access Scope
+
+## 📋 Tabla de Contenidos
+
+1. [Introducción](#introducción)
+2. [Qué es offline_access](#qué-es-offline_access)
+3. [Por qué implementarlo](#por-qué-implementarlo)
+4. [Requisitos Previos](#requisitos-previos)
+5. [Arquitectura y Flujo](#arquitectura-y-flujo)
+6. [Pasos de Implementación Detallados](#pasos-de-implementación-detallados)
+7. [Configuración de Base de Datos](#configuración-de-base-de-datos)
+8. [Configuración de Variables de Entorno](#configuración-de-variables-de-entorno)
+9. [Modificaciones de Código](#modificaciones-de-código)
+10. [Testing](#testing)
+11. [Troubleshooting](#troubleshooting)
+12. [Consideraciones de Seguridad](#consideraciones-de-seguridad)
+13. [Plan de Rollback](#plan-de-rollback)
+14. [Checklist Completo](#checklist-completo)
+
+---
+
+## Introducción
+
+Este documento proporciona un plan detallado paso a paso para implementar el scope `offline_access` en el sistema OIDC. Esta implementación permitirá que las aplicaciones cliente obtengan `refresh_token` y renueven tokens automáticamente sin requerir reautenticación del usuario.
+
+**Estado Actual:**
+- ✅ Sistema OIDC funcionando con scopes: `openid`, `email`, `profile`
+- ✅ Refresh token endpoint implementado en backend
+- ✅ Frontend tiene lógica de auto-refresh
+- ❌ Cliente OIDC NO tiene `refresh_token` en `grant_types`
+- ❌ Cliente OIDC NO tiene `offline_access` en `allowed_scopes`
+- ❌ `.env` NO incluye `offline_access` en `OIDC_SCOPES`
+
+**Estado Deseado:**
+- ✅ Cliente OIDC con `refresh_token` en `grant_types`
+- ✅ Cliente OIDC con `offline_access` en `allowed_scopes`
+- ✅ `.env` con `offline_access` en `OIDC_SCOPES`
+- ✅ Sistema renovando tokens automáticamente cada 24 horas
+
+---
+
+## Qué es offline_access
+
+### Definición
+
+`offline_access` es un scope estándar de OIDC que permite a una aplicación cliente obtener un `refresh_token` durante el flujo de autenticación. Este `refresh_token` puede usarse para obtener nuevos `access_token` e `id_token` sin requerir que el usuario vuelva a autenticarse.
+
+### Características Clave
+
+1. **Refresh Token**: Token de larga duración (típicamente 24 horas o más)
+2. **Renovación Automática**: Permite renovar tokens sin intervención del usuario
+3. **Sesiones Largas**: Mantiene al usuario autenticado por períodos extendidos
+4. **Seguridad**: El refresh_token puede revocarse si es comprometido
+
+### Diferencia con Access Token
+
+| Aspecto | Access Token | Refresh Token |
+|---------|--------------|---------------|
+| **Duración** | Corta (1 hora) | Larga (24 horas) |
+| **Uso** | Acceso a recursos protegidos | Renovar access tokens |
+| **Almacenamiento** | En memoria/cookie | En cookie segura |
+| **Expiración** | Frecuente | Infrecuente |
+| **Scope Requerido** | Ninguno específico | `offline_access` |
+
+---
+
+## Por qué implementarlo
+
+### Beneficios
+
+1. **Mejor Experiencia de Usuario**
+   - Usuarios no se desconectan cada hora
+   - Sesiones continuas sin interrupciones
+   - Menos fricción en el uso de la aplicación
+
+2. **Reducción de Carga en Servidor**
+   - Menos requests de autenticación
+   - Menos carga en base de datos
+   - Mejor rendimiento general
+
+3. **Compatibilidad con Aplicaciones Móviles**
+   - Apps móviles requieren sesiones largas
+   - Mejor experiencia en aplicaciones de escritorio
+   - Soporte para aplicaciones que funcionan en segundo plano
+
+4. **Estándar de la Industria**
+   - Práctica común en aplicaciones OIDC
+   - Mejora la seguridad al permitir rotación de tokens
+   - Facilita integración con otros sistemas
+
+### Casos de Uso
+
+- **Aplicaciones Web**: Sesiones de trabajo largas sin interrupciones
+- **Aplicaciones Móviles**: Mantener sesión activa entre sesiones de app
+- **Aplicaciones de Escritorio**: Sesiones persistentes sin re-login constante
+- **APIs de Larga Duración**: Procesos que requieren acceso continuo
+
+---
+
+## Requisitos Previos
+
+### Verificaciones Necesarias
+
+Antes de comenzar la implementación, verifica:
+
+- [ ] Sistema OIDC funcionando correctamente
+- [ ] Base de datos PostgreSQL accesible
+- [ ] Acceso a archivos de migración
+- [ ] Acceso a archivos `.env` de desarrollo y producción
+- [ ] Backend tiene endpoint `/auth/refresh` implementado
+- [ ] Frontend tiene lógica de auto-refresh implementada
+- [ ] Cliente OIDC existe en base de datos (`writehub-client`)
+
+### Herramientas Necesarias
+
+- PostgreSQL client (psql) o herramienta de gestión de BD
+- Editor de código con acceso a repositorio
+- Acceso a logs del sistema
+- Cliente HTTP (curl, Postman) para testing
+
+---
+
+## Arquitectura y Flujo
+
+### Flujo Actual (Sin offline_access)
+
+```
+Usuario → Login → Recibe tokens (sin refresh_token)
+         ↓
+    Access token expira (1 hora)
+         ↓
+    Usuario debe re-autenticarse
+```
+
+### Flujo Deseado (Con offline_access)
+
+```
+Usuario → Login → Recibe tokens (con refresh_token)
+         ↓
+    Access token expira (1 hora)
+         ↓
+    Sistema usa refresh_token automáticamente
+         ↓
+    Nuevos tokens obtenidos sin intervención del usuario
+         ↓
+    Sesión continúa hasta que refresh_token expire (24 horas)
+```
+
+### Diagrama de Secuencia Detallado
+
+```mermaid
+sequenceDiagram
+    participant U as Usuario
+    participant F as Frontend
+    participant B as Backend<br/>(write-mvp)
+    participant O as OIDC Server
+    participant DB as Database
+
+    Note over U,DB: Fase 1: Login Inicial con offline_access
+    
+    U->>F: Click "Login"
+    F->>B: GET /auth/login
+    B->>B: Lee OIDC_SCOPES<br/>"openid email profile offline_access"
+    B->>O: GET /auth?scope=openid email profile offline_access
+    O->>U: Formulario de login
+    U->>O: Credenciales
+    O->>DB: Validar usuario
+    DB-->>O: Usuario válido
+    O->>O: Genera código de autorización<br/>(incluye offline_access)
+    O->>B: Redirect con código
+    B->>O: POST /token<br/>grant_type=authorization_code<br/>code=...
+    O->>DB: Validar código y scopes
+    DB-->>O: Código válido<br/>offline_access permitido
+    O->>O: Genera tokens:<br/>- id_token<br/>- access_token<br/>- refresh_token ✅
+    O-->>B: {id_token, access_token, refresh_token}
+    B->>B: Almacena refresh_token<br/>en token JWT interno
+    B->>F: Cookie de sesión establecida
+    F->>U: Dashboard mostrado
+
+    Note over U,DB: Fase 2: Renovación Automática
+    
+    U->>F: Navega (token próximo a expirar)
+    F->>B: GET /api/protected
+    B->>B: Detecta token expirando<br/>(< 30 minutos)
+    B->>B: Extrae refresh_token<br/>del token JWT interno
+    B->>O: POST /token<br/>grant_type=refresh_token<br/>refresh_token=...
+    O->>DB: Validar refresh_token
+    DB-->>O: Refresh token válido
+    O->>O: Genera nuevos tokens:<br/>- Nuevo id_token<br/>- Nuevo access_token<br/>- Nuevo refresh_token ✅
+    O-->>B: Nuevos tokens
+    B->>B: Actualiza token JWT interno<br/>con nuevos tokens
+    B->>B: Actualiza cookie de sesión
+    B-->>F: Request procesado exitosamente
+    F->>U: Contenido mostrado
+```
+
+---
+
+## Pasos de Implementación Detallados
+
+### Paso 1: Crear Migración SQL para Actualizar Cliente OIDC
+
+**Archivo:** `provider/migrations/016_add_offline_access_to_writehub_client.sql`
+
+```sql
+-- Migration 016: Add offline_access scope and refresh_token grant type to WriteHub Client
+-- This migration updates the WriteHub OIDC client to support offline_access scope
+-- and refresh_token grant type for automatic token renewal
+
+-- Update WriteHub client to include refresh_token grant type and offline_access scope
+UPDATE oidc_clients
+SET 
+    grant_types = ARRAY['authorization_code', 'refresh_token'],
+    allowed_scopes = ARRAY['openid', 'email', 'profile', 'offline_access'],
+    updated_at = CURRENT_TIMESTAMP
+WHERE client_id = 'writehub-client';
+
+-- Verify the update
+DO $$
+DECLARE
+    updated_grant_types TEXT[];
+    updated_allowed_scopes TEXT[];
+BEGIN
+    SELECT grant_types, allowed_scopes
+    INTO updated_grant_types, updated_allowed_scopes
+    FROM oidc_clients
+    WHERE client_id = 'writehub-client';
+    
+    -- Verify refresh_token is in grant_types
+    IF NOT ('refresh_token' = ANY(updated_grant_types)) THEN
+        RAISE EXCEPTION 'refresh_token not found in grant_types';
+    END IF;
+    
+    -- Verify offline_access is in allowed_scopes
+    IF NOT ('offline_access' = ANY(updated_allowed_scopes)) THEN
+        RAISE EXCEPTION 'offline_access not found in allowed_scopes';
+    END IF;
+    
+    RAISE NOTICE '✅ WriteHub client updated successfully';
+    RAISE NOTICE '   Grant types: %', array_to_string(updated_grant_types, ', ');
+    RAISE NOTICE '   Allowed scopes: %', array_to_string(updated_allowed_scopes, ', ');
+END $$;
+```
+
+**Verificación Post-Migración:**
+
+```sql
+-- Verificar que la migración se aplicó correctamente
+SELECT 
+    client_id,
+    grant_types,
+    allowed_scopes,
+    refresh_token_lifetime,
+    updated_at
+FROM oidc_clients
+WHERE client_id = 'writehub-client';
+
+-- Resultado esperado:
+-- grant_types: {authorization_code,refresh_token}
+-- allowed_scopes: {openid,email,profile,offline_access}
+```
+
+---
+
+### Paso 2: Actualizar Variables de Entorno
+
+#### 2.1 Desarrollo Local
+
+**Archivo:** `Write-mvp/apps/api/.env.dev`
+
+**Antes:**
+```bash
+OIDC_SCOPES=openid email profile
+```
+
+**Después:**
+```bash
+OIDC_SCOPES=openid email profile offline_access
+```
+
+#### 2.2 Producción
+
+**Archivo:** `Write-mvp/apps/api/.env.production`
+
+**Antes:**
+```bash
+OIDC_SCOPES=openid email profile
+```
+
+**Después:**
+```bash
+OIDC_SCOPES=openid email profile offline_access
+```
+
+#### 2.3 Verificación
+
+Después de actualizar, verifica que la variable se carga correctamente:
+
+```bash
+# En el backend, verifica los logs al iniciar:
+# Deberías ver:
+# ✅ OIDC service initialized
+#    Scopes: openid email profile offline_access
+```
+
+---
+
+### Paso 3: Verificar Código Existente (Sin Cambios Necesarios)
+
+El código actual ya soporta `offline_access`. Solo necesitas verificar:
+
+#### 3.1 Backend - OIDC Service
+
+**Archivo:** `Write-mvp/apps/api/src/common/services/oidc.service.ts`
+
+**Verificar que el método `refreshTokens` existe:**
+
+```typescript
+async refreshTokens(refreshToken: string): Promise<TokenSet> {
+  try {
+    const tokenResponse = await axios.post(
+      `${this.issuerUrl}/token`,
+      new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken,
+        client_id: this.clientId,
+        client_secret: this.clientSecret,
+      }).toString(),
+      {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      }
+    );
+
+    return tokenResponse.data as TokenSet;
+  } catch (error) {
+    this.logger.error('Failed to refresh tokens', error);
+    throw new Error('Failed to refresh tokens');
+  }
+}
+```
+
+✅ **Este código ya existe y funciona correctamente.**
+
+#### 3.2 Backend - Auth Controller
+
+**Archivo:** `Write-mvp/apps/api/src/auth/auth.controller.ts`
+
+**Verificar que el endpoint `/auth/refresh` maneja refresh_token:**
+
+```typescript
+// Verificar que el código extrae refresh_token del payload
+if (!currentPayload.refresh_token) {
+  this.logger.error('❌ Refresh failed - No refresh_token in current token');
+  return res.status(401).json({ error: 'Refresh token not available' });
+}
+
+// Verificar que llama a refreshTokens
+const tokenSet = await this.oidcService.refreshTokens(
+  currentPayload.refresh_token
+);
+```
+
+✅ **Este código ya existe y funciona correctamente.**
+
+#### 3.3 Frontend - Auth Context
+
+**Archivo:** `Write-mvp/apps/web/src/contexts/AuthContext.tsx`
+
+**Verificar que hay lógica de auto-refresh:**
+
+```typescript
+// Verificar que hay un intervalo de refresh
+const checkAndRefreshToken = useCallback(async (): Promise<void> => {
+  // ... código de refresh
+}, []);
+```
+
+✅ **Este código ya existe y funciona correctamente.**
+
+---
+
+## Configuración de Base de Datos
+
+### Verificación Pre-Implementación
+
+Antes de ejecutar la migración, verifica el estado actual:
+
+```sql
+-- Conectar a la base de datos
+psql -h localhost -p 5437 -U postgres -d oidc_db
+
+-- Verificar estado actual del cliente
+SELECT 
+    client_id,
+    grant_types,
+    allowed_scopes,
+    refresh_token_lifetime,
+    is_active
+FROM oidc_clients
+WHERE client_id = 'writehub-client';
+```
+
+**Resultado Esperado (Antes):**
+```
+client_id        | writehub-client
+grant_types      | {authorization_code}
+allowed_scopes   | {openid,email,profile}
+refresh_token_lifetime | 86400
+is_active        | true
+```
+
+### Ejecución de Migración
+
+```bash
+# Opción 1: Ejecutar migración manualmente
+psql -h localhost -p 5437 -U postgres -d oidc_db -f provider/migrations/016_add_offline_access_to_writehub_client.sql
+
+# Opción 2: Las migraciones se ejecutan automáticamente al iniciar el provider
+# Solo asegúrate de que el archivo esté en la carpeta migrations/
+```
+
+### Verificación Post-Implementación
+
+```sql
+-- Verificar que la migración se aplicó correctamente
+SELECT 
+    client_id,
+    grant_types,
+    allowed_scopes,
+    refresh_token_lifetime,
+    updated_at
+FROM oidc_clients
+WHERE client_id = 'writehub-client';
+```
+
+**Resultado Esperado (Después):**
+```
+client_id        | writehub-client
+grant_types      | {authorization_code,refresh_token}
+allowed_scopes   | {openid,email,profile,offline_access}
+refresh_token_lifetime | 86400
+is_active        | true
+updated_at       | 2024-XX-XX XX:XX:XX
+```
+
+### Actualización Manual (Si es Necesario)
+
+Si necesitas actualizar manualmente sin migración:
+
+```sql
+-- Actualizar grant_types
+UPDATE oidc_clients
+SET grant_types = ARRAY['authorization_code', 'refresh_token']
+WHERE client_id = 'writehub-client';
+
+-- Actualizar allowed_scopes
+UPDATE oidc_clients
+SET allowed_scopes = ARRAY['openid', 'email', 'profile', 'offline_access']
+WHERE client_id = 'writehub-client';
+
+-- Verificar cambios
+SELECT grant_types, allowed_scopes
+FROM oidc_clients
+WHERE client_id = 'writehub-client';
+```
+
+---
+
+## Configuración de Variables de Entorno
+
+### Archivos a Modificar
+
+1. **Desarrollo Local:**
+   - `Write-mvp/apps/api/.env.dev`
+   - `Write-mvp/apps/api/.env.local` (si existe)
+
+2. **Producción:**
+   - `Write-mvp/apps/api/.env.production`
+   - Variables en secret manager (si aplica)
+
+### Cambios Específicos
+
+#### Archivo: `Write-mvp/apps/api/.env.dev`
+
+```bash
+# ANTES
+OIDC_SCOPES=openid email profile
+
+# DESPUÉS
+OIDC_SCOPES=openid email profile offline_access
+```
+
+#### Archivo: `Write-mvp/apps/api/.env.production`
+
+```bash
+# ANTES
+OIDC_SCOPES=openid email profile
+
+# DESPUÉS
+OIDC_SCOPES=openid email profile offline_access
+```
+
+### Verificación de Configuración
+
+Después de actualizar las variables de entorno:
+
+1. **Reiniciar el backend:**
+   ```bash
+   # Detener el servicio
+   docker compose down backend
+   
+   # Iniciar el servicio
+   docker compose up -d backend
+   ```
+
+2. **Verificar logs al iniciar:**
+   ```bash
+   docker compose logs -f backend | grep -i "scopes\|OIDC"
+   ```
+
+3. **Buscar en los logs:**
+   ```
+   ✅ OIDC service initialized
+      Scopes: openid email profile offline_access
+   ```
+
+### Configuración Adicional (Opcional)
+
+Si quieres ajustar el tiempo de vida del refresh_token:
+
+**En la migración SQL:**
+```sql
+-- Cambiar refresh_token_lifetime a 7 días (604800 segundos)
+UPDATE oidc_clients
+SET refresh_token_lifetime = 604800
+WHERE client_id = 'writehub-client';
+```
+
+**Valores Recomendados:**
+- **Desarrollo:** 86400 segundos (24 horas)
+- **Producción:** 604800 segundos (7 días) o 2592000 segundos (30 días)
+
+---
+
+## Modificaciones de Código
+
+### Verificación de Código Existente
+
+El código actual **YA SOPORTA** `offline_access`. Solo necesitas verificar que todo esté en orden:
+
+#### 1. Backend - Almacenamiento de refresh_token
+
+**Archivo:** `Write-mvp/apps/api/src/auth/auth.controller.ts`
+
+**Verificar que el refresh_token se almacena en el token JWT interno:**
+
+```typescript
+// Línea ~197-205: En el callback después de recibir tokens OIDC
+const sessionToken = this.jwtService.sign({
+  sub: userInfo.sub,
+  email: userInfo.email,
+  name: userInfo.name,
+  company_id: userInfo.company_id,
+  id_token: tokenSet.id_token,
+  access_token: tokenSet.access_token,
+  refresh_token: tokenSet.refresh_token,  // ✅ Debe estar aquí
+});
+```
+
+✅ **Verificar:** El código ya incluye `refresh_token` en el token JWT.
+
+#### 2. Backend - Extracción de refresh_token
+
+**Archivo:** `Write-mvp/apps/api/src/auth/auth.controller.ts`
+
+**Verificar que el refresh_token se extrae correctamente:**
+
+```typescript
+// Línea ~479-526: En el endpoint /auth/refresh
+const currentPayload = this.jwtService.decode(token) as {
+  sub?: string;
+  email?: string;
+  name?: string;
+  company_id?: string;
+  id_token?: string;
+  access_token?: string;
+  refresh_token?: string;  // ✅ Debe estar en el tipo
+  exp?: number;
+};
+
+// Verificar que existe
+if (!currentPayload.refresh_token) {
+  this.logger.error('❌ Refresh failed - No refresh_token in current token');
+  return res.status(401).json({ error: 'Refresh token not available' });
+}
+```
+
+✅ **Verificar:** El código ya maneja `refresh_token` correctamente.
+
+#### 3. Backend - Renovación de Tokens
+
+**Archivo:** `Write-mvp/apps/api/src/auth/auth.controller.ts`
+
+**Verificar que se renuevan los tokens y se actualiza el refresh_token:**
+
+```typescript
+// Línea ~530-586: Renovación de tokens
+const tokenSet = await this.oidcService.refreshTokens(
+  currentPayload.refresh_token
+);
+
+// Generar nuevo token JWT con nuevos tokens
+const newSessionToken = this.jwtService.sign({
+  sub: freshUserInfo.sub,
+  email: freshUserInfo.email,
+  name: freshUserInfo.name,
+  company_id: freshUserInfo.company_id,
+  id_token: tokenSet.id_token,
+  access_token: tokenSet.access_token,
+  refresh_token: tokenSet.refresh_token,  // ✅ Nuevo refresh_token
+});
+```
+
+✅ **Verificar:** El código ya actualiza el `refresh_token` en cada renovación.
+
+### No Se Requieren Cambios de Código
+
+**IMPORTANTE:** El código actual **YA ESTÁ PREPARADO** para `offline_access`. Solo necesitas:
+
+1. ✅ Actualizar la base de datos (migración SQL)
+2. ✅ Actualizar variables de entorno
+3. ✅ Reiniciar servicios
+
+---
+
+## Testing
+
+### Plan de Testing Completo
+
+#### Test 1: Verificación de Configuración
+
+**Objetivo:** Verificar que la configuración se aplicó correctamente.
+
+**Pasos:**
+
+1. Verificar base de datos:
+   ```sql
+   SELECT grant_types, allowed_scopes
+   FROM oidc_clients
+   WHERE client_id = 'writehub-client';
+   ```
+
+2. Verificar variables de entorno:
+   ```bash
+   # En el contenedor del backend
+   docker compose exec backend env | grep OIDC_SCOPES
+   # Debe mostrar: OIDC_SCOPES=openid email profile offline_access
+   ```
+
+3. Verificar logs al iniciar:
+   ```bash
+   docker compose logs backend | grep -i "scopes\|OIDC"
+   # Debe mostrar scopes incluyendo offline_access
+   ```
+
+**Resultado Esperado:**
+- ✅ `grant_types` incluye `refresh_token`
+- ✅ `allowed_scopes` incluye `offline_access`
+- ✅ Logs muestran `offline_access` en scopes
+
+---
+
+#### Test 2: Login Inicial con offline_access
+
+**Objetivo:** Verificar que el login inicial recibe `refresh_token`.
+
+**Pasos:**
+
+1. Limpiar cookies del navegador
+2. Iniciar sesión en la aplicación
+3. Verificar respuesta del callback
+
+**Verificación en Backend:**
+
+```bash
+# Ver logs del backend durante el login
+docker compose logs -f backend | grep -i "refresh_token\|callback"
+
+# Buscar en los logs:
+# ✅ Token exchange successful
+#    Has refresh_token: true
+```
+
+**Verificación en Base de Datos:**
+
+```sql
+-- Verificar que se creó un refresh_token en la sesión
+-- (depende de cómo oidc-provider almacena los tokens)
+SELECT * FROM oidc_sessions 
+WHERE client_id = 'writehub-client' 
+ORDER BY created_at DESC 
+LIMIT 1;
+```
+
+**Resultado Esperado:**
+- ✅ Login exitoso
+- ✅ Logs muestran `refresh_token` recibido
+- ✅ Token JWT interno contiene `refresh_token`
+
+---
+
+#### Test 3: Verificación de refresh_token en Token JWT
+
+**Objetivo:** Verificar que el `refresh_token` se almacena en el token JWT interno.
+
+**Pasos:**
+
+1. Iniciar sesión
+2. Extraer cookie de sesión del navegador
+3. Decodificar token JWT
+
+**Script de Verificación:**
+
+```javascript
+// En la consola del navegador (después de login)
+const cookies = document.cookie.split(';');
+const sessionCookie = cookies.find(c => c.trim().startsWith('oauth_token='));
+if (sessionCookie) {
+  const token = sessionCookie.split('=')[1];
+  const parts = token.split('.');
+  const payload = JSON.parse(atob(parts[1]));
+  console.log('Token payload:', payload);
+  console.log('Has refresh_token:', !!payload.refresh_token);
+}
+```
+
+**Resultado Esperado:**
+- ✅ Token JWT contiene `refresh_token`
+- ✅ `refresh_token` es una cadena no vacía
+
+---
+
+#### Test 4: Renovación Automática de Tokens
+
+**Objetivo:** Verificar que los tokens se renuevan automáticamente.
+
+**Pasos:**
+
+1. Iniciar sesión
+2. Esperar a que el token esté próximo a expirar (< 30 minutos)
+3. Hacer una request a un endpoint protegido
+4. Verificar que se renueva automáticamente
+
+**Simulación de Token Próximo a Expirar:**
+
+```bash
+# Modificar temporalmente el tokenRefreshWindow para testing
+# En .env.dev:
+OIDC_TOKEN_REFRESH_WINDOW=3600000  # 1 hora (para testing)
+
+# O modificar el código temporalmente para forzar refresh
+```
+
+**Verificación en Logs:**
+
+```bash
+docker compose logs -f backend | grep -i "refresh\|token"
+
+# Buscar:
+# ⏰ Token expiring soon - refreshing...
+# 🔐 Refreshing tokens from OIDC provider...
+# ✅ Token refreshed successfully
+```
+
+**Resultado Esperado:**
+- ✅ Sistema detecta token próximo a expirar
+- ✅ Se llama a `/auth/refresh` automáticamente
+- ✅ Se obtienen nuevos tokens del OIDC server
+- ✅ Cookie de sesión se actualiza con nuevo token
+
+---
+
+#### Test 5: Renovación Manual de Tokens
+
+**Objetivo:** Verificar que el endpoint `/auth/refresh` funciona correctamente.
+
+**Pasos:**
+
+1. Iniciar sesión y obtener cookie de sesión
+2. Hacer request manual a `/auth/refresh`
+
+**Request Manual:**
+
+```bash
+# Obtener cookie de sesión del navegador
+COOKIE="oauth_token=eyJ..."
+
+# Hacer request a /auth/refresh
+curl -X GET http://localhost:5008/auth/refresh \
+  -H "Cookie: $COOKIE" \
+  -v
+```
+
+**Resultado Esperado:**
+
+```json
+{
+  "refreshed": true,
+  "expiresAt": "2024-XX-XXTXX:XX:XX.XXXZ",
+  "timeUntilExpiry": 86400
+}
+```
+
+---
+
+#### Test 6: Validación de Seguridad
+
+**Objetivo:** Verificar que las validaciones de seguridad funcionan.
+
+**Test 6.1: Validación de company_id**
+
+**Pasos:**
+
+1. Iniciar sesión con usuario de company_id "COMP-001"
+2. Modificar manualmente el company_id en la base de datos
+3. Intentar renovar token
+4. Verificar que se rechaza
+
+**Resultado Esperado:**
+- ✅ Sistema detecta cambio de `company_id`
+- ✅ Renovación rechazada con error 403
+- ✅ Cookie de sesión eliminada
+- ✅ Usuario debe re-autenticarse
+
+**Test 6.2: Validación de Acceso Revocado**
+
+**Pasos:**
+
+1. Iniciar sesión con usuario de company_id "COMP-001"
+2. Revocar acceso de la compañía al cliente en `company_client_access`
+3. Intentar renovar token
+4. Verificar que se rechaza
+
+**Resultado Esperado:**
+- ✅ Sistema detecta acceso revocado
+- ✅ Renovación rechazada con error 403
+- ✅ Cookie de sesión eliminada
+- ✅ Usuario debe re-autenticarse
+
+---
+
+#### Test 7: Expiración de refresh_token
+
+**Objetivo:** Verificar que cuando el refresh_token expira, el usuario debe re-autenticarse.
+
+**Pasos:**
+
+1. Iniciar sesión
+2. Modificar manualmente la expiración del refresh_token en la base de datos (si es posible)
+3. O esperar a que expire naturalmente (24 horas)
+4. Intentar renovar token
+5. Verificar que se rechaza
+
+**Resultado Esperado:**
+- ✅ Refresh token rechazado por expiración
+- ✅ Error 401 devuelto
+- ✅ Usuario debe re-autenticarse
+
+---
+
+#### Test 8: Frontend - Auto-refresh
+
+**Objetivo:** Verificar que el frontend renueva tokens automáticamente.
+
+**Pasos:**
+
+1. Abrir aplicación en navegador
+2. Iniciar sesión
+3. Abrir DevTools → Network
+4. Esperar a que el sistema intente renovar
+5. Verificar requests a `/auth/refresh`
+
+**Verificación en Consola del Navegador:**
+
+```javascript
+// Verificar que hay lógica de auto-refresh
+// En AuthContext.tsx debe haber:
+// - Intervalo de verificación
+// - Función checkAndRefreshToken
+```
+
+**Resultado Esperado:**
+- ✅ Frontend hace requests periódicos a `/auth/refresh`
+- ✅ Tokens se renuevan automáticamente
+- ✅ Usuario no se desconecta
+
+---
+
+### Checklist de Testing
+
+- [ ] Test 1: Configuración verificada
+- [ ] Test 2: Login inicial recibe refresh_token
+- [ ] Test 3: refresh_token almacenado en token JWT
+- [ ] Test 4: Renovación automática funciona
+- [ ] Test 5: Renovación manual funciona
+- [ ] Test 6.1: Validación de company_id funciona
+- [ ] Test 6.2: Validación de acceso revocado funciona
+- [ ] Test 7: Expiración de refresh_token funciona
+- [ ] Test 8: Frontend auto-refresh funciona
+
+---
+
+## Troubleshooting
+
+### Problema 1: refresh_token no se recibe
+
+**Síntomas:**
+- Login exitoso pero no hay `refresh_token` en la respuesta
+- Logs muestran `Has refresh_token: false`
+
+**Causas Posibles:**
+
+1. **Cliente OIDC no tiene `refresh_token` en `grant_types`**
+   ```sql
+   -- Verificar
+   SELECT grant_types FROM oidc_clients WHERE client_id = 'writehub-client';
+   -- Debe incluir: refresh_token
+   ```
+
+2. **Cliente OIDC no tiene `offline_access` en `allowed_scopes`**
+   ```sql
+   -- Verificar
+   SELECT allowed_scopes FROM oidc_clients WHERE client_id = 'writehub-client';
+   -- Debe incluir: offline_access
+   ```
+
+3. **`.env` no incluye `offline_access` en `OIDC_SCOPES`**
+   ```bash
+   # Verificar
+   docker compose exec backend env | grep OIDC_SCOPES
+   # Debe mostrar: offline_access
+   ```
+
+**Solución:**
+
+1. Ejecutar migración SQL (Paso 1)
+2. Actualizar `.env` (Paso 2)
+3. Reiniciar servicios
+
+---
+
+### Problema 2: Error "invalid_grant" al renovar
+
+**Síntomas:**
+- Error 400 al llamar a `/auth/refresh`
+- Mensaje: "invalid_grant"
+
+**Causas Posibles:**
+
+1. **Refresh token expirado**
+   - Verificar `refresh_token_lifetime` en base de datos
+   - Verificar que no haya pasado más tiempo del permitido
+
+2. **Refresh token inválido**
+   - Verificar que el refresh_token no haya sido modificado
+   - Verificar que el refresh_token corresponde al cliente correcto
+
+3. **Cliente no tiene `refresh_token` en `grant_types`**
+   ```sql
+   -- Verificar
+   SELECT grant_types FROM oidc_clients WHERE client_id = 'writehub-client';
+   ```
+
+**Solución:**
+
+1. Verificar configuración del cliente OIDC
+2. Verificar que el refresh_token no haya expirado
+3. Intentar login nuevamente para obtener nuevo refresh_token
+
+---
+
+### Problema 3: Renovación automática no funciona
+
+**Síntomas:**
+- Tokens no se renuevan automáticamente
+- Usuario se desconecta después de 1 hora
+
+**Causas Posibles:**
+
+1. **Frontend no tiene lógica de auto-refresh**
+   - Verificar `AuthContext.tsx`
+   - Verificar que hay intervalo de verificación
+
+2. **`tokenRefreshWindow` muy grande**
+   - Verificar valor en `.env`
+   - Debe ser menor que `access_token_lifetime`
+
+3. **Refresh_token no disponible en token JWT**
+   - Verificar que el token JWT contiene `refresh_token`
+   - Verificar que se almacena correctamente en el login
+
+**Solución:**
+
+1. Verificar código del frontend
+2. Ajustar `OIDC_TOKEN_REFRESH_WINDOW` en `.env`
+3. Verificar que refresh_token se almacena en login
+
+---
+
+### Problema 4: Error "Refresh token not available"
+
+**Síntomas:**
+- Error 401 al intentar renovar
+- Mensaje: "Refresh token not available"
+
+**Causas Posibles:**
+
+1. **Token JWT no contiene refresh_token**
+   - Usuario inició sesión antes de implementar `offline_access`
+   - Token JWT antiguo sin refresh_token
+
+2. **Refresh_token no se almacenó en login**
+   - Verificar código del callback
+   - Verificar que `tokenSet.refresh_token` existe
+
+**Solución:**
+
+1. Cerrar sesión y volver a iniciar sesión
+2. Verificar que el nuevo token JWT contiene refresh_token
+3. Verificar código del callback en `auth.controller.ts`
+
+---
+
+### Problema 5: Validación de company_id falla
+
+**Síntomas:**
+- Error 403 al renovar
+- Mensaje: "Company ID changed"
+
+**Causas Posibles:**
+
+1. **Company_id del usuario cambió en la base de datos**
+   - Verificar cambios en tabla `users`
+   - Verificar que el usuario no fue movido a otra compañía
+
+2. **Bug en validación**
+   - Verificar código de validación
+   - Verificar que compara correctamente
+
+**Solución:**
+
+1. Verificar estado del usuario en base de datos
+2. Si el cambio es legítimo, usuario debe re-autenticarse
+3. Si es un bug, revisar código de validación
+
+---
+
+## Consideraciones de Seguridad
+
+### 1. Almacenamiento Seguro de refresh_token
+
+**Recomendaciones:**
+
+- ✅ Almacenar en cookie `httpOnly` (ya implementado)
+- ✅ Usar `secure` flag en producción (HTTPS)
+- ✅ Usar `sameSite: 'lax'` para protección CSRF
+- ❌ NO almacenar en `localStorage` (vulnerable a XSS)
+
+**Implementación Actual:**
+
+```typescript
+// En auth.controller.ts - buildCookieOptions()
+{
+  httpOnly: true,
+  secure: this.oidcConfig.cookieSecure,  // true en producción
+  sameSite: this.oidcConfig.cookieSameSite,  // 'lax'
+  maxAge: this.oidcConfig.cookieMaxAge,
+}
+```
+
+✅ **Ya implementado correctamente.**
+
+---
+
+### 2. Rotación de refresh_token
+
+**Recomendación:** El sistema debe rotar el refresh_token en cada renovación.
+
+**Implementación Actual:**
+
+```typescript
+// En auth.controller.ts - refresh endpoint
+const tokenSet = await this.oidcService.refreshTokens(
+  currentPayload.refresh_token
+);
+
+// Nuevo refresh_token se almacena
+refresh_token: tokenSet.refresh_token,  // ✅ Nuevo token
+```
+
+✅ **Ya implementado correctamente.**
+
+---
+
+### 3. Revocación de refresh_token
+
+**Recomendación:** El sistema debe poder revocar refresh_tokens comprometidos.
+
+**Implementación Actual:**
+
+- ✅ Logout revoca refresh_token (si está implementado en oidc-provider)
+- ✅ Cambio de contraseña puede revocar tokens (si está implementado)
+- ⚠️ No hay endpoint explícito de revocación manual
+
+**Mejora Futura:**
+
+```typescript
+// Agregar endpoint de revocación
+@Post('/auth/revoke')
+async revokeTokens(@Req() req: Request) {
+  // Revocar refresh_token actual
+  // Forzar re-autenticación
+}
+```
+
+---
+
+### 4. Validación de Seguridad en Renovación
+
+**Implementaciones Actuales:**
+
+✅ **Validación de company_id:**
+```typescript
+if (freshUserInfo.company_id !== currentPayload.company_id) {
+  // Rechazar renovación
+}
+```
+
+✅ **Validación de acceso:**
+```typescript
+const hasAccess = await this.oidcAccessCheckService.checkCompanyClientAccess(
+  freshUserInfo.company_id,
+  clientId
+);
+```
+
+✅ **Validación de expiración:**
+```typescript
+if (timeUntilExpiry > refreshWindow) {
+  // No renovar aún
+}
+```
+
+---
+
+### 5. Lifetime de Tokens
+
+**Recomendaciones:**
+
+- **Access Token:** 1 hora (3600 segundos) ✅
+- **Refresh Token:** 24 horas - 7 días (86400 - 604800 segundos)
+- **ID Token:** 1 hora (3600 segundos) ✅
+
+**Configuración Actual:**
+
+```sql
+access_token_lifetime = 3600      -- 1 hora ✅
+refresh_token_lifetime = 86400    -- 24 horas ✅
+```
+
+**Consideración:** Para producción, considerar aumentar `refresh_token_lifetime` a 7 días (604800 segundos) para mejor UX.
+
+---
+
+## Plan de Rollback
+
+### Escenario: Necesidad de Revertir Cambios
+
+Si después de implementar `offline_access` encuentras problemas críticos, puedes revertir los cambios:
+
+### Paso 1: Revertir Migración SQL
+
+**Archivo:** `provider/migrations/017_rollback_offline_access.sql`
+
+```sql
+-- Rollback: Remove offline_access scope and refresh_token grant type
+UPDATE oidc_clients
+SET 
+    grant_types = ARRAY['authorization_code'],
+    allowed_scopes = ARRAY['openid', 'email', 'profile'],
+    updated_at = CURRENT_TIMESTAMP
+WHERE client_id = 'writehub-client';
+
+-- Verify rollback
+SELECT grant_types, allowed_scopes
+FROM oidc_clients
+WHERE client_id = 'writehub-client';
+-- Expected: grant_types = {authorization_code}, allowed_scopes = {openid,email,profile}
+```
+
+### Paso 2: Revertir Variables de Entorno
+
+**Archivo:** `Write-mvp/apps/api/.env.dev`
+
+```bash
+# Revertir a:
+OIDC_SCOPES=openid email profile
+```
+
+**Archivo:** `Write-mvp/apps/api/.env.production`
+
+```bash
+# Revertir a:
+OIDC_SCOPES=openid email profile
+```
+
+### Paso 3: Reiniciar Servicios
+
+```bash
+docker compose restart backend
+docker compose restart provider
+```
+
+### Paso 4: Verificar Rollback
+
+1. Verificar base de datos:
+   ```sql
+   SELECT grant_types, allowed_scopes
+   FROM oidc_clients
+   WHERE client_id = 'writehub-client';
+   ```
+
+2. Verificar variables de entorno:
+   ```bash
+   docker compose exec backend env | grep OIDC_SCOPES
+   ```
+
+3. Probar login:
+   - Debe funcionar normalmente
+   - NO debe recibir refresh_token
+   - Usuario se desconectará después de 1 hora
+
+---
+
+## Checklist Completo
+
+### Pre-Implementación
+
+- [ ] Revisar este documento completo
+- [ ] Verificar que el sistema OIDC funciona correctamente
+- [ ] Hacer backup de la base de datos
+- [ ] Verificar acceso a archivos de migración
+- [ ] Verificar acceso a archivos `.env`
+- [ ] Preparar entorno de testing
+
+### Implementación
+
+- [ ] **Paso 1:** Crear archivo de migración SQL
+  - [ ] Crear `016_add_offline_access_to_writehub_client.sql`
+  - [ ] Verificar sintaxis SQL
+  - [ ] Agregar comentarios descriptivos
+
+- [ ] **Paso 2:** Ejecutar migración SQL
+  - [ ] Ejecutar migración en desarrollo
+  - [ ] Verificar que se aplicó correctamente
+  - [ ] Verificar logs de migración
+
+- [ ] **Paso 3:** Actualizar variables de entorno
+  - [ ] Actualizar `.env.dev`
+  - [ ] Actualizar `.env.production`
+  - [ ] Verificar sintaxis
+
+- [ ] **Paso 4:** Reiniciar servicios
+  - [ ] Reiniciar backend
+  - [ ] Reiniciar provider
+  - [ ] Verificar que inician correctamente
+
+- [ ] **Paso 5:** Verificar configuración
+  - [ ] Verificar base de datos
+  - [ ] Verificar variables de entorno
+  - [ ] Verificar logs al iniciar
+
+### Testing
+
+- [ ] **Test 1:** Verificación de configuración
+- [ ] **Test 2:** Login inicial con offline_access
+- [ ] **Test 3:** Verificación de refresh_token en token JWT
+- [ ] **Test 4:** Renovación automática de tokens
+- [ ] **Test 5:** Renovación manual de tokens
+- [ ] **Test 6.1:** Validación de company_id
+- [ ] **Test 6.2:** Validación de acceso revocado
+- [ ] **Test 7:** Expiración de refresh_token
+- [ ] **Test 8:** Frontend auto-refresh
+
+### Post-Implementación
+
+- [ ] Documentar cambios realizados
+- [ ] Actualizar documentación del sistema
+- [ ] Comunicar cambios al equipo
+- [ ] Monitorear logs por 24 horas
+- [ ] Verificar métricas de uso
+- [ ] Revisar feedback de usuarios
+
+### Producción
+
+- [ ] Ejecutar migración en producción
+- [ ] Actualizar variables de entorno en producción
+- [ ] Reiniciar servicios en producción
+- [ ] Verificar que todo funciona
+- [ ] Monitorear logs de producción
+- [ ] Estar preparado para rollback si es necesario
+
+---
+
+## Notas Adicionales
+
+### Tiempo Estimado de Implementación
+
+- **Preparación:** 30 minutos
+- **Implementación:** 1 hora
+- **Testing:** 2 horas
+- **Total:** ~3.5 horas
+
+### Dependencias
+
+- Sistema OIDC funcionando
+- Base de datos PostgreSQL accesible
+- Acceso a archivos de configuración
+- Backend y Frontend funcionando
+
+### Riesgos
+
+- **Bajo:** Cambios son principalmente de configuración
+- **Mitigación:** Código ya soporta offline_access, solo falta configuración
+- **Rollback:** Fácil de revertir si es necesario
+
+### Próximos Pasos Después de Implementación
+
+1. Monitorear uso de refresh_tokens
+2. Considerar aumentar `refresh_token_lifetime` a 7 días
+3. Implementar endpoint de revocación manual
+4. Agregar métricas de renovación de tokens
+5. Documentar mejores prácticas para el equipo
+
+---
+
+## Referencias
+
+- [OIDC Specification - offline_access](https://openid.net/specs/openid-connect-core-1_0.html#OfflineAccess)
+- [oidc-provider Documentation](https://github.com/panva/node-oidc-provider)
+- [OAuth 2.0 Refresh Token Flow](https://oauth.net/2/refresh-tokens/)
+
+---
+
+**Última Actualización:** 2024-XX-XX  
+**Versión del Documento:** 1.0  
+**Autor:** Sistema de Documentación OIDC

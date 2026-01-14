@@ -1,0 +1,7 @@
+# Title
+Hardening rápido (añadir luego al backend)
+
+- `helmet` para cabeceras seguras.
+- `express-rate-limit` en rutas `/auth/*`.
+- Cookies `secure` en producción + `trust proxy`.
+- Sanitizar logs; nunca loguear tokens/sesiones.

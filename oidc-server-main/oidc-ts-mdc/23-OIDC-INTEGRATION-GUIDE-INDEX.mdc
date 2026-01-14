@@ -1,0 +1,308 @@
+# Title
+
+Guía de Integración OIDC - Índice y Inicio Rápido
+
+# Summary
+
+Este documento es el punto de entrada para implementar seguridad OIDC en nuevos módulos o sistemas. Proporciona un mapa completo de la documentación disponible y guías de decisión rápida para determinar qué pasos seguir según el tipo de integración requerida.
+
+El proceso completo de integración OIDC incluye: (1) Configuración del servidor OIDC y creación de clientes, (2) Integración en backend APIs, (3) Integración en frontends, (4) Testing y validación, (5) Deployment en producción.
+
+# QuickDecisionGuide
+
+¿Qué necesitas hacer?
+
+**Escenario A: Implementar OIDC en un nuevo backend API (NestJS)**
+
+- Leer: `24-OIDC-SERVER-SETUP.mdc` → `25-OIDC-BACKEND-NESTJS-INTEGRATION.mdc` → `29-OIDC-TESTING-VALIDATION.mdc`
+
+**Escenario B: Implementar OIDC en un nuevo frontend (React)**
+
+- Leer: `24-OIDC-SERVER-SETUP.mdc` → `27-OIDC-FRONTEND-REACT-INTEGRATION.mdc` → `29-OIDC-TESTING-VALIDATION.mdc`
+
+**Escenario C: Implementar OIDC en un backend con otro framework (Express, Fastify, Python, Go)**
+
+- Leer: `24-OIDC-SERVER-SETUP.mdc` → `26-OIDC-BACKEND-OTHER-FRAMEWORKS.mdc` → `29-OIDC-TESTING-VALIDATION.mdc`
+
+**Escenario D: Implementar OIDC en Next.js**
+
+- Leer: `24-OIDC-SERVER-SETUP.mdc` → `28-OIDC-FRONTEND-NEXTJS-INTEGRATION.mdc` → `29-OIDC-TESTING-VALIDATION.mdc`
+
+**Escenario E: Desplegar a producción**
+
+- Leer: `30-OIDC-DEPLOYMENT-CONSIDERATIONS.mdc` (después de completar la integración)
+
+# DocumentMap
+
+## Documento 1: `24-OIDC-SERVER-SETUP.mdc`
+
+**Qué cubre:**
+
+- Configuración inicial del servidor OIDC
+- Setup de base de datos (migrations)
+- Configuración de variables de entorno del provider
+- Acceso al admin panel
+- Creación de empresas (companies) y usuarios base
+- **CRÍTICO**: Creación de cliente OIDC para el nuevo módulo
+- Grant de acceso empresa-cliente
+- Troubleshooting común del servidor
+
+**Cuándo leer:** SIEMPRE es el primer paso. Debes completar este documento antes de cualquier integración.
+
+**Tiempo estimado:** 30-45 minutos
+
+## Documento 2: `25-OIDC-BACKEND-NESTJS-INTEGRATION.mdc`
+
+**Qué cubre:**
+
+- Integración completa en API NestJS
+- Estructura de archivos necesarios
+- Dependencias y configuración
+- Implementación paso a paso de todos los componentes (OIDCConfig, OIDCService, OIDCAuthGuard, AuthController, AuthModule)
+- Protección de módulos existentes
+- Código completo copiable
+
+**Cuándo leer:** Si vas a proteger un backend NestJS (como Write-MVP)
+
+**Tiempo estimado:** 1-2 horas
+
+## Documento 3: `26-OIDC-BACKEND-OTHER-FRAMEWORKS.mdc`
+
+**Qué cubre:**
+
+- Integración en Express.js, Fastify, Python (Flask/FastAPI), Go
+- Patrones comunes de OIDC authorization_code flow
+- Implementación de middleware de autenticación
+- Manejo de tokens JWT
+- Ejemplos de código por framework
+
+**Cuándo leer:** Si vas a proteger un backend con framework diferente a NestJS
+
+**Tiempo estimado:** 1-2 horas por framework
+
+## Documento 4: `27-OIDC-FRONTEND-REACT-INTEGRATION.mdc`
+
+**Qué cubre:**
+
+- Integración completa en frontend React
+- AuthContext y AuthProvider
+- ProtectedRoutes component
+- Axios client con interceptors
+- Manejo de errores 401
+- Variables de entorno (VITE_API_URL)
+- Código completo copiable
+
+**Cuándo leer:** Si vas a proteger un frontend React (como Write-MVP)
+
+**Tiempo estimado:** 1-2 horas
+
+## Documento 5: `28-OIDC-FRONTEND-NEXTJS-INTEGRATION.mdc`
+
+**Qué cubre:**
+
+- Integración en Next.js (App Router y Pages Router)
+- Middleware de autenticación
+- Server Components vs Client Components
+- API Routes para callback
+- Variables de entorno NEXT*PUBLIC*\*
+- Patrones específicos de Next.js
+
+**Cuándo leer:** Si vas a proteger un frontend Next.js
+
+**Tiempo estimado:** 1-2 horas
+
+## Documento 6: `29-OIDC-TESTING-VALIDATION.mdc`
+
+**Qué cubre:**
+
+- Checklist completo de verificación
+- Testing manual paso a paso
+- Validación de claims (sub, email, name, company_id)
+- Testing de login, logout, expiración de sesión
+- Escenarios de error comunes
+- Troubleshooting avanzado
+
+**Cuándo leer:** DESPUÉS de completar la integración, para validar que todo funciona
+
+**Tiempo estimado:** 30-60 minutos
+
+## Documento 7: `30-OIDC-DEPLOYMENT-CONSIDERATIONS.mdc`
+
+**Qué cubre:**
+
+- Variables de entorno en producción
+- Configuración de cookies (secure, sameSite)
+- Requisitos HTTPS
+- Configuración CORS
+- Rate limiting
+- Monitoring y logging
+- Security hardening
+
+**Cuándo leer:** Antes de desplegar a producción
+
+**Tiempo estimado:** 45-60 minutos
+
+# Prerequisites
+
+Antes de comenzar cualquier integración, asegúrate de tener:
+
+## Requisitos Técnicos
+
+- [ ] Servidor OIDC funcionando y accesible
+- [ ] Acceso al admin panel del OIDC server
+- [ ] Base de datos PostgreSQL configurada para el OIDC server
+- [ ] Conocimiento del framework/tecnología que vas a proteger (NestJS, React, Next.js, etc.)
+- [ ] Acceso a las variables de entorno del sistema que vas a proteger
+
+## Información Necesaria
+
+Antes de empezar, ten a mano:
+
+- [ ] URL del OIDC Provider (ej: `https://auth.test.acceleralia.com`)
+- [ ] Credenciales de admin del OIDC server
+- [ ] URL base del sistema que vas a proteger (backend API o frontend)
+- [ ] Nombre del nuevo módulo/sistema (para crear el client_id)
+
+## Checklist de Decisión
+
+Responde estas preguntas antes de empezar:
+
+1. **¿Qué tipo de sistema voy a proteger?**
+   - [ ] Backend API (NestJS) → `25-OIDC-BACKEND-NESTJS-INTEGRATION.mdc`
+   - [ ] Backend API (otro framework) → `26-OIDC-BACKEND-OTHER-FRAMEWORKS.mdc`
+   - [ ] Frontend React → `27-OIDC-FRONTEND-REACT-INTEGRATION.mdc`
+   - [ ] Frontend Next.js → `28-OIDC-FRONTEND-NEXTJS-INTEGRATION.mdc`
+
+2. **¿Ya existe un cliente OIDC para este módulo?**
+   - [ ] Sí → Puedes saltar `24-OIDC-SERVER-SETUP.mdc` (solo la parte de creación de cliente)
+   - [ ] No → Debes completar TODO `24-OIDC-SERVER-SETUP.mdc`
+
+3. **¿Tengo acceso al admin panel del OIDC server?**
+   - [ ] Sí → Continúa
+   - [ ] No → Solicita acceso primero
+
+# ProcessOverview
+
+## Flujo Completo de Integración (Resumen)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ PASO 1: Configuración del OIDC Server                      │
+│ Documento: 24-OIDC-SERVER-SETUP.mdc                         │
+│                                                             │
+│ ✓ Setup de base de datos                                    │
+│ ✓ Configuración del provider                                │
+│ ✓ Creación de empresa (company)                             │
+│ ✓ Creación de usuarios                                      │
+│ ✓ [CRÍTICO] Creación de cliente OIDC para el nuevo módulo   │
+│ ✓ Grant de acceso empresa-cliente                          │
+└─────────────────────────────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────┐
+│ PASO 2: Integración en Cliente                              │
+│ Documentos según tipo:                                      │
+│                                                             │
+│ Backend NestJS → 25-OIDC-BACKEND-NESTJS-INTEGRATION.mdc     │
+│ Backend Otro → 26-OIDC-BACKEND-OTHER-FRAMEWORKS.mdc        │
+│ Frontend React → 27-OIDC-FRONTEND-REACT-INTEGRATION.mdc     │
+│ Frontend Next.js → 28-OIDC-FRONTEND-NEXTJS-INTEGRATION.mdc │
+│                                                             │
+│ ✓ Configuración de variables de entorno                     │
+│ ✓ Implementación de componentes de autenticación            │
+│ ✓ Protección de rutas/endpoints                             │
+└─────────────────────────────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────┐
+│ PASO 3: Testing y Validación                                │
+│ Documento: 29-OIDC-TESTING-VALIDATION.mdc                   │
+│                                                             │
+│ ✓ Validación de login/logout                                │
+│ ✓ Verificación de claims                                   │
+│ ✓ Testing de rutas protegidas                               │
+│ ✓ Testing de errores                                        │
+└─────────────────────────────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────┐
+│ PASO 4: Deployment a Producción                            │
+│ Documento: 30-OIDC-DEPLOYMENT-CONSIDERATIONS.mdc            │
+│                                                             │
+│ ✓ Configuración de variables de entorno en producción       │
+│ ✓ Security hardening                                        │
+│ ✓ Monitoring y logging                                      │
+└─────────────────────────────────────────────────────────────┘
+```
+
+# CommonConcepts
+
+## Conceptos Clave OIDC
+
+### Cliente OIDC (OIDC Client)
+
+Un cliente OIDC es la aplicación/sistema que quiere usar el servidor OIDC para autenticar usuarios. Cada módulo que proteges necesita su propio cliente OIDC con:
+
+- `client_id`: Identificador único (ej: "write-mvp-api")
+- `client_secret`: Secreto para autenticar el cliente
+- `redirect_uris`: URLs donde el OIDC provider redirigirá después del login
+- `post_logout_redirect_uris`: URLs donde redirigir después del logout
+
+### Empresa (Company)
+
+Una empresa agrupa usuarios. Cada usuario pertenece a una empresa. El `company_id` está incluido en los claims del token OIDC.
+
+### Grant de Acceso
+
+Debes "grant" (otorgar) acceso explícitamente a cada empresa para que pueda usar cada cliente OIDC. Esto permite control granular: "La empresa X puede usar el cliente Y".
+
+### Claims del Token
+
+Los tokens JWT incluyen información del usuario:
+
+- `sub`: ID único del usuario
+- `email`: Email del usuario
+- `name`: Nombre completo
+- `company_id`: ID de la empresa a la que pertenece
+
+### Flujo Authorization Code
+
+1. Usuario visita `/auth/login` en tu aplicación
+2. Tu aplicación redirige al OIDC Provider
+3. Usuario ingresa credenciales en el Provider
+4. Provider redirige a `/auth/callback` con un `code`
+5. Tu aplicación intercambia el `code` por tokens
+6. Tu aplicación genera un JWT interno con la información del usuario
+7. Usuario autenticado con acceso a rutas protegidas
+
+# Troubleshooting
+
+## Problemas Comunes al Iniciar
+
+**Problema: "No sé por dónde empezar"**
+
+- Solución: Empieza con `24-OIDC-SERVER-SETUP.mdc` siempre. Es el primer paso obligatorio.
+
+**Problema: "Ya tengo un cliente OIDC, ¿puedo saltar pasos?"**
+
+- Solución: Revisa `24-OIDC-SERVER-SETUP.mdc` pero solo la sección de creación de cliente para verificar que está correctamente configurado.
+
+**Problema: "¿Qué documento debo leer si tengo backend Y frontend?"**
+
+- Solución: Debes leer ambos documentos (backend + frontend). Empieza con el backend, luego el frontend.
+
+# NextSteps
+
+Una vez completado este índice, procede con:
+
+1. **Si es tu primera vez**: Comienza con `24-OIDC-SERVER-SETUP.mdc`
+2. **Si ya configuraste el servidor**: Ve directo al documento de integración correspondiente a tu tipo de sistema
+3. **Si completaste la integración**: Revisa `29-OIDC-TESTING-VALIDATION.mdc` para validar
+4. **Si vas a producción**: Revisa `30-OIDC-DEPLOYMENT-CONSIDERATIONS.mdc`
+
+## Referencias Relacionadas
+
+- **Arquitectura del Sistema**: `01-architecture.mdc`
+- **Configuración de Entorno**: `02-env.mdc`, `20-ENV-PROVIDER-PRODUCCION.mdc`, `21-ENV-BACKEND-PRODUCCION.mdc`
+- **Testing Funcional**: `18-TESTING-FUNCIONAL.mdc`
+- **Security Hardening**: `17-hardening.mdc`

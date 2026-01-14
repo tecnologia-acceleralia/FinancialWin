@@ -1,0 +1,2010 @@
+# Guía Completa: Implementación de Módulo Satélite con Protección OIDC
+
+**Versión:** 2.0  
+**Fecha:** 2025-01-16  
+**Objetivo:** Documentar el proceso completo y automatizable para integrar un nuevo módulo satélite con oidc-server, utilizando la arquitectura centralizada de validación de tokens. Esta guía está diseñada para ser usada con Cursor AI para automatizar la implementación.
+
+---
+
+## 📋 Tabla de Contenidos
+
+1. [Prerequisitos](#prerequisitos)
+2. [Configuración en oidc-server](#configuración-en-oidc-server)
+3. [Configuración del Módulo Satélite](#configuración-del-módulo-satélite)
+4. [Implementación Completa para NestJS](#implementación-completa-para-nestjs)
+5. [Implementación para Express](#implementación-para-express)
+6. [Configuración de Base de Datos (Opcional)](#configuración-de-base-de-datos-opcional)
+7. [Configuración de Main.ts / App Bootstrap](#configuración-de-maints--app-bootstrap)
+8. [Protección de Endpoints](#protección-de-endpoints)
+9. [Testing y Validación](#testing-y-validación)
+10. [Troubleshooting](#troubleshooting)
+11. [Checklist de Implementación](#checklist-de-implementación)
+
+---
+
+## 🎯 Prerequisitos
+
+### Requisitos del Módulo Satélite
+
+- Framework: NestJS (recomendado) o Express
+- Lenguaje: TypeScript (recomendado) o JavaScript
+- Base de datos: PostgreSQL (para caché de acceso, opcional pero recomendado)
+- Dependencias mínimas:
+  - `axios` para llamadas HTTP
+  - `@nestjs/config` (NestJS) o `dotenv` (Express)
+  - `@nestjs/jwt` (NestJS) o `jsonwebtoken` (Express)
+  - `cookie-parser` (para Express, NestJS lo maneja automáticamente)
+  - `zod` (NestJS, para validación de configuración)
+
+### Requisitos de oidc-server
+
+- oidc-server debe estar corriendo y accesible
+- Endpoint `/api/token/validate` debe estar disponible
+- Endpoint `/admin/access/check` debe estar disponible (para verificación de acceso)
+- Variable `JWT_SECRET` debe estar configurada
+
+---
+
+## ⚙️ Configuración en oidc-server
+
+### Paso 1: Configurar JWT_SECRET en Provider
+
+**Ubicación:** `oidc-server/provider/.env` o variables de entorno del contenedor
+
+```bash
+# JWT Secret - DEBE ser el mismo valor usado por todos los módulos satélite
+# Este secret se usa para validar tokens de sesión JWT generados por módulos satélite
+JWT_SECRET=your_jwt_secret_for_file_access_development_1758720469
+```
+
+**⚠️ CRÍTICO:**
+
+- Este `JWT_SECRET` debe ser **exactamente el mismo** que el usado por los módulos satélite
+- Si cambias este valor, todos los tokens existentes se invalidarán
+- En producción, usa un secret fuerte (mínimo 32 caracteres)
+- Genera un nuevo secret con: `openssl rand -base64 32`
+
+### Paso 2: Registrar Cliente OIDC en oidc-server
+
+El módulo satélite debe estar registrado como cliente OIDC en la base de datos.
+
+**Opción A: Via Admin Panel (Recomendado)**
+
+1. Accede a `https://auth.test.acceleralia.com/admin-panel/`
+2. Inicia sesión como administrador
+3. Ve a "OIDC Clients" → "Create New Client"
+4. Completa el formulario:
+   - **Client ID**: `tu-modulo-client-id` (ej: `mi-modulo-client`)
+   - **Client Name**: Nombre descriptivo del módulo
+   - **Redirect URIs**: `https://tu-modulo.com/api/auth/callback`
+   - **Post Logout Redirect URIs**: `https://tu-modulo.com`
+   - **Scopes**: `openid profile email`
+   - **Response Types**: `code`
+   - **Grant Types**: `authorization_code refresh_token`
+   - **Token Endpoint Auth Method**: `client_secret_post`
+   - **Frontend URL**: `https://tu-modulo.com` (opcional)
+
+**Opción B: Via SQL Directo**
+
+```sql
+INSERT INTO oidc_clients (
+  client_id,
+  client_secret,
+  client_name,
+  client_description,
+  redirect_uris,
+  post_logout_redirect_uris,
+  response_types,
+  grant_types,
+  allowed_scopes,
+  token_endpoint_auth_method,
+  frontend_url,
+  is_active,
+  created_at,
+  updated_at
+) VALUES (
+  'tu-modulo-client-id',
+  'tu-client-secret-seguro', -- Generar con: openssl rand -base64 32
+  'Mi Módulo Satélite',
+  'Descripción del módulo',
+  ARRAY['https://tu-modulo.com/api/auth/callback'],
+  ARRAY['https://tu-modulo.com'],
+  ARRAY['code'],
+  ARRAY['authorization_code', 'refresh_token'],
+  ARRAY['openid', 'profile', 'email'],
+  'client_secret_post',
+  'https://tu-modulo.com',
+  TRUE,
+  NOW(),
+  NOW()
+);
+```
+
+### Paso 3: Asignar Acceso de Compañías al Cliente
+
+Las compañías deben tener acceso explícito al cliente:
+
+```sql
+-- Asignar acceso de una compañía al cliente
+INSERT INTO company_client_access (
+  company_id,
+  client_id,
+  is_active,
+  created_at,
+  updated_at
+) VALUES (
+  'uuid-de-la-compania',
+  'tu-modulo-client-id',
+  TRUE,
+  NOW(),
+  NOW()
+);
+```
+
+**Via Admin Panel:**
+
+1. Ve a "Companies" → Selecciona la compañía
+2. Ve a "Client Access" → "Grant Access"
+3. Selecciona el cliente del módulo satélite
+
+---
+
+## 🔧 Configuración del Módulo Satélite
+
+### Paso 1: Instalar Dependencias
+
+**Para NestJS:**
+
+```bash
+npm install axios @nestjs/config @nestjs/jwt cookie-parser zod
+npm install -D @types/cookie-parser
+```
+
+**Para Express:**
+
+```bash
+npm install axios cookie-parser jsonwebtoken dotenv
+npm install -D @types/cookie-parser @types/jsonwebtoken
+```
+
+### Paso 2: Configurar Variables de Entorno
+
+Crea o actualiza tu archivo `.env`:
+
+```bash
+# OIDC Configuration
+# OIDC_ISSUER_URL: URL interna para llamadas HTTP (ej: http://host.docker.internal:5009)
+# OIDC_PUBLIC_URL: URL pública para redirects del navegador (ej: https://auth.test.acceleralia.com)
+OIDC_ISSUER_URL=http://host.docker.internal:5009
+OIDC_PUBLIC_URL=https://auth.test.acceleralia.com
+OIDC_CLIENT_ID=tu-modulo-client-id
+OIDC_CLIENT_SECRET=tu-client-secret-seguro
+OIDC_REDIRECT_URI=https://tu-modulo.com/api/auth/callback
+OIDC_POST_LOGOUT_REDIRECT_URI=https://tu-modulo.com
+OIDC_SCOPES="openid profile email"
+
+# JWT Configuration (para firmar tokens de sesión)
+# CRÍTICO: Debe ser EXACTAMENTE el mismo que en oidc-server/provider
+JWT_SECRET=your_jwt_secret_for_file_access_development_1758720469
+JWT_EXPIRES_IN=24h
+
+# Cookie Configuration
+OIDC_COOKIE_NAME=oauth_session
+OIDC_COOKIE_SECURE=true
+OIDC_COOKIE_SAME_SITE=strict
+OIDC_COOKIE_DOMAIN=""  # Vacío por defecto (seguro para multi-tenant)
+OIDC_COOKIE_PATH=/api
+OIDC_COOKIE_MAX_AGE=1800000  # 30 minutos en milisegundos
+OIDC_TOKEN_REFRESH_WINDOW=300000  # 5 minutos en milisegundos
+
+# CORS Configuration (múltiples orígenes separados por coma)
+CORS_ORIGIN=https://tu-modulo.com,https://auth.test.acceleralia.com
+
+# Environment
+NODE_ENV=production
+```
+
+**⚠️ IMPORTANTE:**
+
+- `JWT_SECRET` debe ser **exactamente el mismo** que en oidc-server/provider
+- `OIDC_ISSUER_URL` vs `OIDC_PUBLIC_URL`:
+  - `OIDC_ISSUER_URL`: URL interna para llamadas HTTP entre servicios (puede ser `host.docker.internal` en Docker)
+  - `OIDC_PUBLIC_URL`: URL pública para redirects del navegador (debe ser HTTPS en producción)
+- `OIDC_COOKIE_DOMAIN` debe estar vacío (`""`) a menos que frontend y backend estén en subdominios diferentes
+- `OIDC_COOKIE_SECURE=true` en producción (requiere HTTPS)
+
+---
+
+## 🛡️ Implementación Completa para NestJS
+
+### Paso 1: Configuración OIDC
+
+Crea `src/common/config/oidc.config.ts`:
+
+```typescript
+import { registerAs } from "@nestjs/config";
+import { z } from "zod";
+
+const oidcConfigSchema = z.object({
+  issuerUrl: z.string().url(),
+  clientId: z.string(),
+  clientSecret: z.string(),
+  redirectUri: z.string().url(),
+  postLogoutRedirectUri: z.string().url(),
+  scopes: z.string(),
+  cookieName: z.string(),
+  cookieSecure: z.boolean(),
+  cookieSameSite: z.enum(["lax", "strict", "none"]),
+  cookieDomain: z.string().optional(),
+  cookiePath: z.string().optional(),
+  cookieMaxAge: z.number().optional(),
+  tokenRefreshWindow: z.number().optional(),
+});
+
+export type OIDCConfigValues = z.infer<typeof oidcConfigSchema>;
+
+export const OIDCConfig = registerAs("oidc", (): OIDCConfigValues => {
+  const config = {
+    issuerUrl: process.env.OIDC_ISSUER_URL,
+    clientId: process.env.OIDC_CLIENT_ID,
+    clientSecret: process.env.OIDC_CLIENT_SECRET,
+    redirectUri: process.env.OIDC_REDIRECT_URI,
+    postLogoutRedirectUri: process.env.OIDC_POST_LOGOUT_REDIRECT_URI,
+    scopes: process.env.OIDC_SCOPES,
+    cookieName: process.env.OIDC_COOKIE_NAME,
+    cookieSecure: process.env.OIDC_COOKIE_SECURE === "true",
+    cookieSameSite: process.env.OIDC_COOKIE_SAME_SITE,
+    cookieDomain: process.env.OIDC_COOKIE_DOMAIN,
+    cookiePath: process.env.OIDC_COOKIE_PATH,
+    cookieMaxAge: process.env.OIDC_COOKIE_MAX_AGE
+      ? parseInt(process.env.OIDC_COOKIE_MAX_AGE)
+      : undefined,
+    tokenRefreshWindow: process.env.OIDC_TOKEN_REFRESH_WINDOW
+      ? parseInt(process.env.OIDC_TOKEN_REFRESH_WINDOW)
+      : undefined,
+  };
+
+  return oidcConfigSchema.parse(config);
+});
+```
+
+### Paso 2: OIDC Service
+
+Crea `src/common/services/oidc.service.ts`:
+
+```typescript
+import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
+import axios from "axios";
+
+export interface OIDCUser {
+  sub: string;
+  email: string;
+  name: string;
+  company_id: string;
+}
+
+export interface TokenSet {
+  access_token: string;
+  id_token: string;
+  refresh_token?: string;
+  token_type?: string;
+  expires_in?: number;
+  scope?: string;
+}
+
+@Injectable()
+export class OIDCService implements OnModuleInit {
+  private readonly logger = new Logger(OIDCService.name);
+  private issuerUrl: string; // URL interna para llamadas HTTP
+  private issuerPublicUrl: string; // URL pública para redirects del navegador
+  private clientId: string;
+  private clientSecret: string;
+  private redirectUri: string;
+  private postLogoutRedirectUri: string;
+  private scopes: string;
+
+  async onModuleInit() {
+    // Validate required environment variables
+    const requiredEnvVars = {
+      OIDC_ISSUER_URL: process.env.OIDC_ISSUER_URL,
+      OIDC_PUBLIC_URL: process.env.OIDC_PUBLIC_URL,
+      OIDC_CLIENT_ID: process.env.OIDC_CLIENT_ID,
+      OIDC_CLIENT_SECRET: process.env.OIDC_CLIENT_SECRET,
+      OIDC_REDIRECT_URI: process.env.OIDC_REDIRECT_URI,
+      OIDC_POST_LOGOUT_REDIRECT_URI: process.env.OIDC_POST_LOGOUT_REDIRECT_URI,
+      OIDC_SCOPES: process.env.OIDC_SCOPES,
+    };
+
+    const missingVars = Object.entries(requiredEnvVars)
+      .filter(([_, value]) => !value)
+      .map(([key]) => key);
+
+    if (missingVars.length > 0) {
+      const errorMessage = `❌ Missing required OIDC environment variables: ${missingVars.join(", ")}`;
+      this.logger.error(errorMessage);
+      throw new Error(errorMessage);
+    }
+
+    this.issuerUrl = requiredEnvVars.OIDC_ISSUER_URL!;
+    this.issuerPublicUrl = requiredEnvVars.OIDC_PUBLIC_URL!;
+    this.clientId = requiredEnvVars.OIDC_CLIENT_ID!;
+    this.clientSecret = requiredEnvVars.OIDC_CLIENT_SECRET!;
+    this.redirectUri = requiredEnvVars.OIDC_REDIRECT_URI!;
+    this.postLogoutRedirectUri = requiredEnvVars.OIDC_POST_LOGOUT_REDIRECT_URI!;
+    this.scopes = requiredEnvVars.OIDC_SCOPES!;
+
+    this.logger.log("✅ OIDC service initialized");
+    this.logger.log(`   Issuer URL (internal): ${this.issuerUrl}`);
+    this.logger.log(`   Issuer URL (public): ${this.issuerPublicUrl}`);
+    this.logger.log(`   Client ID: ${this.clientId}`);
+    this.logger.log(`   Redirect URI: ${this.redirectUri}`);
+    this.logger.log(`   Scopes: ${this.scopes}`);
+  }
+
+  /**
+   * Generate authorization URL for OIDC login
+   */
+  getAuthUrl(state: string): string {
+    this.logger.log(`🔗 Generating auth URL for state: ${state}`);
+
+    const params = new URLSearchParams({
+      response_type: "code",
+      client_id: this.clientId,
+      redirect_uri: this.redirectUri,
+      scope: this.scopes,
+      state,
+    });
+
+    // Use public URL for browser redirect
+    const authUrl = `${this.issuerPublicUrl}/auth?${params.toString()}`;
+    this.logger.log(`   Public URL for browser: ${authUrl}`);
+    return authUrl;
+  }
+
+  /**
+   * Exchange authorization code for tokens
+   */
+  async handleCallback(code: string, state: string): Promise<TokenSet> {
+    this.logger.log("🔐 Starting token exchange...");
+    this.logger.log(`   Code length: ${code?.length}`);
+    this.logger.log(`   State: ${state}`);
+    this.logger.log(`   Token endpoint: ${this.issuerUrl}/token`);
+
+    try {
+      const requestBody = new URLSearchParams({
+        grant_type: "authorization_code",
+        code,
+        redirect_uri: this.redirectUri,
+        client_id: this.clientId,
+        client_secret: this.clientSecret,
+      }).toString();
+
+      this.logger.log("   Sending token request to OIDC provider...");
+      const tokenResponse = await axios.post(
+        `${this.issuerUrl}/token`,
+        requestBody,
+        {
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        }
+      );
+
+      this.logger.log("✅ Token exchange successful");
+      this.logger.log(
+        `   Has access_token: ${!!tokenResponse.data.access_token}`
+      );
+      this.logger.log(`   Has id_token: ${!!tokenResponse.data.id_token}`);
+      return tokenResponse.data as TokenSet;
+    } catch (error) {
+      const axiosError = error as {
+        message?: string;
+        code?: string;
+        response?: {
+          status: number;
+          statusText: string;
+          data: unknown;
+        };
+      };
+
+      this.logger.error("❌ Token exchange failed");
+      this.logger.error(`   Error message: ${axiosError?.message || "N/A"}`);
+      this.logger.error(`   Error code: ${axiosError?.code || "N/A"}`);
+      if (axiosError?.response) {
+        this.logger.error(`   Status: ${axiosError.response.status}`);
+        this.logger.error(
+          `   Response data: ${JSON.stringify(axiosError.response.data)}`
+        );
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Get user information from id_token JWT
+   */
+  getUserInfoFromIdToken(idToken: string): OIDCUser {
+    this.logger.log("👤 Extracting user info from id_token JWT...");
+
+    try {
+      // Decode JWT without verification (we already trust the token from OIDC provider)
+      const parts = idToken.split(".");
+      if (parts.length !== 3) {
+        throw new Error("Invalid JWT format");
+      }
+
+      // Decode payload (second part)
+      const payload = JSON.parse(
+        Buffer.from(parts[1], "base64").toString("utf-8")
+      );
+
+      this.logger.log("✅ User info extracted from id_token");
+      return {
+        sub: payload.sub,
+        email: payload.email,
+        name: payload.name,
+        company_id: payload.company_id,
+      } as OIDCUser;
+    } catch (error) {
+      this.logger.error("❌ Failed to decode id_token");
+      throw new Error("Failed to decode id_token");
+    }
+  }
+
+  /**
+   * Refresh access tokens using refresh token
+   */
+  async refreshTokens(refreshToken: string): Promise<TokenSet> {
+    try {
+      const tokenResponse = await axios.post(
+        `${this.issuerUrl}/token`,
+        new URLSearchParams({
+          grant_type: "refresh_token",
+          refresh_token: refreshToken,
+          client_id: this.clientId,
+          client_secret: this.clientSecret,
+        }).toString(),
+        {
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        }
+      );
+
+      return tokenResponse.data as TokenSet;
+    } catch (error) {
+      this.logger.error("Failed to refresh tokens", error);
+      throw new Error("Failed to refresh tokens");
+    }
+  }
+
+  /**
+   * Get logout URL for OIDC provider
+   */
+  getLogoutUrl(idTokenHint?: string): string {
+    const params = new URLSearchParams({
+      client_id: this.clientId,
+      post_logout_redirect_uri: this.postLogoutRedirectUri,
+    });
+
+    if (idTokenHint) {
+      params.append("id_token_hint", idTokenHint);
+    }
+
+    // Use public URL for browser redirect
+    return `${this.issuerPublicUrl}/session/end?${params.toString()}`;
+  }
+}
+```
+
+### Paso 3: OIDC Access Check Service (Opcional pero Recomendado)
+
+Crea `src/common/services/oidc-access-check.service.ts`:
+
+```typescript
+import { Injectable, Logger, ForbiddenException } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { DataSource } from "typeorm";
+import axios from "axios";
+
+/**
+ * Service to check company-client access in real-time
+ * Uses PostgreSQL cache with 30-second TTL to balance security and performance
+ * Fail-closed: denies access if verification fails (for security)
+ */
+@Injectable()
+export class OIDCAccessCheckService {
+  private readonly logger = new Logger(OIDCAccessCheckService.name);
+  private readonly issuerUrl: string;
+  private readonly clientId: string;
+  private readonly cacheTtlSeconds = 30; // 30 seconds TTL
+
+  constructor(
+    private configService: ConfigService,
+    private dataSource: DataSource
+  ) {
+    this.issuerUrl = this.configService.get<string>("oidc.issuerUrl") || "";
+    this.clientId = this.configService.get<string>("oidc.clientId") || "";
+
+    if (!this.issuerUrl || !this.clientId) {
+      this.logger.warn(
+        "OIDC configuration incomplete. Access checks may fail."
+      );
+    }
+  }
+
+  /**
+   * Check if company has access to client (with caching)
+   * Returns true if access is granted, false otherwise
+   * Throws ForbiddenException if verification fails (fail-closed)
+   */
+  async checkCompanyClientAccess(
+    companyId: string,
+    clientId?: string
+  ): Promise<boolean> {
+    // Use provided clientId or default to configured clientId
+    const targetClientId = clientId || this.clientId;
+
+    if (!targetClientId) {
+      this.logger.error(
+        "No client_id provided and OIDC_CLIENT_ID not configured"
+      );
+      throw new ForbiddenException("Client ID not configured");
+    }
+
+    // Check cache first
+    const cached = await this.getCachedAccess(companyId, targetClientId);
+    if (cached !== null) {
+      this.logger.debug(
+        `Cache hit for company ${companyId} -> client ${targetClientId}: ${cached}`
+      );
+      return cached;
+    }
+
+    // Cache miss - verify with OIDC provider
+    try {
+      const hasAccess = await this.verifyAccessWithOIDCProvider(
+        companyId,
+        targetClientId
+      );
+
+      // Cache the result
+      await this.setCachedAccess(companyId, targetClientId, hasAccess);
+
+      this.logger.log(
+        `Access check for company ${companyId} -> client ${targetClientId}: ${hasAccess}`
+      );
+
+      return hasAccess;
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      this.logger.error(
+        `Access check failed for company ${companyId} -> client ${targetClientId}: ${errorMessage}`
+      );
+
+      // Fail-closed: deny access if verification fails
+      throw new ForbiddenException(
+        "Unable to verify access. Please contact administrator."
+      );
+    }
+  }
+
+  /**
+   * Verify access by querying OIDC provider admin API
+   */
+  private async verifyAccessWithOIDCProvider(
+    companyId: string,
+    clientId: string
+  ): Promise<boolean> {
+    try {
+      const response = await axios.get(`${this.issuerUrl}/admin/access/check`, {
+        params: {
+          company_id: companyId,
+          client_id: clientId,
+        },
+        timeout: 5000,
+      });
+
+      const hasAccess = response.data?.hasAccess === true;
+
+      // If access was revoked, clear cache immediately
+      if (!hasAccess) {
+        await this.clearCache(companyId, clientId);
+      }
+
+      return hasAccess;
+    } catch (error) {
+      const axiosError = error as {
+        response?: { status: number; data?: unknown };
+        message?: string;
+        code?: string;
+      };
+
+      // If OIDC provider returns 404, company doesn't have access
+      if (axiosError.response?.status === 404) {
+        await this.clearCache(companyId, clientId);
+        return false;
+      }
+
+      // Network errors - fail closed
+      if (
+        axiosError.code === "ECONNREFUSED" ||
+        axiosError.code === "ETIMEDOUT"
+      ) {
+        this.logger.error(
+          `OIDC provider unavailable: ${axiosError.code}. Denying access (fail-closed).`
+        );
+        throw new Error("OIDC provider unavailable");
+      }
+
+      throw error;
+    }
+  }
+
+  /**
+   * Get cached access result
+   */
+  private async getCachedAccess(
+    companyId: string,
+    clientId: string
+  ): Promise<boolean | null> {
+    try {
+      const result = await this.dataSource.query(
+        `SELECT has_access, expires_at 
+         FROM access_check_cache 
+         WHERE company_id = $1 AND client_id = $2 AND expires_at > NOW()`,
+        [companyId, clientId]
+      );
+
+      if (result.length === 0) {
+        return null; // Cache miss
+      }
+
+      return result[0].has_access;
+    } catch (error) {
+      this.logger.warn(`Error reading cache: ${error}`);
+      return null; // Treat cache errors as cache miss
+    }
+  }
+
+  /**
+   * Cache access result with TTL
+   */
+  private async setCachedAccess(
+    companyId: string,
+    clientId: string,
+    hasAccess: boolean
+  ): Promise<void> {
+    try {
+      const expiresAt = new Date();
+      expiresAt.setSeconds(expiresAt.getSeconds() + this.cacheTtlSeconds);
+
+      await this.dataSource.query(
+        `INSERT INTO access_check_cache (company_id, client_id, has_access, expires_at, cached_at)
+         VALUES ($1, $2, $3, $4, NOW())
+         ON CONFLICT (company_id, client_id) 
+         DO UPDATE SET 
+           has_access = EXCLUDED.has_access,
+           expires_at = EXCLUDED.expires_at,
+           cached_at = NOW()`,
+        [companyId, clientId, hasAccess, expiresAt]
+      );
+    } catch (error) {
+      // Log but don't fail - cache is optional
+      this.logger.warn(`Error caching access result: ${error}`);
+    }
+  }
+
+  /**
+   * Clear cache for a company-client pair
+   */
+  async clearCache(companyId: string, clientId: string): Promise<void> {
+    try {
+      await this.dataSource.query(
+        `DELETE FROM access_check_cache WHERE company_id = $1 AND client_id = $2`,
+        [companyId, clientId]
+      );
+    } catch (error) {
+      this.logger.warn(`Error clearing cache: ${error}`);
+    }
+  }
+
+  /**
+   * Clear all cache entries for a company
+   */
+  async clearCompanyCache(companyId: string): Promise<void> {
+    try {
+      await this.dataSource.query(
+        `DELETE FROM access_check_cache WHERE company_id = $1`,
+        [companyId]
+      );
+    } catch (error) {
+      this.logger.warn(`Error clearing company cache: ${error}`);
+    }
+  }
+}
+```
+
+### Paso 4: OIDC Auth Guard
+
+Crea `src/common/guards/oidc-auth.guard.ts`:
+
+```typescript
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  UnauthorizedException,
+  ForbiddenException,
+  Logger,
+} from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { Request } from "express";
+import axios from "axios";
+
+export interface AuthenticatedUser {
+  sub: string;
+  email: string;
+  name: string;
+  company_id: string;
+  accessToken: string;
+  idToken?: string;
+}
+
+/* eslint-disable @typescript-eslint/no-namespace */
+declare global {
+  namespace Express {
+    interface Request {
+      user?: AuthenticatedUser;
+    }
+  }
+}
+
+/**
+ * OIDC Authentication Guard - Simplified "Dumb" Version
+ *
+ * This guard delegates ALL security logic to oidc-server's centralized validation endpoint.
+ * Satellite modules should be "dumb" - they only call the central endpoint and use the result.
+ */
+@Injectable()
+export class OIDCAuthGuard implements CanActivate {
+  private readonly logger = new Logger(OIDCAuthGuard.name);
+  private readonly oidcIssuerUrl: string;
+  private readonly clientId: string;
+  private readonly validationTimeout: number = 5000; // 5 seconds
+
+  constructor(private configService: ConfigService) {
+    this.oidcIssuerUrl = this.configService.get<string>("oidc.issuerUrl") || "";
+    this.clientId = this.configService.get<string>("oidc.clientId") || "";
+
+    if (!this.oidcIssuerUrl) {
+      this.logger.error(
+        "❌ OIDC_ISSUER_URL not configured - token validation will fail"
+      );
+    }
+  }
+
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const request = context.switchToHttp().getRequest<Request>();
+
+    // Extract token from request (cookie or Authorization header)
+    const token = this.extractTokenFromRequest(request);
+
+    if (!token) {
+      this.logger.warn("❌ [OIDCAuthGuard] No token found in request");
+      throw new UnauthorizedException("Authentication required");
+    }
+
+    // Log token preview for debugging
+    const tokenPreview =
+      token.length > 40
+        ? `${token.substring(0, 20)}...${token.substring(token.length - 20)}`
+        : token.substring(0, 20);
+    this.logger.debug(`🔐 [OIDCAuthGuard] Validating token: ${tokenPreview}`);
+
+    try {
+      // Call centralized validation endpoint in oidc-server
+      const validationUrl = `${this.oidcIssuerUrl}/api/token/validate`;
+
+      this.logger.debug(
+        `🔍 [OIDCAuthGuard] Calling validation endpoint: ${validationUrl}`
+      );
+
+      const validationResponse = await axios.post(
+        validationUrl,
+        { token },
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+          params: {
+            client_id: this.clientId, // Include client_id for access verification
+          },
+          timeout: this.validationTimeout,
+        }
+      );
+
+      if (!validationResponse.data.valid) {
+        this.logger.warn(
+          `❌ [OIDCAuthGuard] Token validation failed: ${validationResponse.data.error}`
+        );
+        throw new UnauthorizedException(
+          validationResponse.data.error || "Token validation failed"
+        );
+      }
+
+      const { user } = validationResponse.data;
+
+      // Log successful validation
+      this.logger.log(
+        `✅ [OIDCAuthGuard] Token validated - User: ${user.email}, Company ID: ${user.company_id}`
+      );
+
+      // Assign user to request - all validation was done by oidc-server
+      request.user = {
+        sub: user.sub,
+        email: user.email,
+        name: user.name,
+        company_id: user.company_id,
+        accessToken: token,
+        idToken: undefined,
+      } as AuthenticatedUser;
+
+      return true;
+    } catch (error: any) {
+      // Handle axios errors
+      if (error.response) {
+        const status = error.response.status;
+        const errorData = error.response.data;
+
+        if (status === 401) {
+          this.logger.warn(
+            `❌ [OIDCAuthGuard] Token validation failed (401): ${errorData.error || "Unauthorized"}`
+          );
+          throw new UnauthorizedException(
+            errorData.error || "Invalid or expired token"
+          );
+        }
+
+        if (status === 403) {
+          this.logger.warn(
+            `🚫 [OIDCAuthGuard] Access denied (403): ${errorData.error || "Forbidden"}`
+          );
+          throw new ForbiddenException(
+            errorData.error ||
+              "Your company does not have access to this application. Please contact your administrator."
+          );
+        }
+
+        // Other HTTP errors
+        this.logger.error(
+          `❌ [OIDCAuthGuard] Validation endpoint returned error: ${status} - ${errorData.error || "Unknown error"}`
+        );
+        throw new UnauthorizedException(
+          `Token validation failed: ${errorData.error || "Unknown error"}`
+        );
+      }
+
+      // Network errors
+      if (error.code === "ECONNREFUSED" || error.code === "ETIMEDOUT") {
+        this.logger.error(
+          `❌ [OIDCAuthGuard] Cannot reach oidc-server validation endpoint: ${error.code}`
+        );
+        throw new UnauthorizedException(
+          "Authentication service unavailable. Please try again later."
+        );
+      }
+
+      // Re-throw NestJS exceptions
+      if (
+        error instanceof UnauthorizedException ||
+        error instanceof ForbiddenException
+      ) {
+        throw error;
+      }
+
+      // Unknown errors
+      this.logger.error(
+        `❌ [OIDCAuthGuard] Unexpected error during token validation: ${error.message}`,
+        error.stack
+      );
+      throw new UnauthorizedException("Token validation failed");
+    }
+  }
+
+  /**
+   * Extract token from request (cookie or Authorization header)
+   */
+  private extractTokenFromRequest(request: Request): string | null {
+    // Check Authorization header first
+    const authHeader = request.headers.authorization;
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      const token = authHeader.substring(7);
+      this.logger.debug(
+        "✅ [OIDCAuthGuard] Token found in Authorization header"
+      );
+      return token;
+    }
+
+    // Check cookies
+    const cookieName = this.configService.get<string>("oidc.cookieName");
+    if (!cookieName) {
+      this.logger.error("❌ [OIDCAuthGuard] OIDC_COOKIE_NAME not configured");
+      return null;
+    }
+
+    const cookieToken = request.cookies?.[cookieName];
+    if (cookieToken) {
+      this.logger.debug(
+        `✅ [OIDCAuthGuard] Token found in cookie: ${cookieName}`
+      );
+      return cookieToken;
+    }
+
+    this.logger.warn(
+      `❌ [OIDCAuthGuard] No token found. Authorization header: ${!!authHeader}, Cookie ${cookieName}: ${!!cookieToken}`
+    );
+    return null;
+  }
+}
+```
+
+### Paso 5: Auth Controller
+
+Crea `src/auth/auth.controller.ts`:
+
+```typescript
+import {
+  Controller,
+  Get,
+  Res,
+  Req,
+  Query,
+  Logger,
+  ForbiddenException,
+} from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { Response, Request } from "express";
+import { ApiTags, ApiOperation, ApiResponse } from "@nestjs/swagger";
+import axios from "axios";
+import { OIDCService } from "../common/services/oidc.service";
+import { JwtService } from "@nestjs/jwt";
+import { OIDCConfigValues } from "../common/config/oidc.config";
+import { OIDCAccessCheckService } from "../common/services/oidc-access-check.service";
+
+@ApiTags("auth")
+@Controller("auth")
+export class AuthController {
+  private readonly logger = new Logger(AuthController.name);
+  private readonly oidcConfig: OIDCConfigValues;
+
+  constructor(
+    private oidcService: OIDCService,
+    private jwtService: JwtService,
+    private configService: ConfigService,
+    private oidcAccessCheckService: OIDCAccessCheckService
+  ) {
+    this.oidcConfig = this.configService.get<OIDCConfigValues>("oidc");
+    if (!this.oidcConfig) {
+      throw new Error("❌ FATAL: OIDC configuration not found");
+    }
+  }
+
+  @Get("login")
+  @ApiOperation({ summary: "Iniciar flujo de autenticación OIDC" })
+  @ApiResponse({ status: 302, description: "Redirige a OIDC provider" })
+  async login(@Res() res: Response) {
+    this.logger.log("=== 🔐 AUTH LOGIN STARTED ===");
+
+    const state = this.generateState();
+    this.logger.log(`Generated state: ${state}`);
+
+    const authUrl = this.oidcService.getAuthUrl(state);
+    this.logger.log(`OIDC Auth URL: ${authUrl}`);
+
+    // Store state in cookie for CSRF protection
+    const stateCookieOptions: any = {
+      httpOnly: true,
+      secure: this.oidcConfig.cookieSecure,
+      sameSite: this.oidcConfig.cookieSameSite,
+      maxAge: 10 * 60 * 1000, // 10 minutes
+    };
+
+    if (
+      this.oidcConfig.cookieDomain &&
+      this.oidcConfig.cookieDomain.trim() !== ""
+    ) {
+      stateCookieOptions.domain = this.oidcConfig.cookieDomain;
+    }
+
+    if (this.oidcConfig.cookiePath) {
+      stateCookieOptions.path = this.oidcConfig.cookiePath;
+    }
+
+    res.cookie("oidc_state", state, stateCookieOptions);
+    this.logger.log(`State cookie set: oidc_state=${state}`);
+
+    return res.redirect(authUrl);
+  }
+
+  @Get("callback")
+  @ApiOperation({ summary: "Callback OIDC desde provider" })
+  @ApiResponse({ status: 302, description: "Redirige a frontend" })
+  async callback(
+    @Query("code") code: string,
+    @Query("state") state: string,
+    @Req() req: Request,
+    @Res() res: Response
+  ) {
+    this.logger.log("=== 🔄 AUTH CALLBACK STARTED ===");
+
+    try {
+      // Get state from cookie for CSRF protection
+      const storedState = req.cookies?.oidc_state;
+      if (!storedState || storedState !== state) {
+        this.logger.error(
+          `❌ State mismatch! Expected: ${storedState}, Got: ${state}`
+        );
+        return res.redirect(
+          `${this.oidcConfig.postLogoutRedirectUri}?error=invalid_state`
+        );
+      }
+
+      this.logger.log("✅ State validation passed");
+
+      // Exchange code for tokens
+      this.logger.log("🔐 Exchanging code for tokens...");
+      const tokenSet = await this.oidcService.handleCallback(code, state);
+      this.logger.log("✅ Tokens received from OIDC");
+
+      // Get user info from id_token
+      const userInfo = this.oidcService.getUserInfoFromIdToken(
+        tokenSet.id_token
+      );
+      this.logger.log(`✅ User authenticated: ${userInfo.email}`);
+
+      // CRITICAL: Check company access BEFORE generating token
+      const clientId = this.configService.get<string>("oidc.clientId");
+      const hasAccess =
+        await this.oidcAccessCheckService.checkCompanyClientAccess(
+          userInfo.company_id,
+          clientId
+        );
+
+      if (!hasAccess) {
+        this.logger.warn(
+          `🚫 Access revoked for company ${userInfo.company_id} to client ${clientId}`
+        );
+        res.clearCookie("oidc_state", this.buildCookieOptions());
+        return res.redirect(
+          `${this.oidcConfig.postLogoutRedirectUri}?error=access_revoked`
+        );
+      }
+
+      // Generate internal session token
+      const sessionToken = this.jwtService.sign({
+        sub: userInfo.sub,
+        email: userInfo.email,
+        name: userInfo.name,
+        company_id: userInfo.company_id,
+        id_token: tokenSet.id_token,
+        access_token: tokenSet.access_token,
+        refresh_token: tokenSet.refresh_token,
+      });
+
+      // Clear state cookie
+      res.clearCookie("oidc_state", this.buildCookieOptions());
+
+      // Set session cookie
+      const cookieOptions = this.buildCookieOptions();
+      cookieOptions.maxAge =
+        this.oidcConfig.cookieMaxAge || 24 * 60 * 60 * 1000;
+      res.cookie(this.oidcConfig.cookieName, sessionToken, cookieOptions);
+
+      // Redirect to frontend
+      const redirectUrl = `${this.oidcConfig.postLogoutRedirectUri}/?token=${sessionToken}`;
+      return res.redirect(redirectUrl);
+    } catch (error) {
+      this.logger.error("❌ AUTH CALLBACK FAILED", error);
+      return res.redirect(
+        `${this.oidcConfig.postLogoutRedirectUri}?error=auth_failed`
+      );
+    }
+  }
+
+  @Get("refresh")
+  @ApiOperation({ summary: "Refresh session token" })
+  async refresh(@Req() req: Request, @Res() res: Response) {
+    this.logger.log("=== 🔄 AUTH REFRESH STARTED ===");
+
+    const token = req.cookies?.[this.oidcConfig.cookieName];
+    if (!token) {
+      return res.status(401).json({ error: "No authentication token found" });
+    }
+
+    try {
+      // Validate token using centralized endpoint
+      const validationUrl = `${this.oidcConfig.issuerUrl}/api/token/validate`;
+      const validationResponse = await axios.post(
+        validationUrl,
+        { token },
+        {
+          params: { client_id: this.oidcConfig.clientId },
+          timeout: 5000,
+        }
+      );
+
+      if (!validationResponse.data.valid) {
+        res.clearCookie(this.oidcConfig.cookieName, this.buildCookieOptions());
+        return res.status(401).json({
+          error: validationResponse.data.error || "Token validation failed",
+        });
+      }
+
+      // Decode current token
+      const currentPayload = this.jwtService.decode(token) as {
+        sub?: string;
+        email?: string;
+        name?: string;
+        company_id?: string;
+        refresh_token?: string;
+        exp?: number;
+      };
+
+      if (!currentPayload?.refresh_token) {
+        return res.status(401).json({ error: "Refresh token not available" });
+      }
+
+      // Check if token is expiring soon
+      const refreshWindow = this.oidcConfig.tokenRefreshWindow || 5 * 60 * 1000;
+      const expiresAt = currentPayload.exp
+        ? currentPayload.exp * 1000
+        : Date.now() + 24 * 60 * 60 * 1000;
+      const timeUntilExpiry = expiresAt - Date.now();
+
+      if (timeUntilExpiry > refreshWindow) {
+        return res.json({
+          refreshed: false,
+          expiresAt: new Date(expiresAt).toISOString(),
+          timeUntilExpiry: Math.round(timeUntilExpiry / 1000),
+        });
+      }
+
+      // Refresh tokens from OIDC provider
+      const tokenSet = await this.oidcService.refreshTokens(
+        currentPayload.refresh_token
+      );
+
+      // Get fresh user info
+      const freshUserInfo = this.oidcService.getUserInfoFromIdToken(
+        tokenSet.id_token
+      );
+
+      // Validate company_id hasn't changed
+      if (freshUserInfo.company_id !== currentPayload.company_id) {
+        res.clearCookie(this.oidcConfig.cookieName, this.buildCookieOptions());
+        return res.status(403).json({
+          error: "Company ID changed - re-authentication required",
+        });
+      }
+
+      // Verify company still has access
+      const hasAccess =
+        await this.oidcAccessCheckService.checkCompanyClientAccess(
+          freshUserInfo.company_id,
+          this.oidcConfig.clientId
+        );
+
+      if (!hasAccess) {
+        res.clearCookie(this.oidcConfig.cookieName, this.buildCookieOptions());
+        return res.status(403).json({
+          error: "Access revoked - re-authentication required",
+        });
+      }
+
+      // Generate new session token
+      const newSessionToken = this.jwtService.sign({
+        sub: freshUserInfo.sub,
+        email: freshUserInfo.email,
+        name: freshUserInfo.name,
+        company_id: freshUserInfo.company_id,
+        id_token: tokenSet.id_token,
+        access_token: tokenSet.access_token,
+        refresh_token: tokenSet.refresh_token,
+      });
+
+      // Set new session cookie
+      const cookieOptions = this.buildCookieOptions();
+      cookieOptions.maxAge =
+        this.oidcConfig.cookieMaxAge || 24 * 60 * 60 * 1000;
+      res.cookie(this.oidcConfig.cookieName, newSessionToken, cookieOptions);
+
+      return res.json({
+        refreshed: true,
+        expiresAt: new Date(
+          Date.now() + (this.oidcConfig.cookieMaxAge || 24 * 60 * 60 * 1000)
+        ).toISOString(),
+      });
+    } catch (error) {
+      this.logger.error("❌ AUTH REFRESH FAILED", error);
+      return res.status(500).json({ error: "Token refresh failed" });
+    }
+  }
+
+  @Get("logout")
+  @ApiOperation({ summary: "Cerrar sesión" })
+  async logout(@Req() req: Request, @Res() res: Response) {
+    this.logger.log("=== 🚪 LOGOUT STARTED ===");
+
+    const token = req.cookies?.[this.oidcConfig.cookieName];
+    let idToken = null;
+
+    if (token) {
+      try {
+        const payload = this.jwtService.decode(token) as {
+          id_token?: string;
+        };
+        idToken = payload?.id_token;
+      } catch (error) {
+        this.logger.warn("Could not extract token info for logout", error);
+      }
+    }
+
+    // Clear cookies
+    const cookieOptions = this.buildCookieOptions();
+    res.clearCookie(this.oidcConfig.cookieName, cookieOptions);
+    res.clearCookie("oidc_state", cookieOptions);
+
+    // Redirect to OIDC logout
+    const logoutUrl = this.oidcService.getLogoutUrl(idToken);
+    return res.redirect(logoutUrl);
+  }
+
+  @Get("me")
+  @ApiOperation({ summary: "Obtener información del usuario actual" })
+  async getCurrentUser(@Req() req: Request) {
+    const authHeader = req.headers.authorization;
+    const token = authHeader?.startsWith("Bearer ")
+      ? authHeader.substring(7)
+      : req.cookies?.[this.oidcConfig.cookieName];
+
+    if (!token) {
+      return { authenticated: false };
+    }
+
+    try {
+      const payload = this.jwtService.decode(token) as {
+        sub: string;
+        email: string;
+        name: string;
+        company_id: string;
+      };
+
+      if (!payload?.company_id) {
+        return { authenticated: false };
+      }
+
+      // Verify company has access
+      const clientId = this.configService.get<string>("oidc.clientId");
+      const hasAccess =
+        await this.oidcAccessCheckService.checkCompanyClientAccess(
+          payload.company_id,
+          clientId
+        );
+
+      if (!hasAccess) {
+        throw new ForbiddenException(
+          "Your company does not have access to this application."
+        );
+      }
+
+      return {
+        authenticated: true,
+        user: {
+          sub: payload.sub,
+          email: payload.email,
+          name: payload.name,
+          company_id: payload.company_id,
+        },
+      };
+    } catch (error) {
+      if (error instanceof ForbiddenException) {
+        throw error;
+      }
+      return { authenticated: false };
+    }
+  }
+
+  private generateState(): string {
+    return (
+      Math.random().toString(36).substring(2, 15) +
+      Math.random().toString(36).substring(2, 15)
+    );
+  }
+
+  private buildCookieOptions(): any {
+    const cookieOptions: any = {
+      httpOnly: true,
+      secure: this.oidcConfig.cookieSecure,
+      sameSite: this.oidcConfig.cookieSameSite,
+    };
+
+    if (
+      this.oidcConfig.cookieDomain &&
+      this.oidcConfig.cookieDomain.trim() !== ""
+    ) {
+      cookieOptions.domain = this.oidcConfig.cookieDomain;
+    }
+
+    if (this.oidcConfig.cookiePath) {
+      cookieOptions.path = this.oidcConfig.cookiePath;
+    }
+
+    return cookieOptions;
+  }
+}
+```
+
+### Paso 6: Auth Module
+
+Crea `src/auth/auth.module.ts`:
+
+```typescript
+import { Module } from "@nestjs/common";
+import { ConfigModule, ConfigService } from "@nestjs/config";
+import { AuthController } from "./auth.controller";
+import { OIDCService } from "../common/services/oidc.service";
+import { OIDCAccessCheckService } from "../common/services/oidc-access-check.service";
+import { OIDCConfig } from "../common/config/oidc.config";
+import { JwtModule } from "@nestjs/jwt";
+import { OIDCAuthGuard } from "../common/guards/oidc-auth.guard";
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({
+      load: [OIDCConfig],
+    }),
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      useFactory: async (configService: ConfigService) => ({
+        secret: configService.get("JWT_SECRET"),
+        signOptions: { expiresIn: "24h" },
+      }),
+      inject: [ConfigService],
+    }),
+  ],
+  controllers: [AuthController],
+  providers: [OIDCService, OIDCAccessCheckService, OIDCAuthGuard],
+  exports: [
+    OIDCService,
+    OIDCAccessCheckService,
+    OIDCAuthGuard,
+    JwtModule,
+    ConfigModule,
+  ],
+})
+export class AuthModule {}
+```
+
+### Paso 7: Registrar AuthModule en AppModule
+
+Actualiza `src/app.module.ts`:
+
+```typescript
+import { Module } from "@nestjs/common";
+import { ConfigModule } from "@nestjs/config";
+import { OIDCConfig } from "./common/config/oidc.config";
+import { AuthModule } from "./auth/auth.module";
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+      load: [OIDCConfig], // Agregar OIDCConfig aquí si no está
+      envFilePath: [".env.prod", ".env.local", ".env"],
+    }),
+    AuthModule, // Agregar AuthModule
+    // ... otros módulos
+  ],
+  // ...
+})
+export class AppModule {}
+```
+
+---
+
+## 🔧 Implementación para Express
+
+Si estás usando Express en lugar de NestJS, crea los siguientes archivos:
+
+### Middleware de Autenticación
+
+Crea `src/middleware/oidc-auth.middleware.ts`:
+
+```typescript
+import { Request, Response, NextFunction } from "express";
+import axios from "axios";
+
+export interface AuthenticatedUser {
+  sub: string;
+  email: string;
+  name: string;
+  company_id: string;
+  accessToken: string;
+}
+
+declare global {
+  namespace Express {
+    interface Request {
+      user?: AuthenticatedUser;
+    }
+  }
+}
+
+export function oidcAuthMiddleware(
+  oidcIssuerUrl: string,
+  clientId: string,
+  cookieName: string
+) {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    const authHeader = req.headers.authorization;
+    const token = authHeader?.startsWith("Bearer ")
+      ? authHeader.substring(7)
+      : req.cookies?.[cookieName];
+
+    if (!token) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    try {
+      const validationResponse = await axios.post(
+        `${oidcIssuerUrl}/api/token/validate`,
+        { token },
+        {
+          params: { client_id: clientId },
+          timeout: 5000,
+        }
+      );
+
+      if (!validationResponse.data.valid) {
+        return res.status(401).json({
+          error: validationResponse.data.error || "Token validation failed",
+        });
+      }
+
+      req.user = {
+        sub: validationResponse.data.user.sub,
+        email: validationResponse.data.user.email,
+        name: validationResponse.data.user.name,
+        company_id: validationResponse.data.user.company_id,
+        accessToken: token,
+      };
+
+      next();
+    } catch (error: any) {
+      if (error.response?.status === 403) {
+        return res.status(403).json({
+          error: "Your company does not have access to this application",
+        });
+      }
+
+      if (error.code === "ECONNREFUSED" || error.code === "ETIMEDOUT") {
+        return res.status(503).json({
+          error: "Authentication service unavailable",
+        });
+      }
+
+      return res.status(401).json({ error: "Token validation failed" });
+    }
+  };
+}
+```
+
+---
+
+## 💾 Configuración de Base de Datos (Opcional)
+
+### Migración para Access Check Cache
+
+Si usas TypeORM, crea una migración para la tabla de caché:
+
+```typescript
+import { MigrationInterface, QueryRunner } from "typeorm";
+
+export class CreateAccessCheckCache1234567890123 implements MigrationInterface {
+  name = "CreateAccessCheckCache1234567890123";
+
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`
+      CREATE TABLE IF NOT EXISTS access_check_cache (
+        id SERIAL PRIMARY KEY,
+        company_id VARCHAR(255) NOT NULL,
+        client_id VARCHAR(255) NOT NULL,
+        has_access BOOLEAN NOT NULL,
+        cached_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        UNIQUE(company_id, client_id)
+      );
+    `);
+
+    await queryRunner.query(`
+      CREATE INDEX IF NOT EXISTS idx_access_check_cache_company_client 
+      ON access_check_cache(company_id, client_id);
+    `);
+
+    await queryRunner.query(`
+      CREATE INDEX IF NOT EXISTS idx_access_check_cache_expires_at 
+      ON access_check_cache(expires_at);
+    `);
+  }
+
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS idx_access_check_cache_expires_at;`
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS idx_access_check_cache_company_client;`
+    );
+    await queryRunner.query(`DROP TABLE IF EXISTS access_check_cache;`);
+  }
+}
+```
+
+**Nota:** Esta tabla es opcional pero recomendada para mejorar el rendimiento. Si no la implementas, el `OIDCAccessCheckService` seguirá funcionando pero sin caché.
+
+---
+
+## 🚀 Configuración de Main.ts / App Bootstrap
+
+### Para NestJS
+
+Actualiza `src/main.ts`:
+
+```typescript
+import { NestFactory } from "@nestjs/core";
+import { ValidationPipe } from "@nestjs/common";
+import * as cookieParser from "cookie-parser";
+import { AppModule } from "./app.module";
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+
+  // CRITICAL: Add cookie parser middleware
+  app.use(cookieParser());
+
+  // Global pipes
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+    })
+  );
+
+  // CORS configuration - Parse comma-separated origins
+  if (!process.env.CORS_ORIGIN) {
+    throw new Error("❌ FATAL: CORS_ORIGIN environment variable is required");
+  }
+  const corsOrigins = process.env.CORS_ORIGIN.split(",").map((origin) =>
+    origin.trim()
+  );
+
+  app.enableCors({
+    origin: corsOrigins,
+    credentials: true, // CRITICAL: Required for cookies
+  });
+
+  // Security headers
+  app.use((req, res, next) => {
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("X-Frame-Options", "DENY");
+    if (process.env.NODE_ENV === "production") {
+      res.setHeader(
+        "Strict-Transport-Security",
+        "max-age=31536000; includeSubDomains"
+      );
+    }
+    res.setHeader("X-XSS-Protection", "1; mode=block");
+    next();
+  });
+
+  const port = process.env.PORT || 3000;
+  await app.listen(port);
+  console.log(`🚀 Application running on http://localhost:${port}`);
+}
+
+bootstrap();
+```
+
+### Para Express
+
+```typescript
+import express from "express";
+import cookieParser from "cookie-parser";
+import { oidcAuthMiddleware } from "./middleware/oidc-auth.middleware";
+
+const app = express();
+
+// CRITICAL: Add cookie parser
+app.use(cookieParser());
+
+// CORS configuration
+const corsOrigins =
+  process.env.CORS_ORIGIN?.split(",").map((o) => o.trim()) || [];
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (corsOrigins.includes(origin || "")) {
+    res.setHeader("Access-Control-Allow-Origin", origin || "");
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+  }
+  res.setHeader(
+    "Access-Control-Allow-Methods",
+    "GET, POST, PUT, DELETE, OPTIONS"
+  );
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  next();
+});
+
+// Security headers
+app.use((req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("X-XSS-Protection", "1; mode=block");
+  next();
+});
+
+// Routes
+app.get(
+  "/api/protected",
+  oidcAuthMiddleware(
+    process.env.OIDC_ISSUER_URL!,
+    process.env.OIDC_CLIENT_ID!,
+    process.env.OIDC_COOKIE_NAME!
+  ),
+  (req, res) => {
+    res.json({
+      message: "Protected data",
+      companyId: req.user?.company_id,
+      user: req.user?.email,
+    });
+  }
+);
+
+const port = process.env.PORT || 3000;
+app.listen(port, () => {
+  console.log(`🚀 Application running on http://localhost:${port}`);
+});
+```
+
+---
+
+## 🔒 Protección de Endpoints
+
+### NestJS - Usar Guard
+
+```typescript
+import { Controller, Get, UseGuards, Req } from "@nestjs/common";
+import { OIDCAuthGuard } from "../common/guards/oidc-auth.guard";
+import { Request } from "express";
+
+@Controller("api/protected")
+@UseGuards(OIDCAuthGuard) // Protege todos los endpoints del controlador
+export class ProtectedController {
+  @Get("data")
+  getData(@Req() req: Request) {
+    // req.user está disponible gracias al guard
+    const companyId = req.user.company_id;
+
+    // Filtrar datos por company_id (multi-tenant)
+    return {
+      message: "Protected data",
+      companyId: companyId,
+      user: req.user.email,
+    };
+  }
+
+  @Get("other")
+  @UseGuards(OIDCAuthGuard) // O proteger endpoints individuales
+  getOther(@Req() req: Request) {
+    return { data: "other", companyId: req.user.company_id };
+  }
+}
+```
+
+### Express - Usar Middleware
+
+```typescript
+import express from "express";
+import { oidcAuthMiddleware } from "./middleware/oidc-auth.middleware";
+
+const app = express();
+
+// Aplicar middleware a rutas específicas
+app.get(
+  "/api/protected/data",
+  oidcAuthMiddleware(
+    process.env.OIDC_ISSUER_URL!,
+    process.env.OIDC_CLIENT_ID!,
+    process.env.OIDC_COOKIE_NAME!
+  ),
+  (req, res) => {
+    res.json({
+      message: "Protected data",
+      companyId: req.user.company_id,
+      user: req.user.email,
+    });
+  }
+);
+```
+
+---
+
+## 🧪 Testing y Validación
+
+### Test 1: Verificar Endpoint de Validación
+
+```bash
+# Obtener token de sesión (desde cookie después de login)
+TOKEN="tu-token-jwt-aqui"
+
+# Validar token (POST)
+curl -X POST https://auth.test.acceleralia.com/api/token/validate \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"token": "'"$TOKEN"'", "client_id": "tu-modulo-client-id"}'
+
+# Validar token (GET)
+curl "https://auth.test.acceleralia.com/api/token/validate?token=$TOKEN&client_id=tu-modulo-client-id"
+```
+
+**Respuesta esperada (200):**
+
+```json
+{
+  "valid": true,
+  "user": {
+    "sub": "user-id",
+    "email": "user@example.com",
+    "name": "User Name",
+    "company_id": "uuid-de-compania"
+  },
+  "expiresAt": 1234567890000,
+  "expiresAtISO": "2025-01-16T12:00:00.000Z",
+  "timeUntilExpiry": 86400
+}
+```
+
+### Test 2: Verificar Protección de Endpoint
+
+```bash
+# Sin token (debe fallar)
+curl https://tu-modulo.com/api/protected/data
+# Esperado: 401 Unauthorized
+
+# Con token válido (cookie)
+curl https://tu-modulo.com/api/protected/data \
+  -H "Cookie: oauth_session=tu-token-jwt"
+# Esperado: 200 OK con datos filtrados por company_id
+
+# Con token válido (Authorization header)
+curl https://tu-modulo.com/api/protected/data \
+  -H "Authorization: Bearer tu-token-jwt"
+# Esperado: 200 OK
+```
+
+### Test 3: Verificar Multi-Tenancy
+
+1. Login como usuario de Company A
+2. Acceder a endpoint protegido
+3. Verificar que solo ve datos de Company A
+4. Login como usuario de Company B (mismo navegador)
+5. Acceder al mismo endpoint
+6. Verificar que solo ve datos de Company B (no de Company A)
+
+### Test 4: Verificar Refresh de Tokens
+
+```bash
+# Llamar endpoint de refresh
+curl -X GET https://tu-modulo.com/api/auth/refresh \
+  -H "Cookie: oauth_session=tu-token-jwt"
+
+# Respuesta esperada:
+# {
+#   "refreshed": true,
+#   "expiresAt": "2025-01-17T12:00:00.000Z"
+# }
+```
+
+---
+
+## 🔍 Troubleshooting
+
+### Error: "Cannot reach oidc-server validation endpoint"
+
+**Causa:** oidc-server no está accesible o URL incorrecta
+
+**Solución:**
+
+1. Verificar que `OIDC_ISSUER_URL` es correcta
+2. Verificar conectividad: `curl https://auth.test.acceleralia.com/health`
+3. Verificar firewall/red entre módulo satélite y oidc-server
+4. En Docker, usar `host.docker.internal` para `OIDC_ISSUER_URL` si oidc-server está en el host
+
+### Error: "Invalid token signature"
+
+**Causa:** `JWT_SECRET` diferente entre oidc-server y módulo satélite
+
+**Solución:**
+
+1. Verificar que `JWT_SECRET` en oidc-server/provider es igual al del módulo satélite
+2. Reiniciar ambos servicios después de cambiar `JWT_SECRET`
+3. Los tokens existentes se invalidarán - usuarios deben re-login
+
+### Error: "Access denied (403)"
+
+**Causa:** La compañía del usuario no tiene acceso al cliente
+
+**Solución:**
+
+1. Verificar en Admin Panel que la compañía tiene acceso al cliente
+2. Verificar en base de datos: `SELECT * FROM company_client_access WHERE company_id = '...' AND client_id = '...'`
+3. Asignar acceso si falta
+4. Limpiar caché de acceso si existe: `DELETE FROM access_check_cache WHERE company_id = '...' AND client_id = '...'`
+
+### Error: "Token expired"
+
+**Causa:** Token de sesión expirado
+
+**Solución:**
+
+1. Implementar refresh automático de tokens (endpoint `/api/auth/refresh`)
+2. Redirigir usuario a login si token expirado
+3. Verificar que `OIDC_COOKIE_MAX_AGE` está configurado correctamente
+
+### Error: "State mismatch"
+
+**Causa:** Cookie de state no coincide con el state del callback
+
+**Solución:**
+
+1. Verificar que cookies están habilitadas en el navegador
+2. Verificar que `OIDC_COOKIE_DOMAIN` y `OIDC_COOKIE_PATH` son consistentes
+3. Verificar que no hay problemas de CORS bloqueando cookies
+
+### Error: "OIDC_PUBLIC_URL not configured"
+
+**Causa:** Falta la variable de entorno `OIDC_PUBLIC_URL`
+
+**Solución:**
+
+1. Agregar `OIDC_PUBLIC_URL` al `.env`
+2. Debe ser la URL pública HTTPS para redirects del navegador
+3. Puede ser diferente de `OIDC_ISSUER_URL` (que es para llamadas HTTP internas)
+
+---
+
+## ✅ Checklist de Implementación
+
+### Configuración en oidc-server
+
+- [ ] `JWT_SECRET` configurado en `oidc-server/provider/.env`
+- [ ] Cliente OIDC registrado en base de datos
+- [ ] Compañías tienen acceso al cliente asignado en `company_client_access`
+- [ ] Endpoint `/api/token/validate` accesible y funcionando
+- [ ] Endpoint `/admin/access/check` accesible (para verificación de acceso)
+
+### Configuración del Módulo Satélite
+
+- [ ] Variables de entorno configuradas (`.env`)
+- [ ] `JWT_SECRET` igual al de oidc-server
+- [ ] `OIDC_ISSUER_URL` y `OIDC_PUBLIC_URL` configuradas correctamente
+- [ ] Dependencias instaladas (`axios`, `@nestjs/jwt`, `cookie-parser`, etc.)
+- [ ] `OIDCConfig` creado y registrado en `ConfigModule`
+- [ ] `OIDCService` implementado
+- [ ] `OIDCAccessCheckService` implementado (opcional pero recomendado)
+- [ ] `OIDCAuthGuard` implementado
+- [ ] `AuthController` implementado con todos los endpoints
+- [ ] `AuthModule` creado y registrado en `AppModule`
+- [ ] `cookie-parser` configurado en `main.ts`
+- [ ] CORS configurado con `credentials: true`
+- [ ] Security headers configurados
+
+### Implementación
+
+- [ ] Guard/Middleware aplicado a endpoints protegidos
+- [ ] `req.user` disponible en endpoints protegidos
+- [ ] Multi-tenancy implementado (filtrado por `company_id`)
+- [ ] Manejo de errores implementado (401, 403, etc.)
+- [ ] State cookie implementado para CSRF protection
+- [ ] Validación de company_id en callback y refresh
+- [ ] Limpieza de cookies en logout
+
+### Base de Datos (Opcional)
+
+- [ ] Migración de `access_check_cache` creada (si se usa caché)
+- [ ] Tabla `access_check_cache` creada en base de datos
+- [ ] Índices creados para rendimiento
+
+### Testing
+
+- [ ] Endpoint de validación responde correctamente
+- [ ] Endpoints protegidos rechazan requests sin token
+- [ ] Endpoints protegidos aceptan requests con token válido
+- [ ] Multi-tenancy funciona (usuarios ven solo sus datos)
+- [ ] Refresh de tokens funciona
+- [ ] Logout limpia cookies correctamente
+- [ ] State validation funciona (CSRF protection)
+
+### Seguridad
+
+- [ ] Cookies configuradas con `httpOnly`, `secure`, `sameSite`
+- [ ] `OIDC_COOKIE_DOMAIN` vacío (a menos que sea necesario)
+- [ ] CORS configurado correctamente con orígenes específicos
+- [ ] Security headers configurados
+- [ ] Logs de seguridad implementados
+- [ ] Fail-closed implementado (denegar acceso si verificación falla)
+
+---
+
+## 📚 Referencias
+
+- [Documentación OIDC Integration](./25-OIDC-BACKEND-NESTJS-INTEGRATION.mdc)
+- [Guía de Deployment](./30-OIDC-DEPLOYMENT-CONSIDERATIONS.mdc)
+- [Testing y Validación](./29-OIDC-TESTING-VALIDATION.mdc)
+
+---
+
+## 🎯 Resumen de Arquitectura
+
+```
+┌─────────────────────────────────────────┐
+│      oidc-server (CENTRAL)              │
+│                                         │
+│  ✅ TODA la lógica de seguridad        │
+│  • Validación de tokens                │
+│  • Verificación de acceso              │
+│  • Auditoría                           │
+│  • Logging de seguridad                │
+│                                         │
+│  POST /api/token/validate              │
+│  GET  /api/token/validate               │
+│  GET  /admin/access/check               │
+└──────────────┬──────────────────────────┘
+               │
+               │ HTTP Request
+               │ { token, client_id }
+               │
+┌──────────────▼──────────────────────────┐
+│   Módulo Satélite ("TONTO")             │
+│                                         │
+│  ✅ Solo validación ligera              │
+│  • Extrae token de request              │
+│  • Llama a oidc-server                 │
+│  • Usa resultado                        │
+│  • NO valida tokens                     │
+│  • NO verifica acceso                   │
+│                                         │
+│  Guard/Middleware → oidc-server         │
+│  ↓                                      │
+│  req.user disponible                    │
+│  ↓                                      │
+│  Filtrar datos por company_id           │
+└─────────────────────────────────────────┘
+```
+
+---
+
+## 🔑 Puntos Clave para Automatización
+
+1. **JWT_SECRET debe ser idéntico** en oidc-server y módulo satélite
+2. **OIDC_ISSUER_URL vs OIDC_PUBLIC_URL**:
+   - `OIDC_ISSUER_URL`: Para llamadas HTTP internas
+   - `OIDC_PUBLIC_URL`: Para redirects del navegador (debe ser HTTPS)
+3. **Cookies**: `OIDC_COOKIE_DOMAIN` debe estar vacío para multi-tenant seguro
+4. **CORS**: Debe incluir `credentials: true` para cookies
+5. **Fail-closed**: Siempre denegar acceso si la verificación falla
+6. **State cookie**: Crítico para CSRF protection
+7. **Validación de company_id**: Verificar en callback, refresh y endpoints protegidos
+8. **Caché de acceso**: Opcional pero recomendado para rendimiento (TTL: 30 segundos)
+
+---
+
+**FIN DE LA GUÍA**
+
+Para soporte adicional, consulta los logs de oidc-server o contacta al equipo de infraestructura.

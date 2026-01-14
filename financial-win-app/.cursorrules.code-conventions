@@ -1,0 +1,438 @@
+# Cursor Rules - Convenciones de Código
+
+## Formateo
+
+### Prettier
+- **Archivo de configuración**: `.prettierrc.json` en la raíz
+- **Uso**: Formateo automático antes de commits (via lint-staged)
+
+### Configuración Prettier
+```json
+{
+  "semi": true,
+  "trailingComma": "es5",
+  "singleQuote": true,
+  "printWidth": 80,
+  "tabWidth": 2,
+  "useTabs": false,
+  "endOfLine": "auto",
+  "arrowParens": "avoid",
+  "bracketSpacing": true,
+  "bracketSameLine": false,
+  "quoteProps": "as-needed"
+}
+```
+
+### Reglas
+- **SIEMPRE** formatear código antes de commit
+- Prettier se ejecuta automáticamente en pre-commit hook
+- Nunca deshabilitar Prettier sin razón justificada
+
+## Linting
+
+### ESLint
+- **Backend**: `apps/api/eslint.config.js`
+- **Frontend**: `apps/web/eslint.config.js`
+- **Integración**: Integrado con Prettier vía `eslint-config-prettier`
+
+### Reglas Principales
+
+#### Backend (API)
+- `@typescript-eslint/no-unused-vars`: Error
+- `unused-imports/no-unused-imports`: Error
+- `prettier/prettier`: Error
+- `@typescript-eslint/no-explicit-any`: Warning
+
+#### Frontend (Web)
+- `@typescript-eslint/no-unused-vars`: Warning
+- `unused-imports/no-unused-imports`: Error
+- `react-hooks/rules-of-hooks`: Error
+- `react-hooks/exhaustive-deps`: Warning
+- `prettier/prettier`: Error
+- `@typescript-eslint/no-explicit-any`: Warning
+
+### Reglas
+- **SIEMPRE** ejecutar `pnpm lint` antes de commit
+- ESLint se ejecuta automáticamente en pre-commit hook
+- Corregir errores automáticamente cuando sea posible (`--fix`)
+- No deshabilitar reglas sin comentario justificativo
+
+## TypeScript
+
+### Configuración
+- **Strict Mode**: Habilitado
+- **No Implicit Any**: Error
+- **Strict Null Checks**: Habilitado
+- **Target**: ES2020+
+
+### Reglas de Tipo
+
+#### Evitar `any`
+```typescript
+// ❌ Mal
+function process(data: any) {
+  return data.value;
+}
+
+// ✅ Bien
+function process(data: { value: string }) {
+  return data.value;
+}
+
+// ✅ Bien (cuando el tipo es realmente desconocido)
+function process(data: unknown) {
+  if (typeof data === 'object' && data !== null && 'value' in data) {
+    return (data as { value: string }).value;
+  }
+  throw new Error('Invalid data');
+}
+```
+
+#### Tipos Explícitos
+```typescript
+// ❌ Mal
+const data = fetchData();
+
+// ✅ Bien
+const data: UserData = fetchData();
+
+// ✅ Bien (si el tipo se infiere correctamente)
+const users: User[] = [];
+```
+
+#### Interfaces vs Types
+- **Interfaces**: Para objetos que pueden extenderse
+- **Types**: Para unions, intersections, y tipos más complejos
+
+```typescript
+// ✅ Bien - Interface para objetos
+interface User {
+  id: string;
+  name: string;
+}
+
+// ✅ Bien - Type para union
+type Status = 'active' | 'inactive' | 'pending';
+
+// ✅ Bien - Type para intersection
+type UserWithRole = User & { role: Role };
+```
+
+## Nombres y Estructura
+
+### Nombres de Archivos
+
+#### Backend
+- **Entidades**: `*.entity.ts` (ej: `user.entity.ts`)
+- **Controladores**: `*.controller.ts` (ej: `user.controller.ts`)
+- **Servicios**: `*.service.ts` (ej: `user.service.ts`)
+- **Módulos**: `*.module.ts` (ej: `user.module.ts`)
+- **Tests**: `*.spec.ts` (ej: `user.service.spec.ts`)
+- **E2E Tests**: `*.e2e-spec.ts`
+
+#### Frontend
+- **Componentes**: `PascalCase.tsx` (ej: `UserProfile.tsx`)
+- **Hooks**: `camelCase.ts` con prefijo `use` (ej: `useUserQuery.ts`)
+- **Utils**: `camelCase.ts` (ej: `dateUtils.ts`)
+- **Tests**: `*.test.tsx` (ej: `UserProfile.test.tsx`)
+
+### Nombres de Variables y Funciones
+
+#### camelCase
+```typescript
+// Variables y funciones
+const userId = '123';
+const getUserData = () => {};
+const isAuthenticated = true;
+```
+
+#### PascalCase
+```typescript
+// Clases, componentes, interfaces, tipos
+class UserService {}
+interface UserData {}
+type UserStatus = 'active' | 'inactive';
+```
+
+#### UPPER_SNAKE_CASE
+```typescript
+// Constantes
+const API_BASE_URL = 'https://api.example.com';
+const MAX_RETRY_ATTEMPTS = 3;
+```
+
+#### kebab-case
+```typescript
+// Solo para nombres de archivos cuando sea apropiado (raramente)
+// Normalmente usar camelCase o PascalCase
+```
+
+## Comentarios y Documentación
+
+### JSDoc para Funciones/Clases
+```typescript
+/**
+ * Crea un nuevo usuario en el sistema.
+ *
+ * @param companyId - ID de la compañía del usuario
+ * @param userData - Datos del usuario a crear
+ * @returns El usuario creado
+ * @throws {BadRequestException} Si los datos son inválidos
+ *
+ * @example
+ * ```typescript
+ * const user = await userService.create('company-123', {
+ *   name: 'John Doe',
+ *   email: 'john@example.com'
+ * });
+ * ```
+ */
+async create(companyId: string, userData: CreateUser): Promise<User> {
+  // ...
+}
+```
+
+### Comentarios Inline
+```typescript
+// ✅ Bien - Explica el "por qué", no el "qué"
+// Usamos UUID en lugar de auto-increment para mejor soporte multi-tenancy
+const id = uuidv4();
+
+// ❌ Mal - Solo describe lo obvio
+// Crear un nuevo usuario
+const user = await createUser();
+```
+
+### Reglas
+- Documentar funciones públicas y clases
+- Comentarios deben explicar "por qué", no "qué"
+- Evitar comentarios obvios que solo repiten el código
+- Usar JSDoc para APIs públicas
+
+## Imports
+
+### Orden de Imports
+```typescript
+// 1. Imports externos (node_modules)
+import { Injectable } from '@nestjs/common';
+import { Repository } from 'typeorm';
+
+// 2. Imports internos absolutos
+import { DatabaseConfig } from '@/common/config/database.config';
+
+// 3. Imports relativos
+import { UserService } from './user.service';
+import { CreateUserDto } from './dto/create-user.dto';
+```
+
+### Reglas de Imports
+- Agrupar imports por tipo
+- Usar imports absolutos cuando sea posible (configurado en tsconfig)
+- Evitar imports circulares
+- Eliminar imports no usados (ESLint lo detecta)
+
+## Funciones y Métodos
+
+### Longitud
+- Funciones deben ser cortas y enfocadas (idealmente < 50 líneas)
+- Si una función es muy larga, dividirla en funciones más pequeñas
+
+### Parámetros
+```typescript
+// ❌ Mal - Demasiados parámetros
+function createUser(name, email, phone, address, city, country, zip) {}
+
+// ✅ Bien - Usar objeto
+function createUser(data: CreateUserData) {}
+
+// ✅ Bien - Parámetros relacionados agrupados
+function createUser(
+  companyId: string,
+  userData: CreateUserData,
+  options?: CreateUserOptions
+) {}
+```
+
+### Return Types
+```typescript
+// ✅ Bien - Tipo de retorno explícito
+async function getUser(id: string): Promise<User> {
+  return await repository.findOne({ where: { id } });
+}
+
+// ✅ Bien - Tipo inferido cuando es obvio
+function double(n: number) {
+  return n * 2; // TypeScript infiere number
+}
+```
+
+## Estructura de Código
+
+### Orden en Clases/Componentes
+```typescript
+class Example {
+  // 1. Propiedades públicas
+  public publicProperty: string;
+
+  // 2. Propiedades privadas
+  private privateProperty: string;
+
+  // 3. Constructor
+  constructor(private readonly dependency: Dependency) {}
+
+  // 4. Métodos públicos
+  public publicMethod() {}
+
+  // 5. Métodos privados
+  private privateMethod() {}
+}
+```
+
+### Orden en Componentes React
+```typescript
+export const Component: React.FC<Props> = ({ prop1, prop2 }) => {
+  // 1. Hooks de estado
+  const [state, setState] = useState();
+
+  // 2. Hooks de efectos
+  useEffect(() => {
+    // ...
+  }, []);
+
+  // 3. Custom hooks
+  const { data } = useCustomHook();
+
+  // 4. Funciones helper
+  const handleClick = () => {
+    // ...
+  };
+
+  // 5. Render
+  return <div>...</div>;
+};
+```
+
+## Git y Commits
+
+### Conventional Commits
+Formato: `type(scope): description`
+
+**Types**:
+- `feat`: Nueva funcionalidad
+- `fix`: Corrección de bug
+- `docs`: Documentación
+- `style`: Cambios de formato (no afectan código)
+- `refactor`: Refactorización
+- `test`: Tests
+- `chore`: Tareas de mantenimiento
+
+**Ejemplos**:
+```
+feat(api): add user creation endpoint
+fix(web): correct authentication redirect
+docs: update README with setup instructions
+refactor(api): simplify user service logic
+```
+
+### Reglas de Commits
+- Un commit por cambio lógico
+- Mensajes descriptivos y claros
+- Usar Conventional Commits cuando sea posible
+- No hacer commits de "WIP" o "temp"
+
+## Manejo de Errores
+
+### Backend
+```typescript
+// ✅ Bien - Usar excepciones de NestJS
+if (!user) {
+  throw new NotFoundException('User not found');
+}
+
+// ❌ Mal - Lanzar Error genérico
+if (!user) {
+  throw new Error('User not found');
+}
+```
+
+### Frontend
+```typescript
+// ✅ Bien - Manejar errores apropiadamente
+try {
+  const data = await fetchData();
+  setData(data);
+} catch (error) {
+  console.error('Failed to fetch data:', error);
+  setError('Failed to load data');
+}
+
+// ✅ Bien - Usar React Query error handling
+const { data, error, isLoading } = useQuery({
+  queryKey: ['data'],
+  queryFn: fetchData,
+});
+
+if (error) {
+  return <ErrorDisplay error={error} />;
+}
+```
+
+## Performance
+
+### Backend
+- Evitar N+1 queries
+- Usar índices apropiados
+- Paginar resultados grandes
+- Cachear datos cuando sea apropiado
+
+### Frontend
+- Lazy loading de componentes grandes
+- Memoización cuando sea necesario (evitar premature optimization)
+- Optimistic updates en mutaciones
+- Code splitting
+
+## Seguridad
+
+### Validación
+- **SIEMPRE** validar inputs del usuario
+- Usar Zod schemas para validación
+- Nunca confiar en datos del cliente
+
+### Secrets
+- **NUNCA** commitear secrets, tokens, o API keys
+- Usar variables de entorno
+- Validar que .env está en .gitignore
+
+## Comandos Útiles
+
+```bash
+# Formatear código
+pnpm format
+
+# Verificar formato
+pnpm format:check
+
+# Linting
+pnpm lint
+
+# Type checking
+pnpm --filter financial-win-api exec tsc --noEmit
+pnpm --filter financial-win-web exec tsc --noEmit
+
+# Todo junto
+pnpm lint && pnpm format:check
+```
+
+## Checklist de Código Limpio
+
+Antes de hacer commit, verificar:
+- [ ] Código formateado (Prettier)
+- [ ] Sin errores de linting
+- [ ] Sin errores de TypeScript
+- [ ] Imports organizados
+- [ ] Sin código comentado innecesario
+- [ ] Funciones con nombres descriptivos
+- [ ] Comentarios JSDoc en funciones públicas
+- [ ] Tests pasando
+- [ ] Sin console.logs o debuggers
+- [ ] Variables de entorno documentadas si son nuevas

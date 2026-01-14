@@ -1,0 +1,2 @@
+-- Migration 008: Seed OIDC Users
+-- No example users seeded - users should be created via admin panel or OIDC registration

@@ -1,0 +1,115 @@
+# Guía del financial-win
+
+## Introducción
+
+Esta aplicación proporciona una base sólida para desarrollar aplicaciones full-stack con:
+
+- **Backend**: NestJS con TypeORM, PostgreSQL, OIDC
+- **Frontend**: React + Vite + TypeScript, TanStack Query, Zustand
+- **Autenticación**: Integración completa con oidc-server
+- **Infraestructura**: Docker, migraciones, scripts de desarrollo
+
+## Estructura del Proyecto
+
+```
+jony/
+├── apps/
+│   ├── api/              # Backend NestJS
+│   └── web/              # Frontend React
+├── scripts/              # Scripts de automatización
+├── mdc/                  # Documentación
+└── docker-compose.*.yml  # Configuración Docker
+```
+
+## Primeros Pasos
+
+### 1. Configuración Inicial
+
+```bash
+# Copiar variables de entorno
+cd apps/api
+cp .env.example .env.dev
+
+# Editar .env.dev con tus configuraciones
+# Especialmente importante: OIDC_CLIENT_ID, OIDC_CLIENT_SECRET, JWT_SECRET
+```
+
+### 2. Iniciar Desarrollo
+
+```bash
+# Asegúrate de que oidc-server esté corriendo
+cd ../oidc-server
+docker compose up -d
+
+# Iniciar el financial-win
+cd ../financial-win-project
+./scripts/dev.sh
+```
+
+### 3. Crear Tu Primer Módulo
+
+#### Backend
+
+```bash
+cd apps/api
+
+# Generar módulo
+nest generate module modules/mi-modulo
+nest generate controller modules/mi-modulo
+nest generate service modules/mi-modulo
+
+# Crear entidad
+# Crear: src/modules/mi-modulo/entities/mi-entidad.entity.ts
+```
+
+#### Frontend
+
+```bash
+# Crear componente
+# Crear: apps/web/src/components/mi-modulo/MiComponente.tsx
+
+# Crear página
+# Crear: apps/web/src/pages/mi-modulo/MiPagina.tsx
+
+# Agregar ruta en App.tsx
+```
+
+## Patrones y Convenciones
+
+### Backend
+
+- **Módulos**: Un módulo por dominio de negocio
+- **Entidades**: Usar TypeORM decorators, incluir `created_at` y `updated_at`
+- **DTOs**: Validación con class-validator
+- **Guards**: Usar `OIDCAuthGuard` para endpoints protegidos
+- **Multi-tenancy**: Incluir `company_id` en todas las entidades
+
+### Frontend
+
+- **Componentes**: Organizados por módulo/dominio
+- **Páginas**: Una página por ruta principal
+- **Hooks**: Custom hooks para lógica reutilizable
+- **API**: Clientes API organizados por recurso
+- **Estado**: TanStack Query para servidor, Zustand para cliente
+
+## Migraciones
+
+Ver `mdc/01-ARCHITECTURE.mdc` para detalles sobre migraciones.
+
+## Autenticación OIDC
+
+Ver `mdc/02-OIDC-INTEGRATION.mdc` para detalles sobre integración OIDC.
+
+## Personalización
+
+1. Cambiar nombres en `package.json` (root, api, web)
+2. Actualizar `README.md`
+3. Personalizar `Layout.tsx` con tu branding
+4. Configurar variables de entorno según tu proyecto
+
+## Próximos Pasos
+
+- Revisar `mdc/01-ARCHITECTURE.mdc` para entender la arquitectura
+- Revisar `mdc/02-OIDC-INTEGRATION.mdc` para entender OIDC
+- Crear tu primer módulo siguiendo los patrones establecidos
+- Personalizar según las necesidades de tu proyecto

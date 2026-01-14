@@ -1,0 +1,11 @@
+# Title
+README (TypeScript + Node 22 LTS)
+
+# QuickStart
+1) Crear `.env` (ver 02-env.mdc).
+2) `docker compose up --build`.
+3) Abrir `http://localhost:3000` y loguear con seeds.
+
+# Notas
+- Provider y Backend en TypeScript, compilados a `dist/`.
+- SQLite local persistido en volumen del directorio `provider/`.

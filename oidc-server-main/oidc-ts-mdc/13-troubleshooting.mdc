@@ -1,0 +1,422 @@
+# Title
+Troubleshooting - Problemas Comunes y Soluciones
+
+# Summary
+Guía completa de troubleshooting para problemas comunes en el servidor OIDC,
+incluyendo errores de configuración, problemas de integración y soluciones paso a paso.
+
+# TechnicalDetails
+
+## 1. Error: invalid_redirect_uri
+
+### Descripción del Problema
+
+Cuando intentas acceder al frontend, obtienes el siguiente error:
+
+```
+error: invalid_redirect_uri
+error_description: redirect_uri did not match any of the client's registered redirect_uris
+```
+
+Este error ocurre cuando el `redirect_uri` que está intentando usar el backend no está registrado en la lista de `redirect_uris` del cliente OIDC en la base de datos.
+
+### Causa del Error
+
+El flujo de autenticación funciona así:
+
+1. **Frontend (puerto 3008)** → redirige a **Backend (puerto 4009)** → `/auth/login`
+2. **Backend** → redirige al **Provider OIDC (puerto 5009)** para autenticación
+3. **Provider** → valida credenciales y redirige de vuelta al **Backend** → `/auth/callback`
+4. **Backend** → crea sesión y redirige al **Frontend**
+
+El error ocurre en el paso 3: el Provider OIDC verifica que el `redirect_uri` (`http://localhost:4009/auth/callback`) esté registrado en la base de datos para el cliente OIDC que está usando el backend. Si no está registrado, muestra este error.
+
+### Solución Paso a Paso
+
+#### Paso 1: Verificar la Configuración del Backend
+
+**Ubicación**: `oidc-server/backend/.env`
+
+**Comando para verificar**:
+```bash
+cd /Users/r1go/Documents/CODE/APPLICA/Acceleralia/oidc-server/backend
+cat .env | grep -E "OIDC_CLIENT_ID|OIDC_CALLBACK_URL"
+```
+
+**Resultado esperado**:
+```
+OIDC_CLIENT_ID=local-client
+OIDC_CALLBACK_URL=http://localhost:4009/auth/callback
+```
+
+**Valores críticos**:
+- `OIDC_CLIENT_ID`: Identifica qué cliente OIDC está usando el backend
+- `OIDC_CALLBACK_URL`: Debe ser exactamente `http://localhost:4009/auth/callback`
+
+**Si el archivo `.env` no existe o no tiene estas variables**:
+
+1. Copia el archivo de ejemplo:
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Edita el archivo `.env` y asegúrate de tener:
+   ```env
+   PROVIDER_EXTERNAL_URL=http://localhost:5009
+   OIDC_CLIENT_ID=local-client
+   OIDC_CLIENT_SECRET=tu-secret-aqui
+   OIDC_CALLBACK_URL=http://localhost:4009/auth/callback
+   FRONTEND_URL=http://localhost:3008
+   BACKEND_URL=http://localhost:4009
+   SESSION_SECRET=un-secreto-muy-largo-y-aleatorio-minimo-32-caracteres
+   ```
+
+#### Paso 2: Registrar o Actualizar el Cliente OIDC
+
+**Opción A: Usar el Admin Panel (Recomendado)**
+
+1. Acceder al Admin Panel:
+   ```
+   URL: http://localhost:5009/admin-panel/
+   Usuario: admin
+   Password: admin123
+   ```
+
+2. Ir a "OIDC Clients":
+   - En el menú lateral, haz clic en "OIDC Clients"
+   - Verás una lista de todos los clientes OIDC registrados
+
+3. Buscar el cliente existente:
+   - Busca el cliente cuyo `client_id` coincida con `OIDC_CLIENT_ID` de tu archivo `backend/.env`
+   - Por ejemplo, si `OIDC_CLIENT_ID=local-client`, busca ese cliente
+
+4. Si el cliente existe:
+   - Haz clic en el botón "Edit" (azul) del cliente
+   - En el campo "Redirect URIs", verifica que incluya exactamente:
+     ```
+     http://localhost:4009/auth/callback
+     ```
+   - Si no está, agrégalo (puedes separar múltiples URIs con comas o saltos de línea)
+   - Verifica otros campos importantes:
+     - **Post Logout Redirect URIs**: Debe incluir `http://localhost:3008`
+     - **Grant Types**: Debe incluir `authorization_code`
+     - **Response Types**: Debe incluir `code`
+     - **Token Endpoint Auth Method**: Debe ser `client_secret_post`
+     - **Frontend URL**: Debe ser `http://localhost:3008`
+     - **Active**: Debe estar marcado ✅
+   - Haz clic en "Update Client" para guardar
+
+5. Si el cliente NO existe:
+   - Haz clic en el botón "Add Client" (azul)
+   - Completa el formulario con estos valores:
+     ```
+     Client ID: local-client
+     Client Name: Local Development Client
+     Client Secret: (usa el mismo valor que OIDC_CLIENT_SECRET en backend/.env)
+     Redirect URIs: http://localhost:4009/auth/callback
+     Post Logout Redirect URIs: http://localhost:3008
+     Grant Types: authorization_code
+     Response Types: code
+     Token Endpoint Auth Method: client_secret_post
+     Frontend URL: http://localhost:3008
+     Active: ✅ (marcado)
+     ```
+   - Haz clic en "Create Client"
+
+**Opción B: Verificar/Actualizar directamente en la Base de Datos**
+
+1. Conectar a PostgreSQL:
+   ```bash
+   psql -h localhost -p 5437 -U oidc_user -d oidc_db
+   ```
+
+2. Ver todos los clientes OIDC:
+   ```sql
+   SELECT client_id, client_name, redirect_uris, post_logout_redirect_uris, is_active
+   FROM oidc_clients;
+   ```
+
+3. Verificar cliente específico:
+   ```sql
+   SELECT client_id, client_name, redirect_uris, post_logout_redirect_uris, is_active
+   FROM oidc_clients
+   WHERE client_id = 'local-client';
+   ```
+
+4. Verificar si el redirect_uri está en la lista:
+   El resultado mostrará `redirect_uris` como un array. Debe incluir:
+   ```
+   {"http://localhost:4009/auth/callback"}
+   ```
+
+5. Si necesitas actualizar el redirect_uri:
+   ```sql
+   UPDATE oidc_clients
+   SET redirect_uris = ARRAY['http://localhost:4009/auth/callback']
+   WHERE client_id = 'local-client';
+   ```
+
+   **Nota**: Esto reemplazará todos los redirect_uris existentes. Si necesitas mantener otros:
+   ```sql
+   UPDATE oidc_clients
+   SET redirect_uris = ARRAY['http://localhost:4009/auth/callback', 'otro-uri-aqui']
+   WHERE client_id = 'local-client';
+   ```
+
+6. Verificar que el cliente esté activo:
+   ```sql
+   UPDATE oidc_clients
+   SET is_active = TRUE
+   WHERE client_id = 'local-client';
+   ```
+
+#### Paso 3: Verificar Consistencia de Configuración
+
+El `redirect_uri` debe coincidir **exactamente** en tres lugares:
+
+1. **Archivo `backend/.env`**:
+   ```env
+   OIDC_CALLBACK_URL=http://localhost:4009/auth/callback
+   ```
+
+2. **Base de Datos `oidc_clients.redirect_uris`**:
+   ```sql
+   SELECT redirect_uris FROM oidc_clients WHERE client_id = 'local-client';
+   -- Debe mostrar: {"http://localhost:4009/auth/callback"}
+   ```
+
+3. **Código del Backend** (automático): El backend usa `OIDC_CALLBACK_URL` del archivo `.env`
+
+**⚠️ IMPORTANTE**: El redirect URI debe coincidir exactamente, incluyendo:
+- ✅ Protocolo (`http://` o `https://`)
+- ✅ Dominio (`localhost`)
+- ✅ Puerto (`4009`)
+- ✅ Path (`/auth/callback`)
+- ❌ Sin trailing slash (`/`) al final
+
+#### Paso 4: Reiniciar los Servicios
+
+Después de actualizar el cliente OIDC en la base de datos, reinicia el backend:
+
+```bash
+cd /Users/r1go/Documents/CODE/APPLICA/Acceleralia/oidc-server
+docker compose restart backend
+```
+
+O reinicia todos los servicios:
+```bash
+docker compose restart
+```
+
+**Espera unos segundos** para que los servicios se reinicien completamente (especialmente el provider que necesita recargar los clientes desde la base de datos).
+
+#### Paso 5: Probar la Solución
+
+1. Abrir el navegador y navegar a: `http://localhost:3008`
+2. Verificar el flujo:
+   - Deberías ser redirigido automáticamente a `http://localhost:5009` para autenticación
+   - Si ves el formulario de login, el redirect está funcionando correctamente
+   - Ingresa credenciales de prueba:
+     - Email: `alice@example.com`
+     - Password: `password123`
+   - Después del login, deberías ser redirigido de vuelta a `http://localhost:3008`
+   - Deberías ver la información del usuario autenticado
+
+### Troubleshooting Adicional para invalid_redirect_uri
+
+#### Problema: "El cliente no existe en la base de datos"
+
+**Solución**: Crea el cliente usando el Admin Panel (Opción A del Paso 2) o ejecuta una migración/seeding si está disponible.
+
+#### Problema: "El cliente existe pero está inactivo"
+
+**Solución**:
+```sql
+UPDATE oidc_clients SET is_active = TRUE WHERE client_id = 'local-client';
+```
+
+#### Problema: "El redirect_uri está en la lista pero sigue fallando"
+
+**Posibles causas**:
+
+1. **Trailing slash**: Verifica que no haya `/` al final
+   ```sql
+   -- ❌ Incorrecto
+   http://localhost:4009/auth/callback/
+   
+   -- ✅ Correcto
+   http://localhost:4009/auth/callback
+   ```
+
+2. **Protocolo diferente**: Verifica que ambos usen `http://` o ambos `https://`
+
+3. **Puerto diferente**: Verifica que el puerto sea exactamente `4009`
+
+4. **Case sensitivity**: Aunque generalmente no es problema, verifica que no haya diferencias de mayúsculas/minúsculas
+
+5. **El provider no ha recargado los clientes**: Reinicia el provider:
+   ```bash
+   docker compose restart provider
+   ```
+
+#### Problema: "El cliente tiene múltiples redirect_uris pero solo uno funciona"
+
+**Solución**: PostgreSQL almacena los redirect_uris como un array. Asegúrate de que el array incluya el URI correcto:
+
+```sql
+-- Ver todos los redirect_uris del cliente
+SELECT redirect_uris FROM oidc_clients WHERE client_id = 'local-client';
+
+-- Si necesitas agregar uno sin perder los existentes
+UPDATE oidc_clients
+SET redirect_uris = array_append(redirect_uris, 'http://localhost:4009/auth/callback')
+WHERE client_id = 'local-client'
+AND NOT ('http://localhost:4009/auth/callback' = ANY(redirect_uris));
+```
+
+### Verificación Rápida
+
+```bash
+# 1. Ver qué cliente está usando el backend
+cd /Users/r1go/Documents/CODE/APPLICA/Acceleralia/oidc-server/backend
+echo "=== Configuración del Backend ==="
+grep OIDC_CLIENT_ID .env
+grep OIDC_CALLBACK_URL .env
+
+# 2. Verificar en la base de datos
+echo ""
+echo "=== Verificación en Base de Datos ==="
+CLIENT_ID=$(grep OIDC_CLIENT_ID .env | cut -d'=' -f2)
+CALLBACK_URL=$(grep OIDC_CALLBACK_URL .env | cut -d'=' -f2)
+
+psql -h localhost -p 5437 -U oidc_user -d oidc_db -c \
+  "SELECT client_id, redirect_uris, is_active
+   FROM oidc_clients
+   WHERE client_id = '$CLIENT_ID';"
+```
+
+## 2. Problemas de Configuración de Variables
+
+### Problema: "Missing required OIDC environment variables"
+
+**Solución**:
+- Verifica que todos los archivos .env existan
+- Verifica que todas las variables requeridas estén presentes
+- Ejecuta el script de verificación: `./verify-env.sh`
+
+### Problema: "OIDC_CLIENT_ID does not match"
+
+**Solución**:
+- Verifica que `OIDC_CLIENT_ID` sea el mismo en:
+  - `oidc-server/backend/.env`
+  - `Write-mvp/apps/api/.env.dev`
+  - Base de datos de oidc-server (tabla `oidc_clients`)
+
+### Problema: "OIDC_CLIENT_SECRET does not match"
+
+**Solución**:
+- Verifica que `OIDC_CLIENT_SECRET` sea el mismo en:
+  - `oidc-server/backend/.env`
+  - `Write-mvp/apps/api/.env.dev`
+- El secret en la base de datos debe ser el hash bcrypt del secret en texto plano
+
+### Problema: "Cannot connect to OIDC provider"
+
+**Solución**:
+- Verifica que oidc-server esté corriendo: `docker compose ps` en oidc-server
+- Verifica que `OIDC_PUBLIC_URL` sea `http://localhost:5009`
+- Si ejecutas Write-mvp en Docker, usa `OIDC_ISSUER_URL=http://host.docker.internal:5009`
+- Si ejecutas Write-mvp localmente, usa `OIDC_ISSUER_URL=http://localhost:5009`
+
+### Problema: "Database connection failed"
+
+**Solución**:
+- Verifica que PostgreSQL esté corriendo
+- Verifica que `DATABASE_URL` use el puerto correcto:
+  - oidc-server: puerto 5437
+  - write-mvp: puerto 5432
+- Desde Docker, usa el nombre del servicio (`postgres`) en lugar de `localhost`
+
+## 3. Problemas de Sesión y Autenticación
+
+### Problema: Loop de login
+
+**Solución**:
+- Revisar cookie de sesión y CORS (credentials)
+- Verificar que `SESSION_SECRET` esté configurado correctamente
+- Verificar que las cookies estén configuradas con `sameSite: 'lax'` y `secure: false` en desarrollo
+
+### Problema: 401 en `/api/me`
+
+**Solución**:
+- Verificar `/auth/callback` y serialización de sesión
+- Verificar que el usuario esté autenticado correctamente
+- Revisar los logs del backend para ver errores específicos
+
+### Problema: Cookie de sesión inválida
+
+**Solución**:
+- Verificar que `SESSION_SECRET` tenga al menos 32 caracteres
+- Verificar que las cookies estén configuradas correctamente
+- Limpiar cookies del navegador y volver a intentar
+
+## 4. Problemas de Base de Datos
+
+### Problema: DB vacía o corrupta
+
+**Solución**:
+- Verificar que las migraciones se hayan ejecutado correctamente
+- Revisar logs del provider para ver errores de conexión
+- Verificar que el contenedor de PostgreSQL esté corriendo
+
+### Problema: Cliente OIDC no existe
+
+**Solución**:
+- Crear el cliente usando el Admin Panel
+- O ejecutar migraciones/seeding si está disponible
+
+### Problema: Cliente inactivo
+
+**Solución**:
+```sql
+UPDATE oidc_clients SET is_active = TRUE WHERE client_id = 'tu-client-id';
+```
+
+## 5. Problemas de Red y Conectividad
+
+### Problema: 404 en provider
+
+**Solución**:
+- Confirmar `app.use(provider.callback())` montado
+- Verificar que el provider esté corriendo en el puerto correcto
+- Verificar que las rutas estén configuradas correctamente
+
+### Problema: CORS y credentials
+
+**Solución**:
+- Verificar que CORS esté configurado con `credentials: true`
+- Verificar que el origen esté en la lista de orígenes permitidos
+- Verificar que las cookies estén configuradas correctamente
+
+## 6. Problemas de Build y Dependencias
+
+### Problema: Errores de bcrypt
+
+**Solución**:
+- Rebuild de imagen base Node 22 LTS
+- Verificar que las dependencias nativas estén instaladas correctamente
+- Limpiar `node_modules` y reinstalar
+
+### Problema: Errores de TypeScript
+
+**Solución**:
+- Verificar que TypeScript esté instalado correctamente
+- Ejecutar `npm run build` para ver errores específicos
+- Verificar que los tipos estén correctamente definidos
+
+# Notes
+- Para configuración de variables de entorno, ver [02-env.mdc](02-env.mdc)
+- Para referencia rápida de variables, ver [32-ENV-QUICK-REFERENCE.mdc](32-ENV-QUICK-REFERENCE.mdc)
+- Admin Panel: http://localhost:5009/admin-panel/
+- Health Check Provider: http://localhost:5009/health
+- Health Check Backend: http://localhost:4009/health

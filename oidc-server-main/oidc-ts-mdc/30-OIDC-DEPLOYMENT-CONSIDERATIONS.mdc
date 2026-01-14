@@ -1,0 +1,293 @@
+# Title
+
+Consideraciones para Deployment en Producción OIDC
+
+# Summary
+
+Este documento cubre todas las consideraciones críticas para desplegar sistemas con OIDC en producción, incluyendo variables de entorno, configuración de cookies, HTTPS, CORS, rate limiting, monitoring, y security hardening.
+
+# TechnicalDetails
+
+## Variables de Entorno en Producción
+
+### Backend
+
+```bash
+# OIDC Configuration
+OIDC_ISSUER_URL=https://auth.production.com
+OIDC_PUBLIC_URL=https://auth.production.com
+OIDC_CLIENT_ID=your-production-client-id
+OIDC_CLIENT_SECRET=your-production-client-secret  # ⚠️ GUARDAR EN SECRET MANAGER
+OIDC_REDIRECT_URI=https://your-api.production.com/api/auth/callback
+OIDC_POST_LOGOUT_REDIRECT_URI=https://your-frontend.production.com
+OIDC_SCOPES=openid profile email
+
+# JWT Configuration
+JWT_SECRET=strong-random-secret-min-32-chars  # ⚠️ GENERAR CON: openssl rand -base64 32
+OIDC_COOKIE_NAME=oauth_session
+OIDC_COOKIE_SECURE=true  # ⚠️ SIEMPRE true en producción
+OIDC_COOKIE_SAME_SITE=lax  # o 'strict' para más seguridad
+
+# Database
+DATABASE_URL=postgresql://user:pass@host:port/db?ssl=true
+
+# Environment
+NODE_ENV=production
+```
+
+### Frontend
+
+```bash
+VITE_API_URL=https://your-api.production.com/api
+```
+
+**IMPORTANTE**:
+
+- NUNCA commitees `.env` con secrets reales
+- Usa secret managers (AWS Secrets Manager, Azure Key Vault, etc.)
+- Rota los secrets periódicamente
+
+## Configuración de Cookies
+
+### Backend (NestJS)
+
+```typescript
+// En AuthController callback
+res.cookie(this.oidcConfig.cookieName, sessionToken, {
+  httpOnly: true, // ✅ Previene acceso desde JavaScript
+  secure: true, // ✅ Solo HTTPS en producción
+  sameSite: "lax", // ✅ o 'strict' para más seguridad
+  maxAge: 24 * 60 * 60 * 1000, // 24 horas
+  domain: ".production.com", // Si usas subdominios
+});
+```
+
+### Consideraciones de SameSite
+
+- `lax`: Permite cookies en navegación top-level (recomendado para la mayoría)
+- `strict`: Más seguro, bloquea cookies en navegaciones cross-site
+- `none`: Solo con `secure: true`, permite cookies cross-site (para iframes)
+
+## Requisitos HTTPS
+
+**CRÍTICO**: OIDC requiere HTTPS en producción por:
+
+1. **Seguridad de cookies**: Cookies `secure` solo funcionan con HTTPS
+2. **Tokens**: Los tokens JWT viajan en cookies/headers, deben estar encriptados
+3. **OIDC Provider**: La mayoría de providers requieren HTTPS para redirect URIs
+
+### Configuración de Reverse Proxy (Nginx)
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name your-api.production.com;
+
+    ssl_certificate /path/to/cert.pem;
+    ssl_certificate_key /path/to/key.pem;
+
+    # SSL Configuration
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+
+    # Trust proxy headers
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header Host $host;
+
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+```
+
+## Configuración CORS
+
+### Backend (NestJS)
+
+```typescript
+app.enableCors({
+  origin: process.env.CORS_ORIGIN || "https://your-frontend.production.com",
+  credentials: true, // ✅ CRÍTICO: Permite enviar cookies
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  exposedHeaders: ["Content-Length", "X-Foo", "X-Bar"],
+  maxAge: 86400, // 24 horas
+});
+```
+
+**IMPORTANTE**:
+
+- `credentials: true` es obligatorio para cookies cross-origin
+- Especifica `origin` explícitamente (no uses `*` con `credentials: true`)
+
+## Rate Limiting
+
+### Backend (NestJS con @nestjs/throttler)
+
+```typescript
+// app.module.ts
+import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
+
+@Module({
+  imports: [
+    ThrottlerModule.forRoot({
+      ttl: 60,
+      limit: 10, // 10 requests per minute
+    }),
+  ],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
+})
+export class AppModule {}
+```
+
+### Endpoints Críticos
+
+Protege especialmente:
+
+- `/auth/login`: Limitar intentos de login
+- `/auth/callback`: Limitar intercambios de código
+- `/auth/me`: Limitar verificaciones de sesión
+
+## Monitoring y Logging
+
+### Logging Estructurado
+
+```typescript
+// Logger con contexto
+this.logger.log("User authenticated", {
+  userId: user.sub,
+  email: user.email,
+  companyId: user.company_id,
+  timestamp: new Date().toISOString(),
+});
+
+this.logger.error("Authentication failed", {
+  error: error.message,
+  endpoint: "/auth/callback",
+  timestamp: new Date().toISOString(),
+});
+```
+
+### Métricas Clave
+
+Monitorea:
+
+- Tasa de login exitoso vs fallido
+- Tiempo de respuesta de `/auth/callback`
+- Errores de token exchange
+- Errores de validación de claims
+- Tasa de sesiones expiradas
+
+### Alertas
+
+Configura alertas para:
+
+- Tasa de errores de autenticación > 5%
+- Tiempo de respuesta de auth > 2 segundos
+- Intentos de login fallidos > 10 por minuto (posible ataque)
+
+## Security Hardening
+
+### 1. Rotación de Secrets
+
+Rota periódicamente:
+
+- `JWT_SECRET`: Cada 90 días
+- `OIDC_CLIENT_SECRET`: Cada 180 días (coordinar con admin OIDC)
+
+### 2. Validación de Tokens
+
+Siempre valida:
+
+- Expiración (`exp` claim)
+- Claims requeridos (sub, email, name, company_id)
+- Formato del token
+
+### 3. CSRF Protection
+
+Ya implementado con `state` parameter:
+
+- Genera state aleatorio antes de login
+- Almacena en cookie httpOnly
+- Verifica en callback
+
+### 4. Content Security Policy
+
+```typescript
+// Headers de seguridad
+app.use((req, res, next) => {
+  res.setHeader("Content-Security-Policy", "default-src 'self'");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("X-XSS-Protection", "1; mode=block");
+  next();
+});
+```
+
+## Backup y Recovery
+
+### Backup de Base de Datos
+
+- Backup diario de la base de datos del OIDC Provider
+- Backup de sesiones activas (si usas PostgreSQL session store)
+
+### Recovery Plan
+
+1. **Secret comprometido**: Rotar inmediatamente y invalidar tokens afectados
+2. **Database corrupta**: Restaurar desde backup más reciente
+3. **OIDC Provider caído**: Tener servidor de respaldo configurado
+
+## Checklist Pre-Deployment
+
+- [ ] Todas las variables de entorno configuradas
+- [ ] Secrets almacenados en secret manager
+- [ ] HTTPS configurado y certificados válidos
+- [ ] CORS configurado correctamente
+- [ ] Cookies configuradas con `secure: true`
+- [ ] Rate limiting configurado
+- [ ] Logging y monitoring configurados
+- [ ] Backup plan establecido
+- [ ] Recovery plan documentado
+- [ ] Security headers configurados
+- [ ] Tests de integración pasando
+- [ ] Documentación actualizada
+
+# Troubleshooting
+
+## Problema: Cookies no se envían en producción
+
+**Causa**: Configuración incorrecta de dominio o sameSite.
+
+**Solución**:
+
+1. Verifica que `secure: true` esté configurado
+2. Verifica que el dominio sea correcto (sin trailing slash)
+3. Verifica que `sameSite` sea compatible con tu setup
+
+## Problema: CORS errors en producción
+
+**Causa**: `origin` no coincide o `credentials` no está habilitado.
+
+**Solución**:
+
+1. Verifica `CORS_ORIGIN` incluye el dominio exacto del frontend
+2. Verifica `credentials: true` en CORS
+3. Verifica que el frontend use `withCredentials: true` en Axios
+
+# NextSteps
+
+1. **Monitoreo continuo**: Configurar dashboards y alertas
+2. **Auditorías de seguridad**: Revisar logs periódicamente
+3. **Actualizaciones**: Mantener dependencias actualizadas

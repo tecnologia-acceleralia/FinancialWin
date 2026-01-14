@@ -1,0 +1,339 @@
+# Title
+Variables de Entorno - Desarrollo Local
+
+# Summary
+Guía completa para configurar variables de entorno en desarrollo local,
+incluyendo configuración de oidc-server y write-mvp para integración OIDC.
+
+# Prerequisites
+- Docker Desktop instalado y corriendo
+- PostgreSQL accesible (vía Docker o instalación local)
+- Node.js instalado (versión 18 o superior)
+- Acceso a los repositorios:
+  - `/Users/r1go/Documents/CODE/APPLICA/Acceleralia/oidc-server`
+  - `/Users/r1go/Documents/CODE/APPLICA/Acceleralia/Write-mvp`
+
+# TechnicalDetails
+
+## 1. Provider OIDC (`provider/.env`)
+
+**Ubicación**: `oidc-server/provider/.env`
+
+**Variables Requeridas**:
+
+```env
+# URL pública del Provider OIDC
+PROVIDER_URL=http://localhost:5009
+
+# Conexión a Base de Datos PostgreSQL
+DATABASE_URL=postgresql://oidc_user:oidc_password_dev@localhost:5437/oidc_db
+
+# Ambiente de ejecución
+NODE_ENV=development
+
+# Puerto interno (opcional, default: 8080)
+PORT=8080
+```
+
+**Pasos**:
+
+1. Si el archivo `.env` no existe, copia el archivo `.env.example`:
+   ```bash
+   cd /Users/r1go/Documents/CODE/APPLICA/Acceleralia/oidc-server/provider
+   cp .env.example .env
+   ```
+
+2. Edita el archivo `.env` y ajusta los valores según tu configuración local.
+
+3. Asegúrate de que:
+   - `PROVIDER_URL` apunte a `http://localhost:5009`
+   - `DATABASE_URL` use el puerto correcto (5437 para oidc-server)
+   - Las credenciales de PostgreSQL coincidan con tu configuración
+
+## 2. Backend OIDC (`backend/.env`)
+
+**Ubicación**: `oidc-server/backend/.env`
+
+**Variables Requeridas**:
+
+```env
+# URL externa del Provider (debe coincidir con PROVIDER_URL)
+PROVIDER_EXTERNAL_URL=http://localhost:5009
+
+# Credenciales del Cliente OIDC
+# IMPORTANTE: Estas deben coincidir con el cliente registrado en la BD
+OIDC_CLIENT_ID=writehub-client
+OIDC_CLIENT_SECRET=writehub-secret-super-seguro-al-azar-32chars
+
+# URL de callback después de autenticación
+OIDC_CALLBACK_URL=http://localhost:4009/auth/callback
+
+# URLs del sistema
+FRONTEND_URL=http://localhost:3008
+BACKEND_URL=http://localhost:4009
+
+# Secreto para sesiones (mínimo 32 caracteres)
+SESSION_SECRET=session-secret-muy-largo-y-aleatorio-para-desarrollo-minimo-32-caracteres
+```
+
+**Pasos**:
+
+1. Si el archivo `.env` no existe, copia el archivo `.env.example`:
+   ```bash
+   cd /Users/r1go/Documents/CODE/APPLICA/Acceleralia/oidc-server/backend
+   cp .env.example .env
+   ```
+
+2. Edita el archivo `.env` y ajusta los valores.
+
+3. **IMPORTANTE**: Las credenciales `OIDC_CLIENT_ID` y `OIDC_CLIENT_SECRET` deben coincidir con:
+   - El cliente registrado en la base de datos de oidc-server
+   - Las credenciales en `Write-mvp/apps/api/.env.dev`
+
+## 3. Write-mvp API (`apps/api/.env.dev`)
+
+**Ubicación**: `Write-mvp/apps/api/.env.dev`
+
+**Variables Requeridas**:
+
+```env
+# OIDC Configuration - URL interna (para llamadas HTTP desde contenedor)
+OIDC_ISSUER_URL=http://host.docker.internal:5009
+# O para ejecución local sin Docker: http://localhost:5009
+
+# OIDC Configuration - URL pública (para redirects del navegador)
+OIDC_PUBLIC_URL=http://localhost:5009
+
+# Credenciales del Cliente OIDC (deben coincidir con oidc-server)
+OIDC_CLIENT_ID=writehub-client
+OIDC_CLIENT_SECRET=writehub-secret-super-seguro-al-azar-32chars
+
+# URL de callback después de autenticación
+OIDC_REDIRECT_URI=http://localhost:5008/auth/callback
+
+# URL de post-logout redirect
+OIDC_POST_LOGOUT_REDIRECT_URI=http://localhost:3010
+
+# Scopes OIDC
+OIDC_SCOPES=openid email profile
+
+# Configuración de Cookies (opcional pero recomendado)
+OIDC_COOKIE_NAME=oauth_session
+OIDC_COOKIE_SECURE=false
+OIDC_COOKIE_SAME_SITE=lax
+
+# Base de Datos PostgreSQL
+DATABASE_URL=postgresql://writehub:writehub@postgres:5432/writehub_dev
+# O para ejecución local sin Docker: postgresql://writehub:writehub@localhost:5432/writehub_dev
+
+# Otros
+PORT=5008
+NODE_ENV=development
+```
+
+**Pasos**:
+
+1. Si el archivo `.env.dev` no existe, copia el archivo `.env.dev.example`:
+   ```bash
+   cd /Users/r1go/Documents/CODE/APPLICA/Acceleralia/Write-mvp/apps/api
+   cp .env.dev.example .env.dev
+   ```
+
+2. Edita el archivo `.env.dev` y ajusta los valores.
+
+3. **IMPORTANTE**:
+   - `OIDC_ISSUER_URL` debe usar `http://host.docker.internal:5009` si ejecutas Write-mvp en Docker
+   - `OIDC_PUBLIC_URL` debe ser `http://localhost:5009` (accesible desde el navegador)
+   - Las credenciales deben coincidir exactamente con las de oidc-server
+
+## 4. Write-mvp Web (`apps/web/.env.dev`)
+
+**Ubicación**: `Write-mvp/apps/web/.env.dev`
+
+**Variables Requeridas**:
+
+```env
+# URL del API Backend
+VITE_API_URL=http://localhost:5008
+
+# URL del Frontend
+VITE_FRONTEND_URL=http://localhost:3010
+```
+
+**Pasos**:
+
+1. Si el archivo `.env.dev` no existe, copia el archivo `.env.dev.example`:
+   ```bash
+   cd /Users/r1go/Documents/CODE/APPLICA/Acceleralia/Write-mvp/apps/web
+   cp .env.dev.example .env.dev
+   ```
+
+2. Edita el archivo `.env.dev` y ajusta los valores.
+
+3. **Nota**: Las variables que empiezan con `VITE_` son expuestas al cliente. No incluyas secretos aquí.
+
+## 5. Validaciones Críticas
+
+### Consistencia de Credenciales
+
+Las siguientes variables **DEBEN** coincidir exactamente entre archivos:
+
+- `OIDC_CLIENT_ID`:
+  - `oidc-server/backend/.env`
+  - `Write-mvp/apps/api/.env.dev`
+  - Base de datos `oidc_clients.client_id`
+
+- `OIDC_CLIENT_SECRET`:
+  - `oidc-server/backend/.env`
+  - `Write-mvp/apps/api/.env.dev`
+  - Base de datos `oidc_clients.client_secret` (hash bcrypt)
+
+### Consistencia de URLs
+
+Las siguientes URLs **DEBEN** coincidir:
+
+- `PROVIDER_URL` (provider/.env) = `PROVIDER_EXTERNAL_URL` (backend/.env) = `OIDC_PUBLIC_URL` (api/.env.dev)
+- Valor esperado: `http://localhost:5009`
+
+### URLs de Redirect
+
+- `OIDC_REDIRECT_URI` en `Write-mvp/apps/api/.env.dev` debe estar en `redirect_uris` del cliente en BD
+- `OIDC_POST_LOGOUT_REDIRECT_URI` debe estar en `post_logout_redirect_uris` del cliente en BD
+
+## 6. Registro del Cliente OIDC
+
+Antes de que Write-mvp pueda conectarse a oidc-server, debes registrar el cliente OIDC en la base de datos de oidc-server.
+
+### Opción 1: Usando el Admin Panel (Recomendado)
+
+1. Inicia oidc-server:
+   ```bash
+   cd /Users/r1go/Documents/CODE/APPLICA/Acceleralia/oidc-server
+   docker compose up -d
+   ```
+
+2. Accede al Admin Panel:
+   ```
+   URL: http://localhost:5009/admin-panel/
+   Usuario: admin
+   Password: admin123
+   ```
+
+3. Ve a "OIDC Clients" y haz clic en "Add Client"
+
+4. Completa el formulario con estos valores:
+   - **Client ID**: `writehub-client`
+   - **Client Name**: `Write MVP Application`
+   - **Client Secret**: `writehub-secret-super-seguro-al-azar-32chars`
+   - **Redirect URIs**: `http://localhost:5008/auth/callback`
+   - **Post Logout Redirect URIs**: `http://localhost:3010`
+   - **Grant Types**: `authorization_code`
+   - **Response Types**: `code`
+   - **Token Endpoint Auth Method**: `client_secret_post`
+   - **Frontend URL**: `http://localhost:3010`
+   - **Active**: ✅ (marcado)
+
+5. Haz clic en "Create Client"
+
+### Opción 2: Verificación Manual en Base de Datos
+
+Si prefieres verificar o crear el cliente directamente en la base de datos:
+
+```sql
+-- Conectar a la base de datos de oidc-server
+-- psql -h localhost -p 5437 -U oidc_user -d oidc_db
+
+-- Verificar si el cliente existe
+SELECT client_id, client_name, redirect_uris, post_logout_redirect_uris, is_active 
+FROM oidc_clients 
+WHERE client_id = 'writehub-client';
+
+-- Si no existe, crear el cliente (requiere hash del secret)
+-- Nota: El secret debe ser hasheado con bcrypt antes de insertar
+```
+
+## 7. Verificación
+
+### Script Automatizado
+
+Ejecuta el script de verificación:
+
+```bash
+cd /Users/r1go/Documents/CODE/APPLICA/Acceleralia/oidc-server
+./verify-env.sh
+```
+
+Este script verificará:
+- ✅ Existencia de todos los archivos .env
+- ✅ Presencia de todas las variables requeridas
+- ✅ Consistencia de credenciales entre archivos
+- ✅ Validación de URLs
+- ✅ Validación de URLs de base de datos
+
+### Verificación Manual
+
+#### 1. Verificar que los servicios estén corriendo
+
+```bash
+# OIDC Server
+curl http://localhost:5009/.well-known/openid-configuration
+
+# Write-mvp API
+curl http://localhost:5008/health
+
+# Write-mvp Web
+curl http://localhost:3010/
+```
+
+#### 2. Verificar conexión OIDC
+
+1. Abre http://localhost:3010 en tu navegador
+2. Intenta iniciar sesión
+3. Deberías ser redirigido a http://localhost:5009 para autenticación
+4. Después de autenticarte, deberías volver a Write-mvp
+
+## 8. Troubleshooting Rápido
+
+### Problema: "Missing required OIDC environment variables"
+
+**Solución**:
+- Verifica que todos los archivos .env existan
+- Verifica que todas las variables requeridas estén presentes
+- Ejecuta el script de verificación: `./verify-env.sh`
+
+### Problema: "OIDC_CLIENT_ID does not match"
+
+**Solución**:
+- Verifica que `OIDC_CLIENT_ID` sea el mismo en:
+  - `oidc-server/backend/.env`
+  - `Write-mvp/apps/api/.env.dev`
+  - Base de datos de oidc-server (tabla `oidc_clients`)
+
+### Problema: "redirect_uri mismatch"
+
+**Solución**:
+- Verifica que `OIDC_REDIRECT_URI` en `Write-mvp/apps/api/.env.dev` sea exactamente igual a uno de los valores en `redirect_uris` del cliente en la base de datos
+- El redirect URI debe ser: `http://localhost:5008/auth/callback`
+
+Ver más detalles en [13-troubleshooting.mdc](13-troubleshooting.mdc)
+
+## 9. Checklist Final
+
+Antes de considerar que todo está configurado correctamente:
+
+- [ ] Todos los archivos .env existen
+- [ ] Todas las variables requeridas están presentes
+- [ ] Todas las URLs son correctas para desarrollo local
+- [ ] Las credenciales OIDC coinciden entre archivos
+- [ ] El cliente OIDC está registrado en la base de datos
+- [ ] Las URLs de redirect coinciden con el cliente registrado
+- [ ] Las variables de base de datos apuntan a los servicios correctos
+- [ ] Las variables de sesión y cookies están configuradas para desarrollo
+- [ ] Los puertos no están en conflicto
+- [ ] El script de verificación pasa sin errores
+
+# Notes
+- Para producción, ver [20-ENV-PROVIDER-PRODUCCION.mdc](20-ENV-PROVIDER-PRODUCCION.mdc) y [21-ENV-BACKEND-PRODUCCION.mdc](21-ENV-BACKEND-PRODUCCION.mdc)
+- Para referencia rápida, ver [32-ENV-QUICK-REFERENCE.mdc](32-ENV-QUICK-REFERENCE.mdc)
+- Para troubleshooting detallado, ver [13-troubleshooting.mdc](13-troubleshooting.mdc)
+- Script de verificación: `verify-env.sh` en la raíz del proyecto

@@ -1,0 +1,11 @@
+{
+  "apps/web/src/**/*.{ts,tsx}": [
+    "pnpm --filter web exec prettier --write",
+    "pnpm --filter web exec eslint --fix"
+  ],
+  "apps/api/src/**/*.{ts,js}": [
+    "pnpm --filter api exec prettier --write",
+    "pnpm --filter api exec eslint --fix"
+  ],
+  "*.{json,md,yml,yaml}": ["pnpm exec prettier --write"]
+}

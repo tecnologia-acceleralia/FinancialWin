@@ -1,0 +1,14 @@
+# Title
+Frontend mínimo (HTML + JS)
+
+# Summary
+Estructura estática simple para probar el flujo OIDC. Se sirve con Nginx via docker-compose.
+
+# Files
+## frontend/index.html
+(HTML básico con un contenedor y `<script src="app.js"></script>`)
+
+## frontend/app.js
+- `fetch("http://localhost:4000/api/me", { credentials: "include" })`
+- Si 401 → redirigir a `http://localhost:4000/auth/login`
+- Si OK → mostrar `name`, `email`, `companyId` y botón `Logout`

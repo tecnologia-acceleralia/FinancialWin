@@ -1,0 +1,267 @@
+---
+title: 'Plan de verificación - financial-win de módulos satélites (OIDC + Refresh Tokens)'
+scope: 'Write / Dr. Win / cualquier módulo satélite basado en financial-win'
+audience: 'Dev backend/frontend + QA técnico'
+language: 'es'
+---
+
+## Objetivo
+
+Asegurar que cualquier módulo satélite construido desde el **financial-win**:
+
+- Solicita **`offline_access`** en el flujo de autorización OIDC.
+- Recibe y persiste correctamente **`refresh_token`** (sin exponerlo).
+- Puede renovar sesión/tokens mediante `grant_type=refresh_token`.
+- Mantiene seguridad básica (cookies httpOnly, validación server-side, control de acceso por empresa/cliente).
+- Puede replicar la configuración de forma consistente para nuevos módulos satélites.
+
+Este documento es un **checklist operativo** para validar la implementación y detectar faltantes antes de escalar a múltiples aplicaciones.
+
+---
+
+## 1) Precondiciones (antes de probar)
+
+1. El OIDC Provider (oidc-server) está corriendo y accesible.
+2. Existe un cliente en el admin panel para el módulo satélite (ej. `drwin-client`).
+3. El módulo satélite tiene configuradas variables OIDC (ver sección 2).
+
+---
+
+## 2) Checklist de variables de entorno (módulo satélite)
+
+### 2.1 Variables OIDC mínimas (obligatorias)
+
+- `OIDC_ISSUER_URL`  
+  URL interna para el backend (ej. `http://host.docker.internal:5009` o equivalente en tu red).
+
+- `OIDC_PUBLIC_URL`  
+  URL pública para redirecciones del navegador (ej. `http://localhost:5009` o dominio).
+
+- `OIDC_CLIENT_ID`  
+  Debe coincidir con el `client_id` del admin panel (ej. `drwin-client`).
+
+- `OIDC_CLIENT_SECRET`  
+  Debe coincidir con el secreto del cliente configurado (y con el env var correspondiente del provider si aplica).
+
+- `OIDC_REDIRECT_URI`  
+  Debe ser EXACTA a una de las `redirect_uris` del cliente.
+
+- `OIDC_POST_LOGOUT_REDIRECT_URI`  
+  Debe ser EXACTA a una de las `post_logout_redirect_uris` del cliente.
+
+- `OIDC_SCOPES`  
+  Debe incluir como mínimo:
+  - `openid`
+  - `offline_access` (requisito para refresh tokens)
+    Recomendado: `openid email profile offline_access`
+
+### 2.2 Cookies / sesión del módulo (recomendadas)
+
+- `OIDC_COOKIE_NAME`
+- `OIDC_COOKIE_SECURE` (`true/false`)
+- `OIDC_COOKIE_SAME_SITE` (`lax|strict|none`)
+- `OIDC_COOKIE_DOMAIN` (opcional)
+- `OIDC_COOKIE_PATH` (opcional; en dev suele ser `/`)
+- `OIDC_COOKIE_MAX_AGE` (ms)
+
+### 2.3 Refresh automático (recomendado)
+
+- `OIDC_TOKEN_REFRESH_WINDOW` (ms)  
+  Ventana previa al expiry para intentar refresh (ej. 30 min).
+
+### 2.4 Seguridad (obligatorio)
+
+- `JWT_SECRET`  
+  Para firmar/verificar la cookie/sesión interna del módulo satélite (si aplica).
+
+---
+
+## 3) Checklist de configuración del cliente en oidc-server (admin panel)
+
+Abrir el cliente del módulo satélite y confirmar:
+
+### 3.1 Grant types
+
+- Debe incluir: `authorization_code`
+- Para refresh: debe incluir: `refresh_token`
+
+### 3.2 Allowed scopes
+
+- Debe incluir: `openid`
+- Para refresh: debe incluir: `offline_access`
+
+### 3.3 Token endpoint auth method
+
+Si el backend envía `client_id` y `client_secret` en el body al `/token`, entonces:
+
+- `token_endpoint_auth_method` debe ser: `client_secret_post`
+
+### 3.4 Lifetimes
+
+- `access_token_lifetime` (ej. 3600)
+- `refresh_token_lifetime` (ej. 86400)
+
+### 3.5 Redirect URIs
+
+Debe coincidir EXACTAMENTE (host/puerto/path) con lo que usa el módulo:
+
+- `redirect_uris` incluye: `https://<app>/api/auth/callback` (ejemplo)
+- `post_logout_redirect_uris` incluye: `https://<app>`
+
+---
+
+## 4) Checklist de backend (módulo satélite)
+
+### 4.1 Endpoints esperados
+
+Confirmar que existen (paths orientativos):
+
+- `GET /auth/login`
+  - Genera URL de autorización con `scope=OIDC_SCOPES`
+  - Redirige al provider
+
+- `GET /auth/callback`
+  - Intercambia `code` por tokens en `/token`
+  - Persiste `refresh_token` en sesión interna (cookie httpOnly) sin exponerlo por querystring
+
+- `GET /auth/refresh`
+  - Lee `refresh_token` de sesión/cookie interna
+  - Ejecuta refresh grant en `/token`:
+    - `grant_type=refresh_token`
+    - `refresh_token=<...>`
+    - `client_id`
+    - `client_secret`
+  - Re-emite cookie/sesión interna con el nuevo `refresh_token` si rota
+
+- `GET /auth/logout`
+  - Limpia cookie interna
+  - Redirige a logout del provider (si aplica)
+
+- `GET /auth/me` (si aplica)
+  - Permite al frontend saber si hay sesión válida
+
+### 4.2 Reglas recomendadas de seguridad durante refresh
+
+- Validar firma y expiración del token interno antes de refrescar.
+- Fail-closed: si el provider/endpoint de validación no responde, **no** refrescar.
+- Validar que `company_id` no cambió (si viene en claims/id_token).
+- Verificar que la empresa sigue teniendo acceso al cliente (company-client-access).
+
+---
+
+## 5) Checklist de frontend (módulo satélite)
+
+Confirmar al menos una de estas estrategias:
+
+### 5.1 Refresh periódico (recomendado)
+
+- El frontend llama a `GET /auth/refresh` en un intervalo (ej. cada N minutos).
+- Si recibe `{ refreshed: true }`:
+  - vuelve a consultar `GET /auth/me` o refresca user state.
+
+### 5.2 Refresh on-demand (fallback)
+
+- Un interceptor de HTTP detecta `401` y llama `GET /auth/refresh`.
+- Protecciones anti-loop:
+  - NO intentar refresh si la request fallida ya era `/auth/refresh`.
+  - Evitar concurrencia (lock) y limitar reintentos.
+
+---
+
+## 6) Pruebas manuales (paso a paso)
+
+### Caso A: Login inicial debe entregar refresh_token
+
+1. Abrir la app y loguearse vía OIDC.
+2. Verificar en logs del backend del satélite:
+   - Token exchange OK
+   - Presencia de `refresh_token` (solo longitud/presencia, nunca el valor).
+3. Validar que la sesión se mantiene sin re-login.
+
+Resultado esperado:
+
+- El usuario queda autenticado.
+- La sesión interna incluye refresh_token.
+
+### Caso B: Refresh exitoso (sin re-login)
+
+1. Esperar hasta que el token esté cerca de expirar (o forzar refresh llamando manualmente a `/auth/refresh`).
+2. Ejecutar:
+   - `GET /auth/refresh`
+
+Resultado esperado:
+
+- Respuesta `200`
+- Indica `refreshed: true` (o equivalente)
+- Cookie de sesión se actualiza
+
+### Caso C: Cuando se revoca acceso (o se desactiva acceso) se fuerza re-auth
+
+1. En oidc-server (admin panel) desactivar acceso empresa-cliente o revocarlo.
+2. En el satélite, intentar:
+   - `GET /auth/refresh`
+   - o acceder a endpoint protegido
+
+Resultado esperado:
+
+- Se limpia la cookie interna
+- Se fuerza nuevo login / 403 con mensaje “access_revoked”
+
+---
+
+## 7) Diagnóstico rápido de fallas (tabla)
+
+| Síntoma                                     | Causa probable                                             | Qué revisar                                       |
+| ------------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------- |
+| No llega `refresh_token` en token exchange  | No se solicitó `offline_access` o el cliente no lo permite | `OIDC_SCOPES` + `allowed_scopes`                  |
+| `/token` rechaza refresh                    | Falta `refresh_token` en `grant_types`                     | Config cliente: `grant_types`                     |
+| `/token` 401 invalid_client                 | Auth method mismatch                                       | `token_endpoint_auth_method` vs cómo envía secret |
+| redirect_uri_mismatch                       | URI distinta (host/puerto/path)                            | `OIDC_REDIRECT_URI` + `redirect_uris`             |
+| Loop infinito de refresh                    | Interceptor refresca su propio refresh                     | Protecciones anti-loop                            |
+| Refresh funciona pero sesión no se extiende | No re-setea cookie / no rota token interno                 | Lógica de cookie/refresh                          |
+
+---
+
+## 8) “Export” para otros módulos (plantilla mínima)
+
+### 8.1 Config del cliente (admin panel)
+
+- `grant_types`: `authorization_code, refresh_token`
+- `allowed_scopes`: `openid email profile offline_access`
+- `token_endpoint_auth_method`: `client_secret_post`
+- `redirect_uris`: `https://<app>.test.acceleralia.com/api/auth/callback`
+- `post_logout_redirect_uris`: `https://<app>.test.acceleralia.com`
+- `access_token_lifetime`: `3600`
+- `refresh_token_lifetime`: `86400`
+
+### 8.2 Env vars del módulo satélite (ejemplo)
+
+```
+OIDC_ISSUER_URL=http://host.docker.internal:5009
+OIDC_PUBLIC_URL=http://localhost:5009
+OIDC_CLIENT_ID=<client_id>
+OIDC_CLIENT_SECRET=<secret>
+OIDC_REDIRECT_URI=https://<app>.test.acceleralia.com/api/auth/callback
+OIDC_POST_LOGOUT_REDIRECT_URI=https://<app>.test.acceleralia.com
+OIDC_SCOPES=openid email profile offline_access
+
+OIDC_COOKIE_NAME=oidc_session
+OIDC_COOKIE_SECURE=false
+OIDC_COOKIE_SAME_SITE=lax
+OIDC_COOKIE_MAX_AGE=604800000
+OIDC_TOKEN_REFRESH_WINDOW=1800000
+
+JWT_SECRET=<secret>
+```
+
+---
+
+## 9) Criterio de aceptación
+
+Se considera “OK” si:
+
+1. Login inicial recibe `refresh_token` (confirmado por logs o por comportamiento de refresh).
+2. `GET /auth/refresh` renueva sesión sin re-login.
+3. No hay loops de refresh en el frontend.
+4. Revocación/desactivación de acceso fuerza re-auth.
+5. Las variables y config son replicables y documentadas.

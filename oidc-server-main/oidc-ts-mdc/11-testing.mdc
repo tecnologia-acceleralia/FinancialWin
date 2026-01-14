@@ -1,0 +1,13 @@
+# Title
+Smoke tests (manual)
+
+# Steps
+1) `docker compose up --build`
+2) Abrir `http://localhost:3000`
+3) Debe redirigir a `http://localhost:5000/interaction/...`
+4) Logins seed:
+   - `alice@example.com` / `password123`
+   - `bob@example.com` / `password456`
+5) Debe volver a `http://localhost:3000` y mostrar nombre, email, **Company ID**.
+6) Probar Logout.
+7) (Opcional) Admin DEV: `GET http://localhost:5000/_admin/users`.

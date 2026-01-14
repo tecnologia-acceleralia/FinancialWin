@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Administración OIDC</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Login Page -->
+    <div id="login-page" class="page">
+        <div class="login-container">
+            <h1>🔐 Panel de Administración OIDC</h1>
+            <form id="login-form">
+                <input type="text" id="username" placeholder="Usuario" required>
+                <input type="password" id="password" placeholder="Contraseña" required>
+                <button type="submit">Iniciar Sesión</button>
+                <div id="login-error" class="error"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Admin Dashboard -->
+    <div id="admin-page" class="page" style="display: none;">
+        <nav class="admin-nav">
+            <h1>Panel de Administración OIDC</h1>
+            <div class="admin-info">
+                <span id="admin-name"></span>
+                <button id="logout-btn">Cerrar Sesión</button>
+            </div>
+        </nav>
+
+        <div class="admin-content">
+            <div class="tabs">
+                <button class="tab active" data-tab="companies">Empresas</button>
+                <button class="tab" data-tab="clients">Clientes OIDC</button>
+                <button class="tab" data-tab="users">Usuarios</button>
+                <button class="tab" data-tab="access">Control de Acceso</button>
+                <button class="tab" data-tab="audit">Registros de Auditoría</button>
+                <button class="tab" data-tab="stats">Estadísticas</button>
+            </div>
+
+            <div id="tab-companies" class="tab-content active">
+                <h2>Gestión de Empresas y Usuarios</h2>
+                <p class="subtitle">Gestione empresas y sus usuarios en un solo lugar. Haga clic en una empresa para ver y gestionar sus usuarios.</p>
+                <div class="table-container">
+                    <table id="companies-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 50px;"></th>
+                                <th>ID de Empresa</th>
+                                <th>Nombre de Empresa</th>
+                                <th>Estado</th>
+                                <th style="width: 280px;">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <button class="btn btn-primary" onclick="showAddCompanyForm()">Agregar Empresa</button>
+            </div>
+
+            <div id="tab-clients" class="tab-content">
+                <h2>Gestión de Clientes OIDC</h2>
+                <div class="table-container">
+                    <table id="clients-table">
+                        <thead>
+                            <tr>
+                                <th>ID de Cliente</th>
+                                <th>Nombre de Cliente</th>
+                                <th>URI de Redirección</th>
+                                <th>URL Frontend</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <button class="btn btn-primary" onclick="showAddClientForm()">Agregar Cliente</button>
+            </div>
+
+            <div id="tab-users" class="tab-content">
+                <h2>Gestión de Usuarios OIDC</h2>
+                <div class="table-container">
+                    <table id="users-table">
+                        <thead>
+                            <tr>
+                                <th>Correo Electrónico</th>
+                                <th>Nombre</th>
+                                <th>Empresa</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <button class="btn btn-primary" onclick="showAddUserForm()">Agregar Usuario</button>
+            </div>
+
+            <div id="tab-access" class="tab-content">
+                <h2>Gestión de Control de Acceso</h2>
+                <div class="access-control">
+                    <h3>Acceso Empresa-Cliente</h3>
+                    <div class="table-container">
+                        <table id="company-access-table">
+                            <thead>
+                                <tr>
+                                    <th>Empresa</th>
+                                    <th>Cliente</th>
+                                    <th>Estado</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    <button class="btn btn-primary" onclick="showGrantAccessForm()">Otorgar Acceso</button>
+                </div>
+            </div>
+
+            <div id="tab-audit" class="tab-content">
+                <h2>Registros de Auditoría</h2>
+                <div class="table-container">
+                    <table id="audit-table">
+                        <thead>
+                            <tr>
+                                <th>Fecha y Hora</th>
+                                <th>Acción</th>
+                                <th>Usuario</th>
+                                <th>Detalles</th>
+                                <th>Éxito</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="tab-stats" class="tab-content">
+                <h2>Estadísticas</h2>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3>Empresas Activas</h3>
+                        <div class="stat-number" id="stat-companies">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Clientes Activos</h3>
+                        <div class="stat-number" id="stat-clients">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Usuarios Activos</h3>
+                        <div class="stat-number" id="stat-users">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Sesiones Activas</h3>
+                        <div class="stat-number" id="stat-sessions">-</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Company Add/Edit -->
+    <div id="company-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="company-modal-title">Agregar Empresa</h3>
+                <button class="modal-close" onclick="closeCompanyModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="company-form">
+                    <input type="hidden" id="company-edit-id" value="">
+                    <div id="company-id-display" class="form-group" style="display: none;">
+                        <label for="company-id-display-text">ID de Empresa</label>
+                        <input type="text" id="company-id-display-text" readonly style="background-color: #f5f5f5; cursor: not-allowed;">
+                        <small>Identificador generado automáticamente</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="company-name-input">Nombre de Empresa *</label>
+                        <input type="text" id="company-name-input" required placeholder="Corporación Ejemplo">
+                    </div>
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="company-active-input" checked>
+                            <span>Activo</span>
+                        </label>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" onclick="closeCompanyModal()">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">
+                            <span class="btn-text">Guardar Empresa</span>
+                            <span class="btn-loading" style="display: none;">Guardando...</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for User Add/Edit -->
+    <div id="user-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="user-modal-title">Agregar Usuario</h3>
+                <button class="modal-close" onclick="closeUserModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="user-form">
+                    <input type="hidden" id="user-edit-id" value="">
+                    <div class="form-group">
+                        <label for="user-email-input">Correo Electrónico *</label>
+                        <input type="email" id="user-email-input" required placeholder="usuario@ejemplo.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="user-name-input">Nombre Completo *</label>
+                        <input type="text" id="user-name-input" required placeholder="Juan Pérez">
+                    </div>
+                    <div class="form-group" id="user-password-group">
+                        <label for="user-password-input">Contraseña *</label>
+                        <div class="password-input-wrapper">
+                            <input type="password" id="user-password-input" placeholder="Mínimo 8 caracteres">
+                            <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('user-password-input', this)" title="Mostrar/Ocultar contraseña">
+                                <span class="password-toggle-icon">👁️</span>
+                            </button>
+                        </div>
+                        <small>Deje vacío para mantener la contraseña actual (al editar)</small>
+                    </div>
+                    <div class="form-group" id="user-password-confirm-group">
+                        <label for="user-password-confirm-input">Confirmar Contraseña *</label>
+                        <div class="password-input-wrapper">
+                            <input type="password" id="user-password-confirm-input" placeholder="Reingrese la contraseña">
+                            <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('user-password-confirm-input', this)" title="Mostrar/Ocultar contraseña">
+                                <span class="password-toggle-icon">👁️</span>
+                            </button>
+                        </div>
+                        <small id="password-match-message" style="display: none; color: #d32f2f;">Las contraseñas no coinciden</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="user-company-select">Empresa *</label>
+                        <select id="user-company-select" required>
+                            <option value="">Seleccione una empresa...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="user-active-input" checked>
+                            <span>Activo</span>
+                        </label>
+                    </div>
+                    <div id="user-form-error" class="form-error" style="display: none;"></div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" onclick="closeUserModal()">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">
+                            <span class="btn-text">Guardar Usuario</span>
+                            <span class="btn-loading" style="display: none;">Guardando...</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Client Add/Edit -->
+    <div id="client-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="client-modal-title">Agregar Cliente</h3>
+                <button class="modal-close" onclick="closeClientModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="client-form">
+                    <input type="hidden" id="client-edit-id" value="">
+                    <div class="form-group">
+                        <label for="client-id-input">ID de Cliente *</label>
+                        <input type="text" id="client-id-input" required placeholder="mi-cliente-app">
+                        <small>Solo caracteres alfanuméricos, guiones bajos y guiones</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="client-name-input">Nombre de Cliente *</label>
+                        <input type="text" id="client-name-input" required placeholder="Mi Aplicación Cliente">
+                    </div>
+                    <div class="form-group">
+                        <label for="client-secret-input">Secreto de Cliente *</label>
+                        <input type="text" id="client-secret-input" required placeholder="Mínimo 8 caracteres">
+                        <small>Mínimo 8 caracteres</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="client-redirect-uris-input">URI de Redirección *</label>
+                        <textarea id="client-redirect-uris-input" rows="3" required placeholder="https://ejemplo.com/auth/callback&#10;https://ejemplo.com/auth/callback2"></textarea>
+                        <small>Una URL por línea o separadas por comas</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="client-post-logout-uris-input">URI de Redirección Post-Logout</label>
+                        <textarea id="client-post-logout-uris-input" rows="2" placeholder="https://ejemplo.com/logout"></textarea>
+                        <small>Opcional: Una URL por línea o separadas por comas</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="client-grant-types-input">Tipos de Concesión</label>
+                        <input type="text" id="client-grant-types-input" placeholder="authorization_code">
+                        <small>Por defecto: authorization_code</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="client-auth-method-select">Método de Autenticación del Endpoint de Token</label>
+                        <select id="client-auth-method-select">
+                            <option value="client_secret_post">client_secret_post</option>
+                            <option value="client_secret_basic">client_secret_basic</option>
+                            <option value="none">none</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="client-frontend-url-input">URL Frontend</label>
+                        <input type="url" id="client-frontend-url-input" placeholder="https://ejemplo.com">
+                        <small>Opcional: URL de la aplicación frontend</small>
+                    </div>
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="client-active-input" checked>
+                            <span>Activo</span>
+                        </label>
+                    </div>
+                    <div id="client-form-error" class="form-error" style="display: none;"></div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" onclick="closeClientModal()">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">
+                            <span class="btn-text">Guardar Cliente</span>
+                            <span class="btn-loading" style="display: none;">Guardando...</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Grant Access -->
+    <div id="grant-access-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="grant-access-modal-title">Otorgar Acceso Empresa-Cliente</h3>
+                <button class="modal-close" onclick="closeGrantAccessModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="grant-access-form">
+                    <div class="form-group">
+                        <label for="grant-company-select">Empresa *</label>
+                        <select id="grant-company-select" required>
+                            <option value="">Seleccione una empresa...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="grant-client-select">Cliente *</label>
+                        <select id="grant-client-select" required>
+                            <option value="">Seleccione un cliente...</option>
+                        </select>
+                    </div>
+                    <div id="grant-access-form-error" class="form-error" style="display: none;"></div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" onclick="closeGrantAccessModal()">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">
+                            <span class="btn-text">Otorgar Acceso</span>
+                            <span class="btn-loading" style="display: none;">Otorgando...</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div id="confirm-modal" class="modal">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h3 id="confirm-title">Confirmar Acción</h3>
+            </div>
+            <div class="modal-body">
+                <p id="confirm-message"></p>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeConfirmModal()">Cancelar</button>
+                    <button type="button" class="btn btn-danger" id="confirm-action-btn">Confirmar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="admin.js"></script>
+</body>
+</html>

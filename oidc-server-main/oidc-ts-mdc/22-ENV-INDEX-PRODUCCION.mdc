@@ -1,0 +1,235 @@
+# Índice de Variables de Entorno - OIDC Server (Producción)
+
+## 📋 Resumen Ejecutivo
+
+Este documento proporciona un índice rápido de todas las variables de entorno necesarias para desplegar el sistema OIDC Server en producción.
+
+Para detalles completos de cada servicio, consulta:
+
+- [Provider OIDC](20-ENV-PROVIDER-PRODUCCION.mdc)
+- [Backend OIDC](21-ENV-BACKEND-PRODUCCION.mdc)
+
+---
+
+## 🗂️ Archivos `.env` por Servicio
+
+### 1. Provider OIDC
+
+**Archivo**: `provider/.env`  
+**Documentación**: [20-ENV-PROVIDER-PRODUCCION.mdc](20-ENV-PROVIDER-PRODUCCION.mdc)
+
+### 2. Backend OIDC
+
+**Archivo**: `backend/.env`  
+**Documentación**: [21-ENV-BACKEND-PRODUCCION.mdc](21-ENV-BACKEND-PRODUCCION.mdc)
+
+### 3. Frontend OIDC
+
+**Archivo**: No requiere `.env`  
+**Nota**: La configuración está hardcodeada en `frontend/src/app.js` y debe modificarse directamente en el código si se necesita cambiar.
+
+---
+
+## 📊 Tabla Rápida de Variables
+
+### Provider OIDC (`provider/.env`)
+
+| Variable       | Tipo   | Requerido      | Descripción                      |
+| -------------- | ------ | -------------- | -------------------------------- |
+| `PROVIDER_URL` | URL    | ✅ Sí          | URL pública del Provider (HTTPS) |
+| `DATABASE_URL` | String | ✅ Sí          | Connection string de PostgreSQL  |
+| `NODE_ENV`     | Enum   | ⚠️ Recomendado | `production`                     |
+| `PORT`         | Number | ❌ Opcional    | Puerto interno (default: 8080)   |
+
+**Total**: 2 requeridas, 2 opcionales/recomendadas
+
+---
+
+### Backend OIDC (`backend/.env`)
+
+| Variable                | Tipo   | Requerido      | Descripción                          |
+| ----------------------- | ------ | -------------- | ------------------------------------ |
+| `PROVIDER_EXTERNAL_URL` | URL    | ✅ Sí          | URL pública del Provider             |
+| `PROVIDER_INTERNAL_URL` | URL    | ⚠️ Condicional | URL interna del Provider (si aplica) |
+| `OIDC_CLIENT_ID`        | String | ✅ Sí          | ID del cliente OIDC                  |
+| `OIDC_CLIENT_SECRET`    | String | ✅ Sí          | Secreto del cliente OIDC             |
+| `OIDC_CALLBACK_URL`     | URL    | ✅ Sí          | URL de callback después de auth      |
+| `FRONTEND_URL`          | URL    | ✅ Sí          | URL del frontend                     |
+| `BACKEND_URL`           | URL    | ✅ Sí          | URL del backend                      |
+| `SESSION_SECRET`        | String | ✅ Sí          | Secreto para sesiones                |
+| `SESSION_DOMAIN`        | String | ⚠️ Condicional | Dominio de cookies (subdominios)     |
+| `TRUST_PROXY`           | String | ⚠️ Recomendado | `"1"` si usas reverse proxy          |
+| `PORT`                  | Number | ❌ Opcional    | Puerto interno (default: 8080)       |
+
+**Total**: 7 requeridas, 4 opcionales/condicionales
+
+---
+
+## 🎯 Configuración Mínima para Producción
+
+### Provider OIDC - Mínimo Requerido
+
+```env
+PROVIDER_URL=https://auth.acceleralia.com
+DATABASE_URL=postgresql://oidc_user:password@db.acceleralia.com:5432/oidc_db
+NODE_ENV=production
+```
+
+### Backend OIDC - Mínimo Requerido
+
+```env
+PROVIDER_EXTERNAL_URL=https://auth.acceleralia.com
+OIDC_CLIENT_ID=acceleralia-client
+OIDC_CLIENT_SECRET=TU_CLIENT_SECRET_SEGURO
+OIDC_CALLBACK_URL=https://api.acceleralia.com/auth/callback
+FRONTEND_URL=https://app.acceleralia.com
+BACKEND_URL=https://api.acceleralia.com
+SESSION_SECRET=TU_SESSION_SECRET_SEGURO
+TRUST_PROXY=1
+```
+
+---
+
+## 🔗 Dependencias entre Variables
+
+### Relación Provider ↔ Backend
+
+| Variable Provider | Variable Backend        | Relación                                  |
+| ----------------- | ----------------------- | ----------------------------------------- |
+| `PROVIDER_URL`    | `PROVIDER_EXTERNAL_URL` | **DEBEN ser iguales**                     |
+| -                 | `OIDC_CLIENT_ID`        | Debe existir en BD del Provider           |
+| -                 | `OIDC_CLIENT_SECRET`    | Debe coincidir con BD del Provider        |
+| -                 | `OIDC_CALLBACK_URL`     | Debe estar en `redirect_uris` del cliente |
+
+### Relación Backend ↔ Frontend
+
+| Variable Backend | Frontend                        | Relación                |
+| ---------------- | ------------------------------- | ----------------------- |
+| `FRONTEND_URL`   | `CONFIG.backendUrl` en `app.js` | Deben coincidir         |
+| `BACKEND_URL`    | -                               | URL pública del backend |
+
+---
+
+## ✅ Checklist Global de Deployment
+
+### Pre-Deployment
+
+- [ ] Todos los archivos `.env` creados y configurados
+- [ ] Todas las variables requeridas están presentes
+- [ ] Todas las URLs usan HTTPS
+- [ ] Todos los secretos son únicos y seguros (32+ caracteres)
+- [ ] `PROVIDER_URL` y `PROVIDER_EXTERNAL_URL` coinciden
+- [ ] Cliente OIDC configurado en BD del Provider
+- [ ] `OIDC_CALLBACK_URL` registrada en `redirect_uris`
+- [ ] `TRUST_PROXY=1` si usas reverse proxy
+
+### Verificación de Conectividad
+
+- [ ] Provider accesible en `PROVIDER_URL`
+- [ ] Backend accesible en `BACKEND_URL`
+- [ ] Base de datos PostgreSQL accesible
+- [ ] Frontend accesible (si aplica)
+
+### Seguridad
+
+- [ ] Archivos `.env` en `.gitignore`
+- [ ] Permisos restrictivos en archivos `.env` (`chmod 600`)
+- [ ] Secretos gestionados de forma segura
+- [ ] SSL/TLS configurado correctamente
+- [ ] Reverse proxy configurado (si aplica)
+
+---
+
+## 📝 Plantillas Rápidas
+
+### Provider - Producción Estándar
+
+```env
+PROVIDER_URL=https://auth.tudominio.com
+DATABASE_URL=postgresql://oidc_user:PASSWORD@db.tudominio.com:5432/oidc_db
+NODE_ENV=production
+```
+
+### Backend - Producción Estándar
+
+```env
+PROVIDER_EXTERNAL_URL=https://auth.tudominio.com
+OIDC_CLIENT_ID=tu-client-id
+OIDC_CLIENT_SECRET=TU_SECRET_32_CHARS_MIN
+OIDC_CALLBACK_URL=https://api.tudominio.com/auth/callback
+FRONTEND_URL=https://app.tudominio.com
+BACKEND_URL=https://api.tudominio.com
+SESSION_SECRET=TU_SESSION_SECRET_32_CHARS_MIN
+SESSION_DOMAIN=.tudominio.com
+TRUST_PROXY=1
+```
+
+---
+
+## 🔧 Generación Rápida de Secretos
+
+```bash
+# SESSION_SECRET
+echo "SESSION_SECRET=$(openssl rand -base64 32)"
+
+# OIDC_CLIENT_SECRET
+echo "OIDC_CLIENT_SECRET=$(openssl rand -base64 32)"
+
+# O ambos a la vez
+echo "SESSION_SECRET=$(openssl rand -base64 32)" >> backend/.env
+echo "OIDC_CLIENT_SECRET=$(openssl rand -base64 32)" >> backend/.env
+```
+
+---
+
+## 📚 Referencias por Servicio
+
+### Provider OIDC
+
+- [Documentación Completa](20-ENV-PROVIDER-PRODUCCION.mdc)
+- Variables requeridas: 2
+- Variables opcionales: 2
+
+### Backend OIDC
+
+- [Documentación Completa](21-ENV-BACKEND-PRODUCCION.mdc)
+- Variables requeridas: 7
+- Variables opcionales/condicionales: 4
+
+### Frontend OIDC
+
+- No requiere archivo `.env`
+- Configuración en: `frontend/src/app.js`
+- Modificar `CONFIG.backendUrl` y `CONFIG.providerUrl` directamente
+
+---
+
+## 🚨 Errores Comunes y Soluciones Rápidas
+
+### "PROVIDER_URL environment variable is required"
+
+- **Causa**: Variable no definida en `provider/.env`
+- **Solución**: Agregar `PROVIDER_URL=https://...`
+
+### "Redirect URI mismatch"
+
+- **Causa**: `OIDC_CALLBACK_URL` no coincide con BD
+- **Solución**: Verificar en BD: `SELECT redirect_uris FROM oidc_clients`
+
+### "Invalid client credentials"
+
+- **Causa**: `OIDC_CLIENT_ID` o `OIDC_CLIENT_SECRET` incorrectos
+- **Solución**: Verificar en BD y actualizar `.env`
+
+### URLs generadas son HTTP
+
+- **Causa**: `TRUST_PROXY=1` faltante o `PROVIDER_URL` usa HTTP
+- **Solución**: Configurar `TRUST_PROXY=1` y usar HTTPS en todas las URLs
+
+---
+
+## 📖 Documentación Adicional
+
+- [Guía de Deployment sin Docker](19-DEPLOYMENT-PRODUCCION-SIN-DOCKER.mdc)
+- [Guía de Testing Funcional](18-TESTING-FUNCIONAL.mdc)
+- [README Principal](../README.md)

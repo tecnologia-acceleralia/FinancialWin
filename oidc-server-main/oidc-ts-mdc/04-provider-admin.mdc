@@ -1,0 +1,13 @@
+# Title
+Admin DEV para usuarios (Provider, TS)
+
+# Summary
+Endpoints de desarrollo para listar/crear usuarios. **No exponer en producción**.
+
+# Endpoints
+- `GET /_admin/users` → lista `{ email, name, company_id }`.
+- `POST /_admin/users/create` → body JSON: `{ email, password, name, company_id }`.
+
+# Notas
+- Ya incluidos en `provider/src/server.ts` del .mdc anterior.
+- Base de datos: `better-sqlite3`, contraseñas con `bcrypt`.

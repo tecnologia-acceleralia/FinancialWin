@@ -1,0 +1,49 @@
+{
+  "name": "financial-win",
+  "version": "1.0.0",
+  "description": "financial-win Project - Base financial-win for full-stack applications with NestJS and React",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],"scripts": {
+    "dev": "concurrently \"pnpm --filter financial-win-api start:dev\" \"pnpm --filter financial-win-web dev\"",
+    "build": "pnpm --filter financial-win-api build && pnpm --filter financial-win-web build",
+    "test": "pnpm --filter financial-win-api test && pnpm --filter financial-win-web test",
+    "lint": "pnpm --filter financial-win-api lint && pnpm --filter financial-win-web lint",
+    "format": "pnpm --filter financial-win-api format && pnpm --filter financial-win-web format",
+    "format:check": "pnpm --filter financial-win-api format:check && pnpm --filter financial-win-web format:check",
+    "clean": "pnpm --filter financial-win-api clean && pnpm --filter financial-win-web clean",
+    "docker:dev": "./scripts/dev.sh",
+    "docker:dev:robust": "./scripts/dev-robust.sh",
+    "docker:clean": "./scripts/clean.sh",
+    "docker:stop": "docker-compose -f docker-compose.dev.yml down",
+    "docker:logs": "docker-compose -f docker-compose.dev.yml logs -f",
+    "migrate:prod": "./scripts/migrate-prod.sh",
+    "migrate:prod:revert": "./scripts/migrate-prod.sh revert",
+    "migrate:prod:status": "./scripts/migrate-prod.sh status",
+    "audit:controllers": "pnpm exec tsx scripts/audit-controllers.ts",
+    "audit:services": "pnpm exec tsx scripts/audit-services.ts",
+    "audit:all": "pnpm audit:controllers && pnpm audit:services",
+    "audit:security": "pnpm audit:all",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.6",
+    "prettier": "^3.6.2",
+    "tsx": "^4.19.2"
+  },
+  "packageManager": "pnpm@10.22.0",
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "lint-staged": {
+    "config": ".lintstagedrc.json",
+    "concurrent": false,
+    "verbose": true,
+    "stash": false
+  }
+}

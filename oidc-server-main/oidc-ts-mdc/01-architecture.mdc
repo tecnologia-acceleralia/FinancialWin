@@ -1,0 +1,51 @@
+# Title
+Arquitectura y objetivos del sistema OIDC local (TypeScript + Node.js LTS)
+
+# Summary
+Stack local en 3 servicios y 100% TypeScript (Node.js **22 LTS**):
+- **provider**: OpenID Provider con `oidc-provider`, usuarios en **SQLite**, passwords con **bcrypt**, flujo de interacción (login email+password).
+- **backend**: API Node/Express con **Passport OpenID Connect**; endpoints: `/auth/login`, `/auth/callback`, `/api/me`, `/auth/logout`.
+- **frontend**: HTML+JS simple servido por Nginx que consulta `/api/me` y redirige al login.
+- Dockerfile multi-servicio y `docker-compose.yml` para orquestación local.
+
+# FolderStructure
+openid-app/
+  provider/
+    src/server.ts
+    package.json
+    tsconfig.json
+    users.db (autogenerado)
+  backend/
+    src/server.ts
+    package.json
+    tsconfig.json
+  frontend/
+    index.html
+    app.js
+  Dockerfile
+  docker-compose.yml
+  .env
+  .gitignore
+  Makefile
+
+# Ports
+- Provider: 5000
+- Backend: 4000
+- Frontend: 3000
+
+# Auth Flow
+1. Frontend → `GET http://localhost:4000/api/me` con credenciales.
+2. Si 401 → redirige a `http://localhost:4000/auth/login`.
+3. Provider muestra formulario de login (email/password).
+4. Tras login → OIDC redirige a `/auth/callback` del backend.
+5. Backend serializa sesión y redirige al frontend.
+6. Frontend muestra nombre + `companyId`.
+
+# Claims
+- `sub` = email del usuario
+- `email`, `name`, `company_id`
+
+# SecurityNotes
+- Cookies de sesión: `SameSite=Lax`, `httpOnly`.
+- Producción: HTTPS + `cookie.secure=true` + `trust proxy`.
+- Secretos: `SESSION_SECRET` en `.env` (no commitear).

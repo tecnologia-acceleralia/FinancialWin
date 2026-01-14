@@ -1,0 +1,7 @@
+# Title
+Checklist de seguridad (MVP, TS)
+
+- `SESSION_SECRET` fuerte en `.env`.
+- Producción: reverse proxy TLS (Nginx/Traefik), `TRUST_PROXY=1`, cookies `secure`.
+- Hardening: `helmet`, `express-rate-limit`, logs sanitizados, no exponer admin DEV.
+- Rotación de secretos (SSM/Secrets Manager/Doppler).

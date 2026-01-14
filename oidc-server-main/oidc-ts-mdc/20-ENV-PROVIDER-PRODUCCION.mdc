@@ -1,0 +1,251 @@
+# Variables de Entorno - Provider OIDC (Producción)
+
+## 📋 Archivo: `provider/.env`
+
+Este documento describe todas las variables de entorno requeridas para desplegar el **Provider OIDC** en un ambiente de producción.
+
+---
+
+## 🔴 Variables Requeridas (Críticas)
+
+### `PROVIDER_URL` ✅ REQUERIDO
+
+**Descripción**: URL pública del Provider OIDC que será utilizada para generar metadata, tokens y todas las URLs OIDC.
+
+**Formato**: URL completa con protocolo (http/https)
+
+**Uso**:
+
+- Generación de metadata OIDC (`.well-known/openid-configuration`)
+- URLs en los tokens JWT generados
+- URLs de redirección para el navegador
+
+**Ejemplo Producción**:
+
+```env
+PROVIDER_URL=https://auth.acceleralia.com
+```
+
+**Ejemplo Desarrollo** (NO usar en producción):
+
+```env
+PROVIDER_URL=http://localhost:5009
+```
+
+**Importante**:
+
+- ✅ DEBE ser HTTPS en producción
+- ✅ DEBE ser accesible desde internet
+- ✅ NO debe tener trailing slash (`/`)
+- ✅ Esta URL debe coincidir con el dominio configurado en tu reverse proxy (nginx, etc.)
+
+---
+
+### `DATABASE_URL` ✅ REQUERIDO
+
+**Descripción**: String de conexión completo a la base de datos PostgreSQL.
+
+**Formato**: `postgresql://[usuario]:[password]@[host]:[puerto]/[database]`
+
+**Uso**:
+
+- Conexión a la base de datos PostgreSQL
+- Ejecución de migraciones
+- Acceso a usuarios, empresas, clientes OIDC
+
+**Ejemplo Producción - Base de datos externa**:
+
+```env
+DATABASE_URL=postgresql://oidc_user:TU_PASSWORD_SEGURO@db.acceleralia.com:5432/oidc_db
+```
+
+**Ejemplo Producción - Base de datos en servidor gestionado (AWS RDS, etc.)**:
+
+```env
+DATABASE_URL=postgresql://oidc_user:TU_PASSWORD_SEGURO@oidc-prod.c123.us-east-1.rds.amazonaws.com:5432/oidc_db
+```
+
+**Importante**:
+
+- ✅ La contraseña NO debe tener caracteres especiales que requieran encoding URL (mejor usar letras, números y símbolos simples)
+- ✅ Si la contraseña tiene caracteres especiales, usa `encodeURIComponent()` antes de construir la URL
+- ✅ En producción, la conexión usa SSL automáticamente (`NODE_ENV=production`)
+- ✅ El puerto estándar de PostgreSQL es `5432`
+
+---
+
+## 🟡 Variables Opcionales (Recomendadas)
+
+### `NODE_ENV` ⚠️ RECOMENDADO
+
+**Descripción**: Ambiente de ejecución del Node.js.
+
+**Valores posibles**:
+
+- `production` - Ambiente de producción (RECOMENDADO)
+- `development` - Ambiente de desarrollo (NO usar en producción)
+- `test` - Ambiente de testing
+
+**Uso**:
+
+- Controla si se habilita SSL para conexiones a PostgreSQL
+- Controla el nivel de logging
+- Controla características de seguridad
+
+**Ejemplo Producción**:
+
+```env
+NODE_ENV=production
+```
+
+**Efectos en producción**:
+
+- ✅ Habilita SSL para conexiones a PostgreSQL (`rejectUnauthorized: true`)
+- ✅ Desactiva logging detallado
+- ✅ Activa optimizaciones de producción
+
+**Recomendación**: SIEMPRE usar `production` en servidores de producción.
+
+---
+
+### `PORT` ⚠️ OPCIONAL
+
+**Descripción**: Puerto interno donde el servidor Express escuchará.
+
+**Formato**: Número entero (1-65535)
+
+**Uso**: Puerto interno del contenedor/servicio
+
+**Ejemplo**:
+
+```env
+PORT=8080
+```
+
+**Nota**:
+
+- Este es el puerto **interno** del servicio
+- En producción, normalmente se usa un reverse proxy (nginx) que mapea este puerto interno a un puerto público (80/443)
+- Si no se especifica, el código hardcodea el puerto `8080`
+- **Recomendación**: Dejar sin especificar o usar `8080` estándar
+
+---
+
+## 📝 Ejemplo Completo de `.env` para Producción
+
+```env
+# ============================================
+# OIDC PROVIDER - PRODUCCIÓN
+# ============================================
+
+# URL pública del Provider (REQUERIDO)
+# Debe ser HTTPS y accesible desde internet
+PROVIDER_URL=https://auth.acceleralia.com
+
+# Conexión a Base de Datos PostgreSQL (REQUERIDO)
+# Formato: postgresql://user:password@host:port/database
+DATABASE_URL=postgresql://oidc_user:TU_PASSWORD_SEGURO_MIN_32_CHARS@db.acceleralia.com:5432/oidc_db
+
+# Ambiente (RECOMENDADO)
+# Debe ser "production" en servidores de producción
+NODE_ENV=production
+
+# Puerto interno (OPCIONAL)
+# Puerto donde el servidor Express escucha internamente
+# Por defecto: 8080
+PORT=8080
+```
+
+---
+
+## ✅ Checklist de Configuración
+
+Antes de desplegar, verifica:
+
+- [ ] `PROVIDER_URL` usa HTTPS (`https://`)
+- [ ] `PROVIDER_URL` no tiene trailing slash
+- [ ] `PROVIDER_URL` es accesible desde internet
+- [ ] `DATABASE_URL` tiene credenciales correctas
+- [ ] `DATABASE_URL` apunta al servidor de producción (no localhost)
+- [ ] `NODE_ENV=production` está configurado
+- [ ] Las credenciales de base de datos son seguras
+- [ ] El servidor PostgreSQL está accesible desde el servidor donde corre el Provider
+- [ ] Los puertos de firewall están abiertos (si es necesario)
+
+---
+
+## 🔐 Consideraciones de Seguridad
+
+### Generación de Secretos
+
+Para generar contraseñas seguras para PostgreSQL:
+
+```bash
+# Generar contraseña segura
+openssl rand -base64 32
+
+# O usando Python
+python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
+### Protección de Variables
+
+- ✅ **NUNCA** commits el archivo `.env` al repositorio
+- ✅ Usa un sistema de gestión de secretos (AWS Secrets Manager, HashiCorp Vault, etc.)
+- ✅ Limita el acceso al archivo `.env` con permisos restrictivos (`chmod 600 provider/.env`)
+- ✅ Rotación periódica de contraseñas
+- ✅ Usa diferentes credenciales para producción y desarrollo
+
+---
+
+## 🔄 Diferencia entre Desarrollo y Producción
+
+| Variable       | Desarrollo                                               | Producción                                                        |
+| -------------- | -------------------------------------------------------- | ----------------------------------------------------------------- |
+| `PROVIDER_URL` | `http://localhost:5009`                                  | `https://auth.acceleralia.com`                                    |
+| `DATABASE_URL` | `postgresql://oidc_user:password@localhost:5437/oidc_db` | `postgresql://oidc_user:password@db.acceleralia.com:5432/oidc_db` |
+| `NODE_ENV`     | `development`                                            | `production`                                                      |
+| Protocolo SSL  | Desactivado                                              | Activado automáticamente                                          |
+
+---
+
+## 🐛 Troubleshooting
+
+### Error: "PROVIDER_URL environment variable is required"
+
+**Causa**: Variable no está definida o el archivo `.env` no se está cargando correctamente.
+
+**Solución**:
+
+1. Verificar que el archivo `provider/.env` existe
+2. Verificar que `PROVIDER_URL` está presente
+3. Verificar que no hay espacios extra: `PROVIDER_URL=https://auth.acceleralia.com` (sin espacios alrededor del `=`)
+4. Verificar la ubicación del archivo: debe estar en `provider/.env` (mismo directorio que `package.json`)
+
+### Error: "Cannot connect to database"
+
+**Causa**: `DATABASE_URL` incorrecto o PostgreSQL no accesible.
+
+**Solución**:
+
+1. Verificar formato de `DATABASE_URL`
+2. Verificar que PostgreSQL está corriendo
+3. Verificar credenciales (usuario, contraseña)
+4. Verificar acceso de red (firewall, security groups si es AWS)
+5. Probar conexión manual: `psql $DATABASE_URL`
+
+### URLs generadas son HTTP en vez de HTTPS
+
+**Causa**: `PROVIDER_URL` usa `http://` en vez de `https://`.
+
+**Solución**:
+
+- Cambiar `PROVIDER_URL` a usar HTTPS
+- Asegurarse de que el reverse proxy está configurado correctamente con SSL
+
+---
+
+## 📚 Referencias
+
+- [Guía de Deployment sin Docker](19-DEPLOYMENT-PRODUCCION-SIN-DOCKER.mdc)
+- [Documentación de PostgreSQL Connection Strings](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING)

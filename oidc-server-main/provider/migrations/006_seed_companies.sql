@@ -1,0 +1,2 @@
+-- Migration 006: Seed Companies
+-- No example companies seeded - companies should be created via admin panel

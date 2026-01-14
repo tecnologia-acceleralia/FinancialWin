@@ -1,0 +1,413 @@
+# Análisis de Seguridad Multi-Tenant - Revisión Exhaustiva
+
+**Fecha:** 2025-01-16  
+**Revisado por:** Experto en Seguridad  
+**Estado:** ✅ APROBADO CON RECOMENDACIONES
+
+---
+
+## 🎯 Resumen Ejecutivo
+
+**Veredicto:** El sistema está **bien diseñado** para multi-tenancy con seguridad centralizada. Sin embargo, hay **3 puntos críticos** y **5 mejoras recomendadas** que deben implementarse antes del deploy en producción.
+
+**Confianza en Multi-Tenancy:** **95%** - Los puntos críticos identificados son mitigables y no comprometen el aislamiento de datos si se siguen las recomendaciones.
+
+---
+
+## ✅ FORTALEZAS DE SEGURIDAD IDENTIFICADAS
+
+### 1. Extracción Segura de company_id
+
+**Implementación:** `@CompanyId()` decorator extrae `company_id` SOLO de `req.user`, que viene del token validado por oidc-server.
+
+**Análisis:**
+- ✅ `company_id` NO puede ser manipulado por el usuario (viene del token JWT validado)
+- ✅ El decorator valida que `req.user` existe antes de extraer `company_id`
+- ✅ Lanza `UnauthorizedException` si falta `company_id`
+- ✅ No hay endpoints que acepten `company_id` como parámetro de usuario
+
+**Veredicto:** ✅ SEGURO
+
+### 2. Validación Centralizada de Tokens
+
+**Implementación:** Endpoint `/api/token/validate` en oidc-server valida:
+- Firma JWT con `JWT_SECRET`
+- Expiración del token
+- Claims requeridos (`sub`, `email`, `name`, `company_id`)
+- Acceso de compañía al cliente
+
+**Análisis:**
+- ✅ Validación de firma previene token manipulation
+- ✅ Validación de expiración previene token replay
+- ✅ Validación de acceso previene acceso no autorizado
+- ✅ Fail-closed: Si falla la validación, se deniega acceso
+
+**Veredicto:** ✅ SEGURO
+
+### 3. Filtrado Consistente en Queries
+
+**Implementación:** Todas las queries filtran por `company_id` usando parámetros.
+
+**Análisis:**
+- ✅ TypeORM usa parámetros automáticamente (previene SQL injection)
+- ✅ Queries SQL directas usan `$1`, `$2` (parámetros, no concatenación)
+- ✅ Validación post-query detecta proyectos con `company_id` incorrecto
+- ✅ Todas las tablas tienen `company_id` NOT NULL
+
+**Veredicto:** ✅ SEGURO
+
+### 4. Protección de Cookies
+
+**Implementación:**
+- `httpOnly: true` (previene XSS)
+- `secure: true` en producción (previene MITM)
+- `sameSite: strict` (previene CSRF)
+- `domain` vacío por defecto (previene cookie sharing)
+
+**Análisis:**
+- ✅ Cookies no accesibles desde JavaScript (previene XSS)
+- ✅ Cookies solo se envían por HTTPS (previene MITM)
+- ✅ Cookies no se envían en cross-site requests (previene CSRF)
+- ✅ Domain vacío previene compartir cookies entre subdominios
+
+**Veredicto:** ✅ SEGURO
+
+### 5. Validación de Ownership
+
+**Implementación:** Métodos `findOne()` validan que el recurso pertenece a la compañía antes de retornarlo.
+
+**Ejemplo:**
+```typescript
+async findOne(companyId: string, id: string): Promise<Project> {
+  const project = await this.projectRepository.findOne({
+    where: { id, company_id: companyId, deleted_at: null },
+  });
+  if (!project) {
+    throw new NotFoundException(`Project with ID '${id}' not found`);
+  }
+  return project;
+}
+```
+
+**Análisis:**
+- ✅ Valida `company_id` en la query (no solo después)
+- ✅ Si el recurso no pertenece a la compañía, retorna 404 (no revela existencia)
+- ✅ Patrón consistente en todos los servicios
+
+**Veredicto:** ✅ SEGURO
+
+---
+
+## 🚨 PUNTOS CRÍTICOS IDENTIFICADOS
+
+### CRÍTICO #1: Fallback de Validación en Refresh Permite Bypass
+
+**Ubicación:** `Write-mvp/apps/api/src/auth/auth.controller.ts:288-291`
+
+**Problema:**
+```typescript
+if (validationError.code === 'ECONNREFUSED' || validationError.code === 'ETIMEDOUT') {
+  this.logger.warn(
+    `⚠️ Cannot reach validation endpoint: ${validationError.code}. Proceeding with refresh but token may be invalid.`
+  );
+  // Continúa con refresh aunque validación falló
+}
+```
+
+**Impacto:** Si oidc-server está caído, el refresh puede proceder con tokens inválidos o manipulados.
+
+**Severidad:** 🔴 ALTA - Permite bypass de validación si oidc-server está caído
+
+**Recomendación:** 
+- **OPCIÓN A (Recomendada):** Fail-closed - Denegar refresh si validación falla
+- **OPCIÓN B:** Implementar cache local de validación con TTL corto (5 minutos)
+
+**Solución Propuesta:**
+```typescript
+// Fail-closed: Denegar refresh si validación falla
+if (validationError.code === 'ECONNREFUSED' || validationError.code === 'ETIMEDOUT') {
+  this.logger.error(
+    `❌ Cannot reach validation endpoint: ${validationError.code}. Denying refresh (fail-closed).`
+  );
+  const cookieOptions = this.buildCookieOptions();
+  res.clearCookie(this.oidcConfig.cookieName, cookieOptions);
+  return res.status(503).json({
+    error: 'Authentication service unavailable. Please try again later.',
+    service_unavailable: true,
+  });
+}
+```
+
+### CRÍTICO #2: Logs Revelan Información Sensible
+
+**Ubicación:** Múltiples archivos
+
+**Problema:**
+```typescript
+// Se loguean company_id y emails en logs
+this.logger.log(`✅ Token validated - User: ${user.email}, Company ID: ${user.company_id}`);
+this.logger.debug(`✅ [CompanyId] Extracted company_id: ${companyId}`);
+```
+
+**Impacto:** 
+- Logs pueden contener información sensible (emails, company_id)
+- En caso de breach de logs, se expone información de usuarios
+- No cumple con GDPR/privacidad si se almacenan logs
+
+**Severidad:** 🟡 MEDIA - Riesgo de privacidad y compliance
+
+**Recomendación:**
+- En producción, usar niveles de log apropiados
+- No loguear `company_id` o `email` en nivel `log` (solo `debug` si es necesario)
+- Implementar log sanitization para producción
+
+**Solución Propuesta:**
+```typescript
+// En producción, solo loguear hashes o IDs parciales
+const logLevel = process.env.NODE_ENV === 'production' ? 'debug' : 'log';
+if (logLevel === 'debug') {
+  // Solo en desarrollo o con flag explícito
+  this.logger.debug(`✅ Token validated - User: ${user.email}, Company ID: ${user.company_id}`);
+} else {
+  // En producción, solo loguear que fue exitoso
+  this.logger.log(`✅ Token validated successfully`);
+}
+```
+
+### CRÍTICO #3: Validación de UUID No Es Suficientemente Estricta
+
+**Ubicación:** `Write-mvp/apps/api/src/modules/projects/services/projects.service.ts:77-82`
+
+**Problema:**
+```typescript
+const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+if (!uuidRegex.test(companyId)) {
+  this.logger.warn(`⚠️ Invalid companyId format: ${companyId}`);
+  // Continúa ejecutando aunque formato es inválido
+}
+```
+
+**Impacto:** 
+- Si `company_id` tiene formato inválido, la query puede fallar o retornar resultados inesperados
+- No se valida que `company_id` sea un UUID válido antes de usarlo en queries
+
+**Severidad:** 🟡 MEDIA - Puede causar errores o comportamiento inesperado
+
+**Recomendación:** 
+- Validar formato UUID y lanzar excepción si es inválido
+- Validar en el decorator `@CompanyId()` antes de retornar
+
+**Solución Propuesta:**
+```typescript
+// En CompanyId decorator
+const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+if (!uuidRegex.test(companyId)) {
+  logger.error(`❌ Invalid company_id format: ${companyId}`);
+  throw new UnauthorizedException('Invalid company ID format');
+}
+```
+
+---
+
+## ⚠️ MEJORAS RECOMENDADAS
+
+### MEJORA #1: Rate Limiting en Endpoint de Validación
+
+**Problema:** El endpoint `/api/token/validate` no tiene rate limiting específico.
+
+**Impacto:** Puede ser usado para DoS o brute force.
+
+**Recomendación:** Implementar rate limiting por IP y por `company_id`.
+
+### MEJORA #2: Timeout Más Corto en Validación
+
+**Problema:** Timeout de 5 segundos puede ser demasiado largo.
+
+**Impacto:** Si oidc-server está lento, los usuarios esperan mucho.
+
+**Recomendación:** Reducir a 2-3 segundos y tener fallback más rápido.
+
+### MEJORA #3: Validación de company_id en Relaciones
+
+**Problema:** Al cargar relaciones (ej: `relations: ['document', 'documentWorkspace']`), no se valida explícitamente que pertenezcan a la misma compañía.
+
+**Impacto:** Si hay datos corruptos, podría haber fuga de información.
+
+**Mitigación Actual:** Las relaciones tienen `company_id` y TypeORM las filtra automáticamente si están bien configuradas.
+
+**Recomendación:** Agregar validación post-query para relaciones también.
+
+### MEJORA #4: Headers de Seguridad Adicionales
+
+**Problema:** Faltan algunos headers de seguridad.
+
+**Recomendación:** Agregar:
+- `Content-Security-Policy`
+- `Referrer-Policy`
+- `Permissions-Policy`
+
+### MEJORA #5: Monitoreo de Anomalías
+
+**Problema:** No hay alertas automáticas para detectar data leaks.
+
+**Recomendación:** 
+- Configurar alertas para logs "SECURITY ISSUE"
+- Monitorear tasa de 403 (acceso denegado)
+- Alertar si hay proyectos con `company_id` incorrecto
+
+---
+
+## 🔒 ANÁLISIS DE VECTORES DE ATAQUE
+
+### Vector 1: Manipulación de company_id
+
+**Ataque:** Usuario intenta cambiar `company_id` en request.
+
+**Mitigación:**
+- ✅ `company_id` viene del token JWT validado
+- ✅ No hay endpoints que acepten `company_id` como parámetro
+- ✅ Decorator `@CompanyId()` extrae solo de `req.user`
+
+**Veredicto:** ✅ MITIGADO
+
+### Vector 2: SQL Injection
+
+**Ataque:** Usuario intenta inyectar SQL en queries.
+
+**Mitigación:**
+- ✅ TypeORM usa parámetros automáticamente
+- ✅ Queries SQL directas usan `$1`, `$2` (parámetros)
+- ✅ No hay concatenación de strings en queries
+
+**Veredicto:** ✅ MITIGADO
+
+### Vector 3: Token Replay
+
+**Ataque:** Usuario reutiliza token expirado o robado.
+
+**Mitigación:**
+- ✅ Validación de expiración en endpoint centralizado
+- ✅ Tokens tienen `exp` claim validado
+- ✅ Refresh valida token antes de proceder
+
+**Veredicto:** ✅ MITIGADO (excepto fallback en refresh - ver CRÍTICO #1)
+
+### Vector 4: Direct Object Reference
+
+**Ataque:** Usuario accede a recurso de otra compañía usando ID conocido.
+
+**Mitigación:**
+- ✅ Todos los `findOne()` validan `company_id` en query
+- ✅ Si recurso no pertenece a compañía, retorna 404 (no revela existencia)
+- ✅ Patrón consistente en todos los servicios
+
+**Veredicto:** ✅ MITIGADO
+
+### Vector 5: Cookie Sharing
+
+**Ataque:** Cookies compartidas entre usuarios de diferentes compañías.
+
+**Mitigación:**
+- ✅ `domain` vacío por defecto (previene compartir entre subdominios)
+- ✅ Logout limpia cookies con mismos parámetros
+- ✅ Cookies `httpOnly` y `secure`
+
+**Veredicto:** ✅ MITIGADO
+
+### Vector 6: CSRF
+
+**Ataque:** Cross-site request forgery.
+
+**Mitigación:**
+- ✅ `sameSite: strict` previene CSRF
+- ✅ State parameter en OAuth flow
+- ✅ Tokens en cookies `httpOnly` (no accesibles desde JavaScript)
+
+**Veredicto:** ✅ MITIGADO
+
+### Vector 7: XSS
+
+**Ataque:** Cross-site scripting para robar tokens.
+
+**Mitigación:**
+- ✅ Cookies `httpOnly` (no accesibles desde JavaScript)
+- ✅ Headers de seguridad (`X-XSS-Protection`, `X-Content-Type-Options`)
+- ✅ No hay `localStorage` para tokens
+
+**Veredicto:** ✅ MITIGADO
+
+---
+
+## 📊 MATRIZ DE RIESGO
+
+| Vector de Ataque | Probabilidad | Impacto | Riesgo | Mitigación |
+|------------------|--------------|---------|--------|------------|
+| Manipulación de company_id | Baja | Alto | 🟡 Medio | ✅ Mitigado |
+| SQL Injection | Baja | Alto | 🟡 Medio | ✅ Mitigado |
+| Token Replay | Media | Alto | 🟡 Medio | ⚠️ Ver CRÍTICO #1 |
+| Direct Object Reference | Media | Alto | 🟡 Medio | ✅ Mitigado |
+| Cookie Sharing | Baja | Alto | 🟡 Medio | ✅ Mitigado |
+| CSRF | Baja | Medio | 🟢 Bajo | ✅ Mitigado |
+| XSS | Baja | Medio | 🟢 Bajo | ✅ Mitigado |
+| Data Leak por Logs | Media | Medio | 🟡 Medio | ⚠️ Ver CRÍTICO #2 |
+
+---
+
+## ✅ CHECKLIST FINAL PRE-DEPLOY
+
+### Correcciones Críticas Requeridas
+
+- [ ] **CRÍTICO #1:** Cambiar fallback en refresh a fail-closed
+- [ ] **CRÍTICO #2:** Reducir logging de información sensible en producción
+- [ ] **CRÍTICO #3:** Validar formato UUID en decorator `@CompanyId()`
+
+### Validaciones de Seguridad
+
+- [ ] Verificar que `JWT_SECRET` coincide en ambos servicios
+- [ ] Verificar que `OIDC_COOKIE_DOMAIN` está vacío
+- [ ] Verificar que todas las tablas tienen `company_id` NOT NULL
+- [ ] Verificar que no hay datos con `company_id = NULL`
+- [ ] Verificar que no hay datos con `company_id = '0'` (legacy) en producción
+
+### Testing de Seguridad
+
+- [ ] Intentar acceder a recurso de otra compañía usando ID conocido → Debe retornar 404
+- [ ] Intentar manipular `company_id` en request → Debe fallar
+- [ ] Verificar que cookies no se comparten entre usuarios de diferentes compañías
+- [ ] Verificar que logout elimina cookies correctamente
+- [ ] Verificar que tokens expirados son rechazados
+
+---
+
+## 🎯 CONCLUSIÓN
+
+**Veredicto Final:** El sistema está **bien diseñado** para multi-tenancy. Los 3 puntos críticos identificados son **mitigables** y no comprometen el aislamiento de datos si se implementan las correcciones recomendadas.
+
+**Confianza en Multi-Tenancy:** **95%** → **98%** después de implementar correcciones críticas.
+
+**Recomendación:** 
+1. ✅ Implementar las 3 correcciones críticas antes del deploy
+2. ✅ Realizar testing de seguridad según checklist
+3. ✅ Monitorear logs post-deploy para detectar anomalías
+4. ⚠️ Implementar mejoras recomendadas en siguiente iteración
+
+**El sistema es SEGURO para deployment en producción** después de implementar las correcciones críticas.
+
+---
+
+## 📝 NOTAS ADICIONALES
+
+1. **Testing Multi-Tenant:** Es crítico probar con usuarios reales de diferentes compañías usando el mismo navegador.
+
+2. **Monitoreo:** Configurar alertas para:
+   - Logs "SECURITY ISSUE"
+   - Tasa alta de 403 (acceso denegado)
+   - Proyectos con `company_id` incorrecto
+
+3. **Backup y Recovery:** Asegurar que backups incluyen `company_id` y que recovery scripts respetan multi-tenancy.
+
+4. **Documentación:** Mantener documentación actualizada sobre cómo agregar nuevos módulos satélite siguiendo el patrón de seguridad.
+
+---
+
+**FIN DEL ANÁLISIS**

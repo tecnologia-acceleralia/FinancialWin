@@ -1,0 +1,81 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: oidc-postgres
+    environment:
+      POSTGRES_DB: oidc_db
+      POSTGRES_USER: oidc_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-oidc_password_dev}
+      PGPORT: 5437
+    ports:
+      - "5437:5437"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U oidc_user -d oidc_db -p 5437"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Provider OIDC
+  provider:
+    build:
+      context: .
+      dockerfile: Dockerfile.provider
+    command: npm run dev
+    ports:
+      - "5009:8080"
+    env_file:
+      - "./provider/.env"
+    # environment:
+      # - NODE_ENV=development
+      # - DATABASE_URL=postgresql://oidc_user:${POSTGRES_PASSWORD:-oidc_password_dev}@postgres:5437/oidc_db
+    volumes:
+      # Mount source code for hot reload
+      - ./provider/src:/app/provider/src:ro
+      # Mount admin panel for hot reload
+      - ./provider/admin-panel:/app/provider/admin-panel:ro
+      # Prevent node_modules from being overwritten by host
+      - /app/provider/node_modules
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Backend API
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    command: npm run dev
+    ports:
+      - "4009:8080"
+    env_file:
+      - "./backend/.env"
+    # environment:
+      # - NODE_ENV=development
+      # - OIDC_PROVIDER_HOST=provider
+    volumes:
+      # Mount source code for hot reload
+      - ./backend/src:/app/backend/src:ro
+      # Prevent node_modules from being overwritten by host
+      - /app/backend/node_modules
+    restart: unless-stopped
+    depends_on:
+      - provider
+
+  # Frontend estático con Nginx
+  frontend:
+    image: nginx:alpine
+    ports:
+      - "3008:80"
+    volumes:
+      - ./frontend/src:/usr/share/nginx/html:ro
+    restart: unless-stopped
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+    driver: local

@@ -1,0 +1,311 @@
+# Cursor Rules - Seguridad y Autenticación
+
+## Stack Tecnológico
+- **Autenticación**: OIDC (OpenID Connect) + Passport + JWT
+- **Autorización**: Guards de NestJS
+- **Validación**: Zod schemas
+- **Rate Limiting**: @nestjs/throttler
+- **Seguridad HTTP**: Helmet, CORS
+
+## Autenticación OIDC
+
+### Configuración
+- Configuración en `common/config/oidc.config.ts`
+- Endpoints de autenticación en `auth/` module
+- Guard principal: `OIDCAuthGuard`
+
+### Flujo de Autenticación
+1. Cliente obtiene token JWT del proveedor OIDC
+2. Token se envía en header `Authorization: Bearer <token>`
+3. `OIDCAuthGuard` valida el token
+4. Información del usuario se extrae del token
+5. `company_id` se obtiene del token y se inyecta vía `@CompanyId()` decorator
+
+### Uso en Controladores
+```typescript
+@Controller('protected')
+@UseGuards(OIDCAuthGuard)
+@ApiBearerAuth('JWT-auth')
+export class ProtectedController {
+  @Get()
+  getData(@CompanyId() companyId: string) {
+    // companyId viene del token JWT validado
+    return this.service.getData(companyId);
+  }
+}
+```
+
+### Reglas de Autenticación
+- **SIEMPRE** usar `@UseGuards(OIDCAuthGuard)` en endpoints protegidos
+- **SIEMPRE** usar `@ApiBearerAuth('JWT-auth')` para documentación Swagger
+- **NUNCA** confiar en `company_id` del body/query - siempre usar `@CompanyId()`
+- Validar tokens en cada request
+- Tokens expirados deben retornar 401
+
+## Multi-tenancy y Seguridad
+
+### Company ID
+```typescript
+// ✅ CORRECTO - Usar decorator @CompanyId()
+@Get()
+getData(@CompanyId() companyId: string) {
+  return this.service.findAll(companyId);
+}
+
+// ❌ INCORRECTO - Confiar en company_id del body
+@Post()
+createData(@Body() data: { company_id: string, ... }) {
+  return this.service.create(data.company_id, data); // PELIGROSO
+}
+```
+
+### Reglas de Multi-tenancy
+- **SIEMPRE** usar `@CompanyId()` decorator para obtener company_id
+- **SIEMPRE** filtrar consultas por `company_id`
+- **NUNCA** permitir que un usuario acceda a datos de otro company
+- Validar que el usuario pertenece al company antes de operaciones sensibles
+- Usar parámetros en queries, nunca interpolación
+
+### Ejemplo de Query Segura
+```typescript
+// ✅ CORRECTO
+async findAll(companyId: string) {
+  return this.repository.find({
+    where: {
+      company_id: companyId,  // Siempre filtrar por company_id del token
+      is_active: true,
+    },
+  });
+}
+
+// ❌ INCORRECTO - Sin filtro de company_id
+async findAll() {
+  return this.repository.find(); // Expone datos de todos los companies
+}
+```
+
+## Validación de Inputs
+
+### Zod Schemas
+- **SIEMPRE** validar todos los inputs del usuario
+- Usar schemas Zod de `@financial-win/shared-types`
+- Validar en controladores con `ZodValidationPipe`
+
+```typescript
+// ✅ CORRECTO
+@Post()
+create(
+  @CompanyId() companyId: string,
+  @Body(new ZodValidationPipe(createUserSchema)) data: CreateUser
+) {
+  return this.service.create(companyId, data);
+}
+```
+
+### Reglas de Validación
+- **NUNCA** confiar en datos del cliente sin validar
+- Validar tipos, rangos, formatos
+- Sanitizar inputs cuando sea necesario
+- Validar longitud de strings
+- Validar formatos de email, URL, etc.
+
+### SQL Injection Prevention
+```typescript
+// ✅ CORRECTO - Usar parámetros
+const result = await this.repository
+  .createQueryBuilder('entity')
+  .where('entity.company_id = :companyId', { companyId })
+  .getMany();
+
+// ❌ INCORRECTO - Interpolación de strings
+const result = await this.repository
+  .query(`SELECT * FROM entities WHERE company_id = '${companyId}'`);
+```
+
+## Rate Limiting
+
+### Configuración
+- Configurado globalmente con `@nestjs/throttler`
+- Aplicado automáticamente a todos los endpoints
+- Configurable vía variables de entorno
+
+### Configuración Actual
+```typescript
+ThrottlerModule.forRoot([
+  {
+    ttl: 10 * 1000,  // 10 segundos
+    limit: 3,        // 3 requests por ventana
+  },
+])
+```
+
+### Reglas
+- Rate limiting aplicado automáticamente
+- Protege contra DDoS y abuse
+- Configurar límites apropiados según el endpoint
+- Considerar límites más estrictos para endpoints sensibles
+
+## Headers de Seguridad
+
+### Helmet
+- Configurado en `main.ts`
+- Protege contra varios ataques web comunes
+- Headers de seguridad HTTP
+
+### CORS
+- Configurado apropiadamente
+- Solo permitir orígenes específicos en producción
+- No usar `origin: '*'` en producción
+
+## Manejo de Secrets
+
+### Variables de Entorno
+- **NUNCA** commitear secrets, tokens, o API keys
+- Usar variables de entorno para toda configuración sensible
+- Validar que `.env` está en `.gitignore`
+- Usar diferentes variables para desarrollo/producción
+
+### Secrets Comunes
+- `JWT_SECRET`: Secret para firmar tokens JWT
+- `DATABASE_URL` o credenciales DB: Credenciales de base de datos
+- `OIDC_CLIENT_SECRET`: Secret del cliente OIDC
+- API keys de servicios externos
+
+### Reglas
+- Validar que secrets existen al iniciar la aplicación
+- Usar servicios de gestión de secrets en producción (AWS Secrets Manager, etc.)
+- Rotar secrets regularmente
+- No hardcodear secrets en código
+
+## Logging y Auditoría
+
+### Logging Seguro
+```typescript
+// ✅ CORRECTO - No loggear información sensible
+this.logger.log(`User ${userId} performed action`, 'Context');
+
+// ❌ INCORRECTO - Loggear tokens o passwords
+this.logger.log(`Token: ${token}`, 'Auth'); // PELIGROSO
+```
+
+### Reglas de Logging
+- **NUNCA** loggear passwords, tokens, o información sensible
+- Loggear acciones importantes para auditoría
+- Usar niveles apropiados (log, warn, error)
+- Incluir contexto relevante
+
+### Auditoría
+- Interceptor de auditoría para acciones importantes
+- Registrar quién hizo qué y cuándo
+- Mantener logs de auditoría por tiempo apropiado
+
+## Error Handling Seguro
+
+### No Exponer Información Sensible
+```typescript
+// ✅ CORRECTO - Error genérico al usuario
+throw new NotFoundException('Resource not found');
+
+// ❌ INCORRECTO - Exponer detalles internos
+throw new Error(`Database error: ${dbError.message}`);
+```
+
+### Reglas
+- No exponer detalles internos en errores
+- Usar mensajes genéricos para usuarios
+- Loggear detalles técnicos internamente
+- No exponer stack traces en producción
+
+## File Access y Storage
+
+### Guards de Archivo
+- `FileAccessGuard`: Verifica permisos de acceso a archivos
+- Validar que el usuario tiene acceso al archivo solicitado
+- Verificar `company_id` del archivo contra el usuario
+
+### Reglas de Storage
+- Validar tipos de archivos permitidos
+- Limitar tamaño de archivos
+- Escanear archivos por malware cuando sea posible
+- No permitir ejecución de archivos subidos
+
+## HTTPS y SSL
+
+### Producción
+- **SIEMPRE** usar HTTPS en producción
+- Configurar SSL/TLS apropiadamente
+- Certificados válidos y actualizados
+- Redirigir HTTP a HTTPS
+
+### Base de Datos
+- Usar conexiones SSL para base de datos en producción
+- Validar certificados cuando sea posible
+- Configurar `rejectUnauthorized: false` solo cuando sea necesario (self-signed certs)
+
+## Autenticación en Frontend
+
+### Token Storage
+- **NUNCA** almacenar tokens en localStorage (vulnerable a XSS)
+- Usar httpOnly cookies cuando sea posible
+- Si se usa localStorage, implementar protección XSS
+
+### API Client
+- Incluir token en header `Authorization` automáticamente
+- Manejar refresh tokens apropiadamente
+- Logout y limpiar tokens en caso de error 401
+
+## Validación de Permisos
+
+### Autorización
+- Verificar permisos además de autenticación
+- Implementar roles si es necesario
+- Verificar que el usuario tiene permiso para la acción específica
+
+```typescript
+// Ejemplo de autorización
+@UseGuards(OIDCAuthGuard, RolesGuard)
+@Roles('admin')
+@Delete(':id')
+delete(@CompanyId() companyId: string, @Param('id') id: string) {
+  // Solo admins pueden eliminar
+}
+```
+
+## Checklist de Seguridad
+
+Antes de desplegar, verificar:
+- [ ] Todos los endpoints protegidos tienen `@UseGuards(OIDCAuthGuard)`
+- [ ] Todos usan `@CompanyId()` en lugar de body/query
+- [ ] Todas las queries filtran por `company_id`
+- [ ] Todos los inputs están validados con Zod
+- [ ] No hay interpolación de strings en queries SQL
+- [ ] Secrets están en variables de entorno, no en código
+- [ ] Logs no contienen información sensible
+- [ ] Errores no exponen detalles internos
+- [ ] Rate limiting está configurado
+- [ ] HTTPS está habilitado en producción
+- [ ] CORS está configurado apropiadamente
+- [ ] Headers de seguridad están configurados (Helmet)
+
+## Comandos de Auditoría
+
+```bash
+# Auditar controladores
+pnpm audit:controllers
+
+# Auditar servicios
+pnpm audit:services
+
+# Auditar todo
+pnpm audit:all
+```
+
+## Incidentes de Seguridad
+
+Si se detecta una vulnerabilidad:
+1. **NO** commitear información sensible a repositorio público
+2. Reportar inmediatamente al equipo
+3. Crear fix urgente si es crítico
+4. Documentar el incidente
+5. Rotar secrets comprometidos
+6. Revisar logs para actividad sospechosa

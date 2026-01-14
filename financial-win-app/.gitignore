@@ -1,0 +1,70 @@
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+
+# Testing
+coverage
+*.lcov
+.nyc_output
+
+# Production builds
+dist/
+build/
+*.tsbuildinfo
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.dev
+.env.prod
+.env.*.local
+
+# IDE
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Configuración de aplicación (puede contener información sensible)
+.app-config
+
+# Reportes de auditoría (generados automáticamente)
+security-audit-report.md
+security-audit-report.json
+services-audit-report.md
+services-audit-report.json
+
+# Temporary files
+*.tmp
+*.temp
+.cache
+
+# Docker
+.dockerignore
+
+# Uploads (si se almacenan localmente)
+uploads/
+*.upload
