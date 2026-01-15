@@ -113,9 +113,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, isO
 
       <div className={`sidebar-inner ${isOpen ? 'sidebar-inner-open' : 'sidebar-inner-closed'}`}>
         <div className={`sidebar-header ${isOpen ? 'sidebar-header-open' : 'sidebar-header-closed'}`}>
-          <div className="sidebar-logo-container">
+            <div className="sidebar-logo-container">
             <div className="sidebar-logo-icon-wrapper">
-              <span className="sidebar-logo-icon">all_inclusive</span>
+              <span className="material-symbols-outlined sidebar-logo-icon">all_inclusive</span>
             </div>
             <h1 className={`sidebar-logo-text ${isOpen ? 'sidebar-logo-text-open' : 'sidebar-logo-text-closed'}`}>
                 FinancialWin
@@ -142,7 +142,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, isO
                   title={!isOpen ? item.label : ''}
                 >
                   <div className={`sidebar-item-content ${!isOpen && 'sidebar-item-content-closed'}`}>
-                    <span className={`sidebar-item-icon ${isOpen ? 'sidebar-item-icon-open' : ''} ${isSelected ? 'sidebar-item-icon-active' : 'sidebar-item-icon-inactive'}`}>
+                    <span className={`material-symbols-outlined sidebar-item-icon ${isOpen ? 'sidebar-item-icon-open' : ''} ${isSelected ? 'sidebar-item-icon-active' : 'sidebar-item-icon-inactive'}`}>
                       {item.icon}
                     </span>
                     <span className={`sidebar-item-label ${isOpen ? 'sidebar-item-label-open' : 'sidebar-item-label-closed'}`}>
@@ -151,7 +151,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, isO
                   </div>
                   
                   {hasSubItems && isOpen && (
-                    <span className={`sidebar-item-expand-icon ${isExpanded ? 'sidebar-item-expand-icon-expanded' : ''} ${isSelected ? 'sidebar-item-expand-icon-active' : 'sidebar-item-expand-icon-inactive'}`}>
+                    <span className={`material-symbols-outlined sidebar-item-expand-icon ${isExpanded ? 'sidebar-item-expand-icon-expanded' : ''} ${isSelected ? 'sidebar-item-expand-icon-active' : 'sidebar-item-expand-icon-inactive'}`}>
                       expand_more
                     </span>
                   )}
@@ -172,18 +172,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, isO
                                 >
                                     <div className="sidebar-subitem-content">
                                         {sub.icon ? (
-                                            <span className="sidebar-subitem-icon">{sub.icon}</span>
+                                            <span className="material-symbols-outlined sidebar-subitem-icon">{sub.icon}</span>
                                         ) : (
                                             <>
-                                                {sub.action === 'create' && <span className="sidebar-subitem-icon">add</span>}
-                                                {sub.action === 'list' && <span className="sidebar-subitem-icon">list</span>}
-                                                {sub.action === 'records' && <span className="sidebar-subitem-icon">table_chart</span>}
+                                                {sub.action === 'create' && <span className="material-symbols-outlined sidebar-subitem-icon">add</span>}
+                                                {sub.action === 'list' && <span className="material-symbols-outlined sidebar-subitem-icon">list</span>}
+                                                {sub.action === 'records' && <span className="material-symbols-outlined sidebar-subitem-icon">table_chart</span>}
                                             </>
                                         )}
-                                        {sub.label}
+                                        <span>{sub.label}</span>
                                     </div>
                                     {hasThirdLevel && (
-                                        <span className={`sidebar-subitem-expand-icon ${isSubExpanded ? 'sidebar-subitem-expand-icon-expanded' : ''}`}>
+                                        <span className={`material-symbols-outlined sidebar-subitem-expand-icon ${isSubExpanded ? 'sidebar-subitem-expand-icon-expanded' : ''}`}>
                                             expand_more
                                         </span>
                                     )}
@@ -221,7 +221,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, isO
                 className={`sidebar-footer-button ${isOpen ? 'sidebar-footer-button-open' : 'sidebar-footer-button-closed'}`}
                 title={!isOpen ? t('nav.settings') : ''}
             >
-                <span className={`sidebar-footer-icon ${isOpen ? 'sidebar-footer-icon-open' : ''}`}>settings</span>
+                <span className={`material-symbols-outlined sidebar-footer-icon ${isOpen ? 'sidebar-footer-icon-open' : ''}`}>settings</span>
                 <span className={`sidebar-footer-label ${isOpen ? 'sidebar-footer-label-open' : 'sidebar-footer-label-closed'}`}>{t('nav.settings')}</span>
             </button>
             
@@ -229,7 +229,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, isO
                 className={`sidebar-footer-button ${isOpen ? 'sidebar-footer-button-open' : 'sidebar-footer-button-closed'}`}
                 title={!isOpen ? t('nav.help') : ''}
             >
-                <span className={`sidebar-footer-icon ${isOpen ? 'sidebar-footer-icon-open' : ''}`}>help</span>
+                <span className={`material-symbols-outlined sidebar-footer-icon ${isOpen ? 'sidebar-footer-icon-open' : ''}`}>help</span>
                 <span className={`sidebar-footer-label ${isOpen ? 'sidebar-footer-label-open' : 'sidebar-footer-label-closed'}`}>{t('nav.help')}</span>
             </button>
         </div>

@@ -142,15 +142,51 @@
 
   /* AI Studio - Contenedores y Layout */
   .studio-container {
-    @apply w-full flex flex-col min-h-0;
+    @apply w-full h-full flex flex-col min-h-0;
   }
 
+  /* Modo Claro por defecto */
   .studio-card {
-    @apply bg-white dark:bg-[#131B29] rounded-3xl shadow-sm border border-[#e5e5e5] dark:border-[#2A3B5A] flex flex-col h-full overflow-hidden;
+    @apply border border-slate-200 shadow-sm transition-all duration-300 rounded-3xl p-8 flex flex-col h-full;
+    background-color: #ffffff;
+    color: #0f172a; /* text-slate-900 */
+  }
+
+  /* Forzar que CUALQUIER texto dentro de la card sea oscuro en modo claro */
+  .studio-card h1, 
+  .studio-card h2, 
+  .studio-card h3, 
+  .studio-card h4, 
+  .studio-card p, 
+  .studio-card div, 
+  .studio-card span:not(.material-symbols-outlined) {
+    @apply text-slate-900;
+  }
+
+  /* Modo Oscuro */
+  .dark .studio-card {
+    @apply border-[#2A3B5A] shadow-none;
+    background-color: #131B29;
+    color: #ffffff;
+  }
+
+  .dark .studio-card h1, 
+  .dark .studio-card h2, 
+  .dark .studio-card h3, 
+  .dark .studio-card h4, 
+  .dark .studio-card p, 
+  .dark .studio-card div, 
+  .dark .studio-card span:not(.material-symbols-outlined) {
+    @apply text-white;
+  }
+
+  /* Banner Hero - Siempre oscuro, nunca usa studio-card */
+  .brand-hero-card {
+    @apply lg:col-span-2 bg-gradient-to-r from-[#581c87] to-indigo-900 rounded-2xl p-8 text-white shadow-card relative overflow-hidden;
   }
 
   .studio-kpi-card {
-    @apply bg-white dark:bg-[#131B29] rounded-2xl p-6 border border-[#e5e5e5] dark:border-[#2A3B5A] shadow-sm flex flex-col justify-between h-full hover:shadow-lg transition-all cursor-default;
+    @apply bg-white dark:bg-[#131B29] rounded-2xl p-6 border border-[#e5e5e5] dark:border-[#2A3B5A] shadow-card flex flex-col justify-between h-full hover:shadow-lg transition-all cursor-default group;
   }
 
   /* Shadow utilities */
@@ -164,7 +200,7 @@
 
   /* AI Studio - Botones */
   .btn-studio-back {
-    @apply p-3 rounded-full bg-white dark:bg-[#1B273B] border border-[#e5e5e5] dark:border-[#2A3B5A] text-[#525252] dark:text-[#d4d4d4] hover:bg-[#fafafa] dark:hover:bg-[#2A3B5A] transition-colors shadow-md;
+    @apply p-3 rounded-full bg-white dark:bg-[#1B273B] border border-[#e5e5e5] dark:border-[#2A3B5A] text-[#525252] dark:text-[#d4d4d4] hover:bg-[#fafafa] dark:hover:bg-[#2A3B5A] transition-colors shadow-md group;
   }
 
   .btn-ai-primary {
@@ -406,7 +442,7 @@
 
   /* AI Studio - Cola de Procesamiento */
   .queue-item {
-    @apply w-full flex items-center gap-3 p-3 rounded-lg text-left transition-all relative overflow-hidden;
+    @apply w-full flex items-center gap-3 p-3 rounded-lg text-left transition-all relative overflow-hidden group;
   }
 
   .queue-item-active {
@@ -440,7 +476,7 @@
 
   /* Botón toggle del sidebar */
   .sidebar-toggle-button {
-    @apply absolute -right-3 top-7 z-50 bg-white dark:bg-[#131B29] text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-[#2A3B5A] rounded-full p-1 shadow-md hover:text-brand-500 transition-colors hidden md:flex items-center justify-center w-6 h-6;
+    @apply absolute -right-3 top-7 z-50 bg-white dark:bg-[#131B29] text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-[#2A3B5A] rounded-full p-1 shadow-md hover:text-[#b84e9d] transition-colors hidden md:flex items-center justify-center w-6 h-6;
   }
 
   /* Contenedor interno del sidebar */
@@ -529,7 +565,7 @@
   }
 
   .sidebar-item-active {
-    @apply bg-brand-500 text-white shadow-md shadow-[#b84e9d]/20;
+    @apply bg-[#b84e9d] text-white shadow-md shadow-[#b84e9d]/20;
   }
 
   .sidebar-item-inactive {
@@ -810,7 +846,7 @@
   }
 
   .layout-logo-icon {
-    @apply text-white font-bold text-sm;
+    @apply material-symbols-outlined text-white font-bold text-sm;
   }
 
   .layout-logo-text {
@@ -841,6 +877,707 @@
   /* Main content area */
   .layout-main {
     @apply h-[calc(100vh-4rem)] w-full overflow-x-hidden bg-[#0B1018];
+  }
+
+  /* ============================================
+     TopBar - Clases Semánticas
+     ============================================ */
+
+  /* Contenedor principal del TopBar */
+  .topbar-header {
+    @apply h-20 bg-white/80 dark:bg-[#0B1018]/80 backdrop-blur-md border-b border-[#1E293B] flex items-center justify-between px-4 md:px-8 sticky top-0 z-40 transition-colors;
+  }
+
+  .topbar-backdrop {
+    @apply fixed inset-0 z-40 bg-transparent;
+  }
+
+  /* Contenedor izquierdo del TopBar */
+  .topbar-left {
+    @apply flex items-center gap-4;
+  }
+
+  .topbar-toggle-btn {
+    @apply md:hidden p-2 rounded-lg text-gray-400 hover:bg-[#1E293B] transition-colors;
+  }
+
+  .topbar-toggle-icon {
+    @apply material-symbols-outlined text-2xl;
+  }
+
+  .topbar-title-container {
+    @apply flex flex-col;
+  }
+
+  .topbar-title {
+    @apply text-xl md:text-2xl font-poppins font-semibold text-white leading-tight truncate max-w-[200px] md:max-w-none;
+  }
+
+  .topbar-subtitle {
+    @apply text-xs text-gray-400 font-medium hidden md:block mt-0.5;
+  }
+
+  /* Contenedor derecho del TopBar */
+  .topbar-right {
+    @apply flex items-center gap-2 md:gap-3;
+  }
+
+  /* Botones de acción (theme, notifications) */
+  .topbar-action-btn {
+    @apply w-9 h-9 rounded-xl bg-[#131B29] border border-[#1E293B] text-gray-300 hover:text-[#b84e9d] hover:border-[#b84e9d]/30 transition-colors shadow-sm flex items-center justify-center;
+  }
+
+  .topbar-action-btn-active {
+    @apply topbar-action-btn bg-[#b84e9d]/10 border-[#b84e9d]/30 text-[#b84e9d];
+  }
+
+  .topbar-action-icon {
+    @apply material-symbols-outlined text-[20px];
+  }
+
+  /* Botón de notificaciones con badge */
+  .topbar-notif-btn {
+    @apply relative topbar-action-btn;
+  }
+
+  .topbar-notif-badge {
+    @apply absolute top-2 right-2.5 w-1.5 h-1.5 bg-red-500 rounded-full ring-1 ring-[#0B1018];
+  }
+
+  /* Dropdown panels */
+  .topbar-dropdown-panel {
+    @apply absolute right-0 top-full mt-3 w-80 sm:w-96 max-w-[calc(100vw-2rem)] bg-[#131B29] rounded-xl shadow-xl border border-[#1E293B] z-50 overflow-hidden transition-all duration-200 ease-out;
+  }
+
+  .topbar-dropdown-header {
+    @apply flex items-center justify-between px-4 py-3 border-b border-[#1E293B];
+  }
+
+  .topbar-dropdown-title {
+    @apply font-bold text-white;
+  }
+
+  .topbar-dropdown-action {
+    @apply text-xs text-[#b84e9d] font-bold hover:underline;
+  }
+
+  /* Contenedor de lista scrollable */
+  .topbar-dropdown-list {
+    @apply max-h-[400px] overflow-y-auto;
+  }
+
+  /* Items de notificación */
+  .topbar-notif-item {
+    @apply p-4 border-b border-[#1E293B] hover:bg-[#1E293B]/50 cursor-pointer transition-colors;
+  }
+
+  .topbar-notif-item-unread {
+    @apply topbar-notif-item bg-[#b84e9d]/5;
+  }
+
+  .topbar-notif-content {
+    @apply flex gap-3;
+  }
+
+  .topbar-notif-icon-wrapper {
+    @apply mt-1 p-1.5 rounded-full h-fit shrink-0;
+  }
+
+  .topbar-notif-icon-error {
+    @apply topbar-notif-icon-wrapper bg-red-500/20 text-red-400;
+  }
+
+  .topbar-notif-icon-warning {
+    @apply topbar-notif-icon-wrapper bg-orange-500/20 text-orange-400;
+  }
+
+  .topbar-notif-icon-info {
+    @apply topbar-notif-icon-wrapper bg-blue-500/20 text-blue-400;
+  }
+
+  .topbar-notif-icon {
+    @apply material-symbols-outlined text-sm font-bold;
+  }
+
+  .topbar-notif-details {
+    @apply flex-1;
+  }
+
+  .topbar-notif-title {
+    @apply text-sm font-bold text-white;
+  }
+
+  .topbar-notif-desc {
+    @apply text-xs text-gray-400 mt-0.5;
+  }
+
+  .topbar-notif-time {
+    @apply text-[10px] text-gray-500 mt-1;
+  }
+
+  .topbar-notif-unread-dot {
+    @apply ml-auto w-2 h-2 rounded-full bg-[#b84e9d] mt-2;
+  }
+
+  /* Footer de dropdown */
+  .topbar-dropdown-footer {
+    @apply p-2 text-center bg-[#0B1018] border-t border-[#1E293B];
+  }
+
+  .topbar-dropdown-footer-btn {
+    @apply text-xs font-bold text-gray-300 hover:text-[#b84e9d] py-2 w-full rounded-lg hover:bg-[#1E293B] transition-colors;
+  }
+
+  /* User dropdown trigger */
+  .topbar-user-trigger {
+    @apply flex items-center gap-2 rounded-full p-1 pr-1 md:pr-3 hover:bg-[#1E293B] transition-all border border-transparent hover:border-[#1E293B] relative ml-0 md:ml-2;
+  }
+
+  .topbar-user-avatar {
+    @apply w-9 h-9 rounded-full border border-[#1E293B] shadow-sm;
+  }
+
+  .topbar-user-info {
+    @apply hidden sm:flex flex-col items-start;
+  }
+
+  .topbar-user-name {
+    @apply text-xs font-bold text-gray-200 group-hover:text-white;
+  }
+
+  .topbar-user-role {
+    @apply text-[10px] text-gray-400;
+  }
+
+  .topbar-user-expand-icon {
+    @apply material-symbols-outlined text-gray-400 text-lg sm:ml-1 hidden sm:block;
+  }
+
+  /* User dropdown panel */
+  .topbar-user-dropdown {
+    @apply topbar-dropdown-panel w-80;
+  }
+
+  .topbar-user-header {
+    @apply p-4 flex flex-col items-center border-b border-[#1E293B];
+  }
+
+  .topbar-user-avatar-large {
+    @apply relative mb-3;
+  }
+
+  .topbar-user-avatar-img {
+    @apply w-20 h-20 rounded-full border-4 border-[#0B1018] shadow-md;
+  }
+
+  .topbar-user-avatar-edit {
+    @apply absolute bottom-0 right-0 p-1.5 bg-[#131B29] rounded-full text-white shadow-sm border border-[#1E293B] hover:bg-[#1E293B];
+  }
+
+  .topbar-user-avatar-edit-icon {
+    @apply material-symbols-outlined text-sm;
+  }
+
+  .topbar-user-header-name {
+    @apply text-lg font-bold text-white;
+  }
+
+  .topbar-user-header-email {
+    @apply text-sm text-gray-400 mb-4;
+  }
+
+  .topbar-user-manage-btn {
+    @apply px-6 py-2 rounded-full border border-[#1E293B] text-sm font-bold text-gray-200 hover:bg-[#1E293B] transition-colors;
+  }
+
+  /* User dropdown menu items */
+  .topbar-user-menu {
+    @apply py-2;
+  }
+
+  .topbar-user-menu-item {
+    @apply w-full text-left px-6 py-3 flex items-center gap-4 hover:bg-[#1E293B]/50 transition-colors;
+  }
+
+  .topbar-user-menu-icon {
+    @apply material-symbols-outlined text-gray-400 group-hover:text-white;
+  }
+
+  .topbar-user-menu-text {
+    @apply text-sm font-medium text-gray-300 group-hover:text-white;
+  }
+
+  /* User dropdown logout */
+  .topbar-user-logout-section {
+    @apply border-t border-[#1E293B] p-2;
+  }
+
+  .topbar-user-logout-btn {
+    @apply w-full py-3 rounded-xl flex items-center justify-center gap-2 hover:bg-[#1E293B]/50 transition-colors text-gray-300 hover:text-red-400;
+  }
+
+  .topbar-user-logout-icon {
+    @apply material-symbols-outlined text-xl;
+  }
+
+  .topbar-user-logout-text {
+    @apply text-sm font-bold;
+  }
+
+  /* User dropdown policy footer */
+  .topbar-user-policy-footer {
+    @apply bg-[#0B1018] py-2 text-center border-t border-[#1E293B];
+  }
+
+  .topbar-user-policy-text {
+    @apply text-[10px] text-gray-500;
+  }
+
+  /* ============================================
+     AppLayout - Clases Semánticas
+     ============================================ */
+
+  /* Contenedor principal del layout de aplicación */
+  .layout-wrapper {
+    @apply flex h-screen overflow-hidden transition-colors duration-300;
+  }
+
+  /* Backdrop móvil para cerrar sidebar */
+  .layout-backdrop {
+    @apply fixed inset-0 bg-black/50 z-20 md:hidden transition-opacity duration-300;
+  }
+
+  .layout-backdrop-visible {
+    @apply opacity-100 pointer-events-auto;
+  }
+
+  .layout-backdrop-hidden {
+    @apply opacity-0 pointer-events-none;
+  }
+
+  /* Contenedor principal del contenido */
+  .layout-main-content {
+    @apply flex flex-col flex-1 min-w-0 overflow-hidden relative transition-all duration-300;
+  }
+
+  /* Contenedor de la página (main + wrapper interno) */
+  .layout-page-container {
+    @apply flex-1 overflow-y-auto p-4 md:p-8 scroll-smooth;
+  }
+
+  .layout-page-inner {
+    @apply w-[98%] mx-auto h-full flex flex-col;
+  }
+
+  .layout-page-content {
+    @apply flex-1;
+  }
+
+  /* Footer del layout */
+  .layout-footer {
+    @apply mt-auto py-6 border-t border-[#1E293B] text-center text-sm text-gray-400;
+  }
+
+  /* ============================================
+     Auth - Clases Semánticas
+     ============================================ */
+
+  /* Pantalla de carga de autenticación */
+  .auth-loading-screen {
+    @apply flex items-center justify-center min-h-screen bg-[#0B1018];
+  }
+
+  .auth-loading-container {
+    @apply text-center;
+  }
+
+  .auth-loading-spinner {
+    @apply animate-spin rounded-full h-12 w-12 border-b-2 border-[#B84E9D] mx-auto;
+  }
+
+  .auth-loading-text {
+    @apply mt-4 text-gray-300;
+  }
+
+  .auth-loading-subtext {
+    @apply mt-2 text-sm text-gray-400;
+  }
+
+  /* Card de información de usuario */
+  .auth-user-container {
+    @apply flex items-center space-x-3;
+  }
+
+  .auth-user-card {
+    @apply flex items-center space-x-2 px-3 py-2 bg-[#131B29] rounded-lg border border-[#2A3B5A];
+  }
+
+  .auth-user-avatar {
+    @apply w-8 h-8 bg-gradient-to-br from-[#b84e9d] to-purple-700 rounded-full flex items-center justify-center;
+  }
+
+  .auth-user-avatar-text {
+    @apply text-white font-bold text-xs;
+  }
+
+  .auth-user-info {
+    @apply flex flex-col;
+  }
+
+  .auth-user-name {
+    @apply text-sm font-medium text-white;
+  }
+
+  .auth-user-email {
+    @apply text-xs text-gray-400;
+  }
+
+  .auth-user-logout-btn {
+    @apply flex items-center space-x-1 px-3 py-2 text-sm font-medium text-gray-400 hover:text-white hover:bg-[#1E293B] rounded-lg transition-colors;
+  }
+
+  .auth-user-logout-icon {
+    @apply material-symbols-outlined h-4 w-4;
+  }
+
+  /* ============================================
+     HomePage - Clases Semánticas
+     ============================================ */
+
+  /* Contenedor principal de la página */
+  .home-container {
+    @apply space-y-8 animate-fade-in;
+  }
+
+  /* Grid principal de hero */
+  .home-hero-grid {
+    @apply grid grid-cols-1 lg:grid-cols-3 gap-6;
+  }
+
+  /* Banner Hero - Siempre oscuro (usar brand-hero-card en su lugar) - Clase eliminada, usar .brand-hero-card */
+
+  .home-hero-decoration-1 {
+    @apply absolute -top-12 -right-12 w-48 h-48 bg-white opacity-5 rounded-full blur-2xl;
+  }
+
+  .home-hero-decoration-2 {
+    @apply absolute bottom-0 right-20 w-32 h-32 bg-[#b84e9d] opacity-20 rounded-full blur-xl;
+  }
+
+  .home-hero-content {
+    @apply relative z-10;
+  }
+
+  .home-hero-title {
+    @apply text-5xl font-poppins font-bold mb-3;
+  }
+
+  .home-hero-text {
+    @apply text-[#fce7f3] text-base mb-8 max-w-lg leading-relaxed;
+  }
+
+  .home-hero-button {
+    @apply px-5 py-3 bg-white text-[#581c87] font-semibold text-base rounded-xl shadow-md hover:bg-[#fdf2f8] transition-colors flex items-center gap-2;
+  }
+
+  .home-hero-button-icon {
+    @apply material-symbols-outlined text-base;
+  }
+
+  /* Card de próximos vencimientos */
+  .home-next-due-card {
+    @apply studio-card rounded-2xl p-6 flex flex-col justify-between hover:shadow-lg transition-shadow duration-300;
+  }
+
+  .home-next-due-label {
+    @apply flex items-center justify-between mb-4;
+  }
+
+  .home-next-due-badge {
+    @apply text-xs font-bold text-orange-600 bg-orange-50 dark:bg-orange-900/30 px-2 py-1 rounded-md uppercase tracking-wider;
+  }
+
+  .home-next-due-icon {
+    @apply material-symbols-outlined text-gray-400;
+  }
+
+  .home-next-due-title {
+    @apply text-2xl font-bold font-poppins text-slate-900 dark:text-white mb-2;
+  }
+
+  .home-next-due-time {
+    @apply text-base text-gray-500;
+  }
+
+  .home-next-due-progress-container {
+    @apply mt-4;
+  }
+
+  .home-next-due-progress-bar {
+    @apply w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2 mb-2;
+  }
+
+  .home-next-due-progress-fill {
+    @apply bg-orange-500 h-2 rounded-full w-3/4;
+  }
+
+  .home-next-due-progress-text {
+    @apply text-xs text-slate-600 dark:text-gray-500 text-right;
+  }
+
+  /* Sección de acceso rápido */
+  .home-shortcuts-section {
+    @apply mt-8 mb-6;
+  }
+
+  .home-shortcuts-title {
+    @apply text-2xl font-poppins font-semibold;
+    color: #0f172a !important; /* text-slate-900 - Forzar negro en modo claro */
+  }
+
+  .dark .home-shortcuts-title {
+    color: #ffffff !important; /* text-white - Forzar blanco en modo oscuro */
+  }
+
+  .home-shortcuts-grid {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4;
+  }
+
+  /* Cards de acceso rápido */
+  .home-quick-access-card {
+    @apply cursor-pointer studio-card p-5 rounded-2xl hover:shadow-xl hover:-translate-y-1 transition-all duration-300;
+  }
+
+  .home-quick-access-icon-wrapper {
+    @apply w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-colors shrink-0;
+  }
+
+  .home-quick-access-icon-wrapper-amber {
+    @apply home-quick-access-icon-wrapper bg-amber-50 dark:bg-amber-900/20 group-hover:bg-amber-500;
+  }
+
+  .home-quick-access-icon-wrapper-cyan {
+    @apply home-quick-access-icon-wrapper bg-cyan-50 dark:bg-cyan-900/20 group-hover:bg-cyan-500;
+  }
+
+  .home-quick-access-icon-wrapper-purple {
+    @apply home-quick-access-icon-wrapper bg-purple-50 dark:bg-purple-900/20 group-hover:bg-[#b84e9d];
+  }
+
+  .home-quick-access-icon-wrapper-blue {
+    @apply home-quick-access-icon-wrapper bg-blue-50 dark:bg-blue-900/20 group-hover:bg-blue-500;
+  }
+
+  .home-quick-access-icon-wrapper-emerald {
+    @apply home-quick-access-icon-wrapper bg-emerald-50 dark:bg-emerald-900/20 group-hover:bg-emerald-500;
+  }
+
+  .home-quick-access-icon {
+    @apply material-symbols-outlined;
+  }
+
+  .home-quick-access-icon-amber {
+    @apply home-quick-access-icon text-amber-600 dark:text-amber-400 group-hover:text-white;
+  }
+
+  .home-quick-access-icon-cyan {
+    @apply home-quick-access-icon text-cyan-600 dark:text-cyan-400 group-hover:text-white;
+  }
+
+  .home-quick-access-icon-purple {
+    @apply home-quick-access-icon text-[#a21caf] dark:text-[#f472b6] group-hover:text-white;
+  }
+
+  .home-quick-access-icon-blue {
+    @apply home-quick-access-icon text-blue-600 dark:text-blue-400 group-hover:text-white;
+  }
+
+  .home-quick-access-icon-emerald {
+    @apply home-quick-access-icon text-emerald-600 dark:text-emerald-400 group-hover:text-white;
+  }
+
+  .home-quick-access-title {
+    @apply font-bold text-lg mb-2 text-slate-900 dark:text-white leading-tight;
+  }
+
+  .home-quick-access-desc {
+    @apply text-sm text-slate-600 dark:text-gray-500 mb-4 flex-1;
+  }
+
+  .home-quick-access-footer {
+    @apply flex items-center gap-2 mt-auto;
+  }
+
+  .home-quick-access-badge {
+    @apply px-2 py-1 text-[10px] font-bold rounded;
+  }
+
+  .home-quick-access-badge-gray {
+    @apply home-quick-access-badge bg-slate-100/50 dark:bg-gray-700 text-slate-600 dark:text-gray-300;
+  }
+
+  .home-quick-access-badge-red {
+    @apply home-quick-access-badge bg-red-50 dark:bg-red-900/20 text-red-600;
+  }
+
+  .home-quick-access-badge-green {
+    @apply home-quick-access-badge bg-green-50 dark:bg-green-900/20 text-green-600;
+  }
+
+  /* Grid de resumen y alertas */
+  .home-summary-grid {
+    @apply grid grid-cols-1 lg:grid-cols-3 gap-8;
+  }
+
+  /* Card de resumen operacional */
+  .home-summary-card {
+    @apply lg:col-span-2 studio-card rounded-2xl;
+  }
+
+  .home-summary-title {
+    @apply text-xl font-bold font-poppins mb-6 text-slate-900 dark:text-white;
+  }
+
+  .home-summary-list {
+    @apply space-y-4;
+  }
+
+  .home-summary-item {
+    @apply flex items-center justify-between p-4 rounded-xl bg-slate-50 dark:bg-secondary-900/50 hover:bg-slate-100 dark:hover:bg-[#1a2333] transition-colors;
+  }
+
+  .home-summary-indicator {
+    @apply w-2 h-12 rounded-full;
+  }
+
+  .home-summary-indicator-success {
+    @apply home-summary-indicator bg-green-500;
+  }
+
+  .home-summary-indicator-warning {
+    @apply home-summary-indicator bg-orange-500;
+  }
+
+  .home-summary-indicator-neutral {
+    @apply home-summary-indicator bg-blue-500;
+  }
+
+  .home-summary-item-content {
+    @apply flex items-center gap-4;
+  }
+
+  .home-summary-item-text {
+    @apply font-semibold text-base text-slate-900 dark:text-white;
+  }
+
+  .home-summary-item-subtext {
+    @apply text-sm text-slate-500 dark:text-slate-400;
+  }
+
+  /* Clase centralizada para cifras monetarias */
+  .summary-amount {
+    @apply text-slate-900 dark:text-white font-bold;
+  }
+
+  .home-summary-item-amount {
+    @apply summary-amount text-xl;
+  }
+
+  .home-summary-item-change {
+    @apply text-xs font-bold;
+  }
+
+  .home-summary-item-change-positive {
+    @apply home-summary-item-change text-green-700 dark:text-green-400;
+  }
+
+  .home-summary-item-change-negative {
+    @apply home-summary-item-change text-red-600 dark:text-red-400;
+  }
+
+  /* Panel de alertas */
+  .home-alerts-card {
+    @apply studio-card rounded-2xl;
+  }
+
+  .home-alerts-header {
+    @apply flex items-center justify-between mb-6;
+  }
+
+  .home-alerts-title {
+    @apply text-xl font-bold font-poppins text-slate-900 dark:text-white;
+  }
+
+  .home-alerts-view-all {
+    @apply text-xs text-[#b84e9d] font-bold cursor-pointer hover:underline;
+  }
+
+  .home-alerts-list {
+    @apply space-y-3;
+  }
+
+  .home-alert-item {
+    @apply p-3 rounded-xl flex gap-3;
+  }
+
+  .home-alert-item-error {
+    @apply home-alert-item bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30;
+  }
+
+  .home-alert-item-warning {
+    @apply home-alert-item bg-orange-50 dark:bg-orange-900/10 border border-orange-100 dark:border-orange-900/30;
+  }
+
+  .home-alert-item-info {
+    @apply home-alert-item bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30;
+  }
+
+  .home-alert-icon {
+    @apply material-symbols-outlined;
+  }
+
+  .home-alert-icon-error {
+    @apply home-alert-icon text-red-600;
+  }
+
+  .home-alert-icon-warning {
+    @apply home-alert-icon text-orange-600;
+  }
+
+  .home-alert-icon-info {
+    @apply home-alert-icon text-blue-600;
+  }
+
+  .home-alert-title {
+    @apply text-base font-bold;
+  }
+
+  .home-alert-title-error {
+    @apply home-alert-title text-red-900 dark:text-red-100;
+  }
+
+  .home-alert-title-warning {
+    @apply home-alert-title text-orange-900 dark:text-orange-100;
+  }
+
+  .home-alert-title-info {
+    @apply home-alert-title text-blue-900 dark:text-blue-100;
+  }
+
+  .home-alert-desc {
+    @apply text-xs;
+  }
+
+  .home-alert-desc-error {
+    @apply home-alert-desc text-red-700 dark:text-red-300;
+  }
+
+  .home-alert-desc-warning {
+    @apply home-alert-desc text-orange-700 dark:text-orange-300;
+  }
+
+  .home-alert-desc-info {
+    @apply home-alert-desc text-blue-700 dark:text-blue-300;
   }
 }
 

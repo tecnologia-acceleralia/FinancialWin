@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 import { ViewState } from '../../../types';
+import { useTheme } from '../../../contexts/ThemeContext';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -11,6 +12,7 @@ interface AppLayoutProps {
 
 export const AppLayout: React.FC<AppLayoutProps> = ({ children, currentView, onNavigate }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const { theme } = useTheme();
 
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
 
@@ -23,14 +25,16 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, currentView, onN
     }
   };
 
+  const backgroundColor = theme === 'dark' ? '#0B1018' : '#F8FAFC';
+
   return (
-    <div className="flex h-screen overflow-hidden bg-neutral-50 dark:bg-secondary-900 transition-colors duration-200">
-      
+    <div 
+      className="layout-wrapper transition-colors duration-300"
+      style={{ backgroundColor }}
+    >
       {/* Mobile Backdrop */}
       <div 
-        className={`fixed inset-0 bg-black/50 z-20 md:hidden transition-opacity duration-300 ${
-          isSidebarOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-        }`} 
+        className={`layout-backdrop ${isSidebarOpen ? 'layout-backdrop-visible' : 'layout-backdrop-hidden'}`}
         onClick={() => setIsSidebarOpen(false)} 
       />
 
@@ -43,8 +47,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, currentView, onN
       />
 
       {/* Main Content Wrapper */}
-      <div className="flex flex-col flex-1 min-w-0 overflow-hidden relative transition-all duration-300">
-        
+      <div className="layout-main-content">
         {/* Top Bar with Toggle Trigger */}
         <TopBar 
           currentView={currentView} 
@@ -52,19 +55,18 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, currentView, onN
         />
 
         {/* Scrollable Content Area */}
-        <main className="flex-1 overflow-y-auto p-4 md:p-8 scroll-smooth">
-          <div className="w-[98%] mx-auto h-full flex flex-col">
-            <div className="flex-1">
+        <main className="layout-page-container">
+          <div className="layout-page-inner">
+            <div className="layout-page-content">
               {children}
             </div>
             
             {/* Static Footer */}
-            <footer className="mt-auto py-6 border-t border-gray-200 dark:border-secondary-border text-center text-sm text-gray-500 dark:text-gray-400">
+            <footer className="layout-footer">
               <p>© 2025 FinancialWin. Todos los derechos reservados.</p>
             </footer>
           </div>
         </main>
-        
       </div>
     </div>
   );

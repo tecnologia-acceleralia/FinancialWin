@@ -25,26 +25,26 @@ export function UserInfo() {
   console.log('👤 UserInfo: Showing user info for:', user.name);
 
   return (
-    <div className="flex items-center space-x-3">
-      <div className="flex items-center space-x-2 px-3 py-2 bg-gray-50 rounded-lg">
-        <div className="w-8 h-8 bg-gradient-to-br from-primary-500 to-primary-600 rounded-full flex items-center justify-center">
-          <span className="text-white font-bold text-xs">
+    <div className="auth-user-container">
+      <div className="auth-user-card">
+        <div className="auth-user-avatar">
+          <span className="auth-user-avatar-text">
             {user.name?.charAt(0).toUpperCase() || 'U'}
           </span>
         </div>
-        <div className="flex flex-col">
-          <span className="text-sm font-medium text-gray-900">{user.name}</span>
-          <span className="text-xs text-gray-500">{user.email}</span>
+        <div className="auth-user-info">
+          <span className="auth-user-name">{user.name}</span>
+          <span className="auth-user-email">{user.email}</span>
         </div>
       </div>
 
       <button
         onClick={logout}
-        className="flex items-center space-x-1 px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
+        className="auth-user-logout-btn"
         title="Cerrar Sesión"
       >
         <svg
-          className="h-4 w-4"
+          className="auth-user-logout-icon"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"

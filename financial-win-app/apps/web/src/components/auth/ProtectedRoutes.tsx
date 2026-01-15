@@ -68,11 +68,11 @@ export function ProtectedRoutes({ children }: ProtectedRoutesProps) {
   // Show redirecting state if AuthContext is redirecting
   if (redirecting) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-white">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Redirigiendo al login...</p>
-          <p className="mt-2 text-sm text-gray-500">
+      <div className="auth-loading-screen">
+        <div className="auth-loading-container">
+          <div className="auth-loading-spinner"></div>
+          <p className="auth-loading-text">Redirigiendo al login...</p>
+          <p className="auth-loading-subtext">
             Tu acceso ha sido revocado
           </p>
         </div>
@@ -83,10 +83,10 @@ export function ProtectedRoutes({ children }: ProtectedRoutesProps) {
   // Block rendering until loading is complete
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-white">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Verificando autenticación...</p>
+      <div className="auth-loading-screen">
+        <div className="auth-loading-container">
+          <div className="auth-loading-spinner"></div>
+          <p className="auth-loading-text">Verificando autenticación...</p>
         </div>
       </div>
     );
@@ -95,10 +95,10 @@ export function ProtectedRoutes({ children }: ProtectedRoutesProps) {
   // If not authenticated, show message while redirecting
   if (!authenticated) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-white">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Redirigiendo al login...</p>
+      <div className="auth-loading-screen">
+        <div className="auth-loading-container">
+          <div className="auth-loading-spinner"></div>
+          <p className="auth-loading-text">Redirigiendo al login...</p>
         </div>
       </div>
     );
