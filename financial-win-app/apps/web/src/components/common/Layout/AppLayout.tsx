@@ -18,6 +18,39 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ currentView }) => {
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
 
   const handleNavigation = (view: ViewState, subAction?: string) => {
+    // Handle sub-actions for specific routes
+    if (view === 'billing' && subAction === 'payments') {
+      navigate('/gastos');
+      if (window.innerWidth < 768) {
+        setIsSidebarOpen(false);
+      }
+      return;
+    }
+
+    if (view === 'billing' && subAction === 'collections') {
+      navigate('/ingresos');
+      if (window.innerWidth < 768) {
+        setIsSidebarOpen(false);
+      }
+      return;
+    }
+
+    if (view === 'clients' && subAction === 'create') {
+      navigate('/clientes/nuevo');
+      if (window.innerWidth < 768) {
+        setIsSidebarOpen(false);
+      }
+      return;
+    }
+
+    if (view === 'clients' && subAction === 'list') {
+      navigate('/clientes/lista');
+      if (window.innerWidth < 768) {
+        setIsSidebarOpen(false);
+      }
+      return;
+    }
+
     // Default navigation using React Router
     const routeMap: Record<ViewState, string> = {
       'dashboard': '/',
@@ -30,6 +63,8 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ currentView }) => {
       'upload-invoice': '/upload-invoice',
       'tickets': '/tickets',
       'subscriptions': '/subscriptions',
+      'gastos': '/gastos',
+      'ingresos': '/ingresos',
     };
     
     const route = routeMap[view] || '/';

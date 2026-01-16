@@ -156,6 +156,31 @@
   }
 
   /* ============================================
+     Toast - Sistema de Notificaciones
+     ============================================ */
+  .ui-toast {
+    @apply rounded-xl shadow-2xl flex items-center gap-3 px-4 py-3 min-w-[320px] max-w-md;
+    @apply animate-slide-in-up;
+    @apply bg-white border border-gray-200 text-gray-900;
+  }
+
+  .ui-toast-success {
+    @apply bg-green-50 border-green-200 text-green-900;
+  }
+
+  .ui-toast-error {
+    @apply bg-red-50 border-red-200 text-red-900;
+  }
+
+  .ui-toast-warning {
+    @apply bg-yellow-50 border-yellow-200 text-yellow-900;
+  }
+
+  .ui-toast-container {
+    @apply fixed top-4 right-4 z-50 flex flex-col gap-3;
+  }
+
+  /* ============================================
      AI Studio - Fase 2: Clases Semánticas
      ============================================ */
 
@@ -516,6 +541,100 @@
 
   .queue-item-indicator {
     @apply absolute left-0 top-0 bottom-0 w-1 bg-[#B84E9D];
+  }
+
+  /* ============================================
+     Registros Table - Clases Semánticas
+     ============================================ */
+  .table-wrapper {
+    @apply overflow-x-auto rounded-xl border border-gray-200 dark:border-[#2A3B5A];
+  }
+
+  .table-main {
+    @apply w-full text-left;
+  }
+
+  .table-header {
+    @apply bg-gray-50 dark:bg-[#1B273B] uppercase text-xs font-semibold tracking-wider text-gray-600 dark:text-gray-400 px-6 py-4;
+  }
+
+  .table-row {
+    @apply border-b border-gray-100 dark:border-[#2A3B5A] hover:bg-gray-50 dark:hover:bg-[#1B273B] transition-colors;
+  }
+
+  .table-row td {
+    @apply px-6 py-4 text-sm text-gray-900 dark:text-gray-100;
+  }
+
+  .status-pill {
+    @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold;
+  }
+
+  .pill-success {
+    @apply bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400;
+  }
+
+  .pill-warning {
+    @apply bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-400;
+  }
+
+  .pill-danger {
+    @apply bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400;
+  }
+
+  .table-action-button {
+    @apply p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#2A3B5A] transition-colors text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100;
+  }
+
+  .table-action-button .material-symbols-outlined {
+    @apply text-lg;
+  }
+
+  /* ============================================
+     Gastos Table - Clases Semánticas
+     ============================================ */
+  .finance-table-wrapper {
+    @apply overflow-x-auto rounded-xl border border-gray-200 dark:border-[#2A3B5A] bg-white dark:bg-[#131B29];
+  }
+
+  .finance-table {
+    @apply w-full text-left;
+  }
+
+  .finance-table .table-header {
+    @apply bg-gray-50 dark:bg-[#1B273B] uppercase text-xs font-semibold tracking-wider text-gray-600 dark:text-gray-400 px-6 py-4;
+  }
+
+  .pill-status {
+    @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold;
+  }
+
+  .pill-pagado {
+    @apply bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400;
+  }
+
+  .pill-registrada {
+    @apply bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400;
+  }
+
+  .pill-por-recibir {
+    @apply bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-400;
+  }
+
+  .dept-tag {
+    @apply inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300;
+  }
+
+  .pill-anulada {
+    @apply bg-pink-100 dark:bg-pink-900/30 text-pink-800 dark:text-pink-400;
+  }
+
+  .pill-pendiente-envio {
+    @apply bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-400;
+  }
+
+  .pill-pendiente-resolucion {
+    @apply bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-400;
   }
 
   /* ============================================
@@ -1482,7 +1601,127 @@
     @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4;
   }
 
-  /* Cards de acceso rápido */
+  /* ============================================
+     Base Card Component - Clases Semánticas
+     ============================================ */
+
+  /* Card base reutilizable */
+  .base-card {
+    @apply studio-card p-5 rounded-2xl hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col;
+  }
+
+  /* Icon wrapper base - Mantener compatibilidad */
+  .base-card-icon-wrapper {
+    @apply w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-colors shrink-0;
+  }
+
+  /* Círculo de icono - Clase semántica base */
+  .icon-circle {
+    @apply w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-colors shrink-0;
+  }
+
+  /* Variantes de color para círculos de iconos */
+  .icon-circle-amber {
+    @apply icon-circle bg-amber-50 dark:bg-amber-900/20 group-hover:bg-amber-500;
+  }
+
+  .icon-circle-cyan {
+    @apply icon-circle bg-cyan-50 dark:bg-cyan-900/20 group-hover:bg-cyan-500;
+  }
+
+  .icon-circle-purple {
+    @apply icon-circle bg-purple-50 dark:bg-purple-900/20 group-hover:bg-[#b84e9d];
+  }
+
+  .icon-circle-blue {
+    @apply icon-circle bg-blue-50 dark:bg-blue-900/20 group-hover:bg-blue-500;
+  }
+
+  .icon-circle-emerald {
+    @apply icon-circle bg-emerald-50 dark:bg-emerald-900/20 group-hover:bg-emerald-500;
+  }
+
+  /* Variantes de color para icon wrapper (mantener compatibilidad) */
+  .base-card-icon-wrapper-amber {
+    @apply base-card-icon-wrapper bg-amber-50 dark:bg-amber-900/20 group-hover:bg-amber-500;
+  }
+
+  .base-card-icon-wrapper-cyan {
+    @apply base-card-icon-wrapper bg-cyan-50 dark:bg-cyan-900/20 group-hover:bg-cyan-500;
+  }
+
+  .base-card-icon-wrapper-purple {
+    @apply base-card-icon-wrapper bg-purple-50 dark:bg-purple-900/20 group-hover:bg-[#b84e9d];
+  }
+
+  .base-card-icon-wrapper-blue {
+    @apply base-card-icon-wrapper bg-blue-50 dark:bg-blue-900/20 group-hover:bg-blue-500;
+  }
+
+  .base-card-icon-wrapper-emerald {
+    @apply base-card-icon-wrapper bg-emerald-50 dark:bg-emerald-900/20 group-hover:bg-emerald-500;
+  }
+
+  /* Icono base */
+  .base-card-icon {
+    @apply material-symbols-outlined;
+  }
+
+  /* Variantes de color para iconos */
+  .base-card-icon-amber {
+    @apply base-card-icon text-amber-600 dark:text-amber-400 group-hover:text-white;
+  }
+
+  .base-card-icon-cyan {
+    @apply base-card-icon text-cyan-600 dark:text-cyan-400 group-hover:text-white;
+  }
+
+  .base-card-icon-purple {
+    @apply base-card-icon text-[#a21caf] dark:text-[#f472b6] group-hover:text-white;
+  }
+
+  .base-card-icon-blue {
+    @apply base-card-icon text-blue-600 dark:text-blue-400 group-hover:text-white;
+  }
+
+  .base-card-icon-emerald {
+    @apply base-card-icon text-emerald-600 dark:text-emerald-400 group-hover:text-white;
+  }
+
+  /* Título de la card */
+  .base-card-title {
+    @apply font-bold text-lg mb-2 text-slate-900 dark:text-white leading-tight;
+  }
+
+  /* Descripción de la card */
+  .base-card-desc {
+    @apply text-sm text-slate-600 dark:text-gray-500 mb-4 flex-1;
+  }
+
+  /* Footer de la card */
+  .base-card-footer {
+    @apply flex items-center gap-2 mt-auto;
+  }
+
+  /* Badge base */
+  .base-card-badge {
+    @apply px-2 py-1 text-[10px] font-bold rounded;
+  }
+
+  /* Variantes de color para badges */
+  .base-card-badge-gray {
+    @apply base-card-badge bg-slate-100/50 dark:bg-gray-700 text-slate-600 dark:text-gray-300;
+  }
+
+  .base-card-badge-red {
+    @apply base-card-badge bg-red-50 dark:bg-red-900/20 text-red-600;
+  }
+
+  .base-card-badge-green {
+    @apply base-card-badge bg-green-50 dark:bg-green-900/20 text-green-600;
+  }
+
+  /* Cards de acceso rápido (mantener compatibilidad) */
   .home-quick-access-card {
     @apply cursor-pointer studio-card p-5 rounded-2xl hover:shadow-xl hover:-translate-y-1 transition-all duration-300;
   }
@@ -1759,6 +1998,414 @@
   .home-alert-desc-info {
     @apply home-alert-desc text-blue-700 dark:text-blue-300;
   }
+
+  /* ============================================
+     Modal - Clases Semánticas
+     ============================================ */
+
+  /* Overlay del modal (fondo oscuro con backdrop blur) */
+  .modal-overlay {
+    @apply fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4;
+    z-index: 9999 !important;
+  }
+
+  /* Contenedor del contenido del modal */
+  .modal-content {
+    @apply bg-white rounded-2xl shadow-2xl relative max-h-[90vh] overflow-hidden flex flex-col animate-modal-enter;
+  }
+
+  /* Variantes de tamaño del modal */
+  .modal-content-sm {
+    @apply w-full max-w-sm;
+  }
+
+  .modal-content-md {
+    @apply w-full max-w-md;
+  }
+
+  .modal-content-lg {
+    @apply w-full max-w-lg;
+  }
+
+  .modal-content-xl {
+    @apply w-full max-w-xl;
+  }
+
+  /* Header del modal */
+  .modal-header {
+    @apply flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0;
+  }
+
+  .modal-title {
+    @apply text-xl font-semibold text-gray-900;
+  }
+
+  /* Botón de cierre */
+  .modal-close-button {
+    @apply p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors;
+  }
+
+  /* Contenedor del body del modal */
+  .modal-body {
+    @apply p-6 overflow-y-auto flex-1;
+  }
+
+  /* Footer del modal */
+  .modal-footer {
+    @apply flex items-center justify-end gap-3 p-6 border-t border-gray-200 flex-shrink-0;
+  }
+
+  /* ============================================
+     Nuevo Cliente Page - Clases Semánticas
+     ============================================ */
+
+  /* Contenedor principal de la página */
+  .cliente-page-container {
+    @apply w-full h-full flex flex-col min-h-0;
+  }
+
+  /* Layout con sidebar de navegación */
+  .cliente-page-layout {
+    @apply flex flex-1 min-h-0 overflow-hidden;
+  }
+
+  /* Sidebar de navegación lateral */
+  .cliente-sidebar {
+    @apply w-64 bg-[#fafafa] dark:bg-[#0B1018] border-r border-[#e5e5e5] dark:border-[#2A3B5A] flex flex-col shrink-0 overflow-y-auto;
+  }
+
+  .cliente-sidebar-header {
+    @apply p-6 border-b border-[#e5e5e5] dark:border-[#2A3B5A];
+  }
+
+  .cliente-sidebar-title {
+    @apply text-xl font-bold text-[#171717] dark:text-[#fafafa];
+  }
+
+  .cliente-sidebar-nav {
+    @apply flex-1 p-4 space-y-1;
+  }
+
+  .cliente-nav-item {
+    @apply flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all cursor-pointer;
+  }
+
+  .cliente-nav-item-active {
+    @apply cliente-nav-item bg-[#B84E9D] text-white shadow-sm;
+  }
+
+  .cliente-nav-item-inactive {
+    @apply cliente-nav-item text-[#525252] dark:text-[#a3a3a3] hover:bg-[#f5f5f5] dark:hover:bg-[#1B273B];
+  }
+
+  .cliente-nav-icon {
+    @apply material-symbols-outlined text-xl;
+  }
+
+  /* Contenido principal del formulario */
+  .cliente-content {
+    @apply flex-1 overflow-y-auto bg-white dark:bg-[#131B29] scroll-smooth;
+  }
+
+  .cliente-content-inner {
+    @apply max-w-4xl mx-auto p-8 space-y-8;
+  }
+
+  /* Sección del formulario */
+  .form-section {
+    @apply bg-white dark:bg-[#1B273B] rounded-2xl p-8 border border-[#e5e5e5] dark:border-[#2A3B5A] shadow-sm;
+  }
+
+  .form-section-header {
+    @apply flex items-center gap-3 mb-6;
+  }
+
+  .form-section-icon {
+    @apply material-symbols-outlined text-[#B84E9D] text-2xl;
+  }
+
+  .form-section-title {
+    @apply text-xl font-bold text-[#171717] dark:text-[#fafafa];
+  }
+
+  /* Input group - Layout para etiqueta + input */
+  .input-group {
+    @apply flex flex-col;
+  }
+
+  .input-group-label {
+    @apply block text-xs font-bold text-[#525252] dark:text-[#a3a3a3] mb-1.5 uppercase tracking-wider;
+  }
+
+  .input-group-label-required {
+    @apply input-group-label;
+  }
+
+  .input-group-label-required::after {
+    @apply text-red-500 ml-1;
+    content: '*';
+  }
+
+  .input-group-input {
+    @apply input-studio;
+  }
+
+  .input-group-select {
+    @apply form-select-studio;
+  }
+
+  .input-group-textarea {
+    @apply input-studio min-h-[100px] resize-y;
+  }
+
+  /* Logo upload */
+  .logo-upload {
+    @apply w-32 h-32 rounded-xl border-2 border-dashed border-[#e5e5e5] dark:border-[#2A3B5A] flex flex-col items-center justify-center cursor-pointer transition-all hover:border-[#B84E9D] hover:bg-[#FCECF6]/10 dark:hover:bg-[#B84E9D]/5;
+  }
+
+  .logo-upload-icon {
+    @apply material-symbols-outlined text-[#B84E9D] text-4xl mb-2;
+  }
+
+  .logo-upload-text {
+    @apply text-xs font-medium text-[#525252] dark:text-[#a3a3a3] text-center px-2;
+  }
+
+  /* Grids del formulario */
+  .form-grid-2 {
+    @apply grid grid-cols-1 md:grid-cols-2 gap-6;
+  }
+
+  .form-grid-3 {
+    @apply grid grid-cols-1 md:grid-cols-3 gap-6;
+  }
+
+  .form-grid-full {
+    @apply col-span-1 md:col-span-2;
+  }
+
+  .form-grid-3-full {
+    @apply col-span-1 md:col-span-3;
+  }
+
+  /* Action bar - Barra de botones */
+  .action-bar {
+    @apply flex items-center justify-end gap-3 p-6 border-t border-[#e5e5e5] dark:border-[#2A3B5A] bg-white dark:bg-[#131B29] sticky bottom-0 z-10;
+  }
+
+  .btn-outline {
+    @apply btn border border-[#e5e5e5] dark:border-[#2A3B5A] text-[#525252] dark:text-[#a3a3a3] hover:bg-[#f5f5f5] dark:hover:bg-[#1B273B];
+  }
+
+  /* Checkbox y radio styles */
+  .form-checkbox-container {
+    @apply flex flex-col gap-2;
+  }
+
+  .form-checkbox-group {
+    @apply flex items-center gap-2;
+  }
+
+  .form-checkbox {
+    @apply w-4 h-4 rounded border-[#e5e5e5] dark:border-[#2A3B5A] text-[#B84E9D] focus:ring-[#B84E9D] focus:ring-2;
+  }
+
+  .form-checkbox-label {
+    @apply text-sm font-medium text-[#525252] dark:text-[#a3a3a3];
+  }
+
+  /* ============================================
+     Lista de Clientes - Clases Semánticas
+     ============================================ */
+
+  /* Contenedor principal de la lista */
+  .clients-list-container {
+    @apply w-full p-6 md:p-8;
+  }
+
+  /* Grid de clientes */
+  .clients-grid {
+    @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6;
+  }
+
+  /* Tarjeta de cliente */
+  .client-card {
+    @apply bg-white dark:bg-[#1B273B] rounded-2xl border border-[#e5e5e5] dark:border-[#2A3B5A] shadow-sm hover:shadow-md transition-all cursor-pointer;
+    padding: 1.5rem;
+  }
+
+  /* Header de la tarjeta (avatar + nombre + badge) */
+  .client-card-header {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    margin-bottom: 1rem;
+    gap: 1rem;
+  }
+
+  /* Avatar del cliente */
+  .client-avatar {
+    @apply w-12 h-12 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-sm font-bold text-[#525252] dark:text-[#a3a3a3];
+    flex-shrink: 0;
+  }
+
+  /* Contenedor del nombre */
+  .client-name-container {
+    flex-grow: 1;
+    min-width: 0;
+  }
+
+  .client-card-name {
+    font-weight: bold;
+    font-size: 1.1rem;
+    @apply text-[#171717] dark:text-[#fafafa] mb-1 truncate overflow-hidden text-ellipsis;
+  }
+
+  /* Badge de estado */
+  .client-status-badge {
+    margin-left: auto;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: 0.75rem;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .status-activo {
+    @apply client-status-badge;
+    background-color: #e8f5e9;
+    color: #2e7d32;
+  }
+
+  .dark .status-activo {
+    background-color: rgba(34, 197, 94, 0.15);
+    color: #4ade80;
+  }
+
+  .status-pendiente {
+    @apply client-status-badge;
+    background-color: #fff3e0;
+    color: #e65100;
+  }
+
+  .dark .status-pendiente {
+    background-color: rgba(251, 146, 60, 0.15);
+    color: #fb923c;
+  }
+
+  .status-inactivo {
+    @apply client-status-badge;
+    background-color: #f5f5f5;
+    color: #616161;
+  }
+
+  .dark .status-inactivo {
+    background-color: rgba(107, 114, 128, 0.15);
+    color: #9ca3af;
+  }
+
+  .client-card-meta {
+    @apply text-xs text-[#737373] dark:text-[#a3a3a3] flex items-center gap-1;
+  }
+
+  .client-card-meta-separator {
+    @apply text-[#a3a3a3];
+  }
+
+  /* Información financiera (banco y pagos) */
+  .client-card-financial {
+    @apply space-y-3 mb-4;
+  }
+
+  .client-financial-item {
+    @apply flex items-center gap-2;
+  }
+
+  .client-financial-icon {
+    @apply material-symbols-outlined text-[#525252] dark:text-[#a3a3a3] text-lg;
+  }
+
+  .client-financial-text {
+    @apply text-sm text-[#525252] dark:text-[#a3a3a3] flex-1;
+  }
+
+  .client-financial-amount {
+    @apply text-sm font-semibold text-[#171717] dark:text-[#fafafa];
+  }
+
+  /* Botón ver ficha */
+  .client-card-action {
+    @apply w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-[#e5e5e5] dark:border-[#2A3B5A] text-sm font-medium text-[#525252] dark:text-[#a3a3a3] hover:bg-[#f5f5f5] dark:hover:bg-[#2A3B5A] transition-colors;
+  }
+
+  .client-card-action-icon {
+    @apply material-symbols-outlined text-lg;
+  }
+
+  /* Contenedor de paginación */
+  .pagination-container {
+    @apply mt-8 flex items-center justify-between border-t border-[#e5e5e5] dark:border-[#2A3B5A] pt-6;
+  }
+
+  .pagination-info {
+    @apply text-sm text-[#525252] dark:text-[#a3a3a3];
+  }
+
+  .pagination-controls {
+    @apply flex items-center gap-2;
+  }
+
+  .pagination-button {
+    @apply w-8 h-8 rounded-lg border border-[#e5e5e5] dark:border-[#2A3B5A] bg-white dark:bg-[#1B273B] text-sm font-medium text-[#525252] dark:text-[#a3a3a3] hover:bg-[#f5f5f5] dark:hover:bg-[#2A3B5A] transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .pagination-button-active {
+    @apply pagination-button bg-[#B84E9D] text-white border-[#B84E9D] hover:bg-[#9C3C86];
+  }
+
+  .pagination-button-icon {
+    @apply material-symbols-outlined text-lg;
+  }
+
+  /* Barra de herramientas superior */
+  .action-toolbar {
+    @apply flex items-center justify-between mb-8;
+  }
+
+  /* Buscador */
+  .search-input-wrapper {
+    @apply relative flex-1 max-w-md;
+  }
+
+  .search-input {
+    @apply w-full pl-10 pr-4 py-2.5 bg-white dark:bg-[#1B273B] border border-[#e5e5e5] dark:border-[#2A3B5A] rounded-lg text-sm font-medium text-[#171717] dark:text-[#fafafa] placeholder:text-[#a3a3a3] dark:placeholder:text-[#737373] focus:outline-none focus:ring-2 focus:ring-[#B84E9D] focus:border-[#B84E9D] hover:border-[#a3a3a3] transition-all shadow-sm;
+  }
+
+  .search-input-icon {
+    @apply absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-[#a3a3a3] dark:text-[#737373] text-lg pointer-events-none;
+  }
+
+  /* Grupo de botones de la barra de herramientas */
+  .toolbar-buttons-group {
+    @apply flex items-center gap-2;
+  }
+
+  .toolbar-button {
+    @apply w-10 h-10 rounded-lg border border-[#e5e5e5] dark:border-[#2A3B5A] bg-white dark:bg-[#1B273B] text-[#525252] dark:text-[#a3a3a3] hover:bg-[#f5f5f5] dark:hover:bg-[#2A3B5A] transition-colors flex items-center justify-center;
+  }
+
+  .toolbar-button-icon {
+    @apply material-symbols-outlined text-xl;
+  }
+
+  .toolbar-button-primary {
+    @apply toolbar-button bg-[#B84E9D] text-white border-[#B84E9D] hover:bg-[#9C3C86];
+  }
+
+  .toolbar-button-primary .toolbar-button-icon {
+    @apply text-white;
+  }
 }
 
 @layer utilities {
@@ -1865,5 +2512,36 @@
 
   .animate-fade-in-scale {
     animation: fadeInScale 0.4s ease-out;
+  }
+
+  .animate-fade-out {
+    animation: fadeOut 0.3s ease-out forwards;
+  }
+
+  @keyframes fadeOut {
+    from {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    to {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+  }
+
+  /* Modal animations */
+  @keyframes modalEnter {
+    0% {
+      opacity: 0;
+      transform: scale(0.95) translateY(-10px);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+
+  .animate-modal-enter {
+    animation: modalEnter 0.3s ease-out;
   }
 }

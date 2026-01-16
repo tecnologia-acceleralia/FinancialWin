@@ -33,7 +33,9 @@ export type ViewState =
   | 'suppliers' 
   | 'documents'
   | 'records'
-  | 'ai-extraction';
+  | 'ai-extraction'
+  | 'gastos'
+  | 'ingresos';
 
 export interface NavSubItem {
   label: string;

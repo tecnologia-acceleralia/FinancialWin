@@ -2,6 +2,7 @@ import React from 'react';
 import { ViewState } from '../../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useNavigate } from 'react-router-dom';
+import { Card } from '../../components/common';
 
 interface HomePageProps {
   onNavigate?: (view: ViewState, subAction?: string) => void;
@@ -24,6 +25,8 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
       'upload-invoice': '/upload-invoice',
       'tickets': '/tickets',
       'subscriptions': '/subscriptions',
+      'gastos': '/gastos',
+      'ingresos': '/ingresos',
     };
     
     const route = routeMap[view] || '/';
@@ -80,102 +83,51 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
       <div>
         <h3 className="home-shortcuts-title">{t('home.shortcuts.title')}</h3>
         <div className="home-shortcuts-grid">
-          
-          {/* Card 1 - Documentación */}
-          <div 
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              handleNavigate('documents');
-            }}
-            className="home-quick-access-card group"
-          >
-            <div className="home-quick-access-icon-wrapper-amber">
-              <span className="material-symbols-outlined home-quick-access-icon-amber">folder_open</span>
-            </div>
-            <h4 className="home-quick-access-title">{t('home.shortcuts.documents')}</h4>
-            <p className="home-quick-access-desc">{t('home.shortcuts.documentsDesc')}</p>
-            <div className="home-quick-access-footer">
-              <span className="home-quick-access-badge-gray">15 {t('home.shortcuts.updated')}</span>
-            </div>
-          </div>
-
-          {/* Card 2 - Registros */}
-          <div 
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              handleNavigate('records');
-            }}
-            className="home-quick-access-card group"
-          >
-            <div className="home-quick-access-icon-wrapper-cyan">
-              <span className="material-symbols-outlined home-quick-access-icon-cyan">table_view</span>
-            </div>
-            <h4 className="home-quick-access-title">{t('home.shortcuts.records')}</h4>
-            <p className="home-quick-access-desc">{t('home.shortcuts.recordsDesc')}</p>
-            <div className="home-quick-access-footer">
-              <span className="home-quick-access-badge-gray">23 {t('home.shortcuts.monthly')}</span>
-            </div>
-          </div>
-
-          {/* Card 3 - Billing (Control Financiero) */}
-          <div 
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              handleNavigate('billing');
-            }}
-            className="home-quick-access-card group"
-          >
-            <div className="home-quick-access-icon-wrapper-purple">
-              <span className="material-symbols-outlined home-quick-access-icon-purple">receipt_long</span>
-            </div>
-            <h4 className="home-quick-access-title">{t('home.shortcuts.billing')}</h4>
-            <p className="home-quick-access-desc">{t('home.shortcuts.billingDesc')}</p>
-            <div className="home-quick-access-footer">
-              <span className="home-quick-access-badge-red">12 {t('home.shortcuts.pending')}</span>
-            </div>
-          </div>
-
-          {/* Card 4 - Clients */}
-          <div 
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              handleNavigate('clients');
-            }}
-            className="home-quick-access-card group"
-          >
-            <div className="home-quick-access-icon-wrapper-blue">
-              <span className="material-symbols-outlined home-quick-access-icon-blue">group</span>
-            </div>
-            <h4 className="home-quick-access-title">{t('home.shortcuts.clients')}</h4>
-            <p className="home-quick-access-desc">{t('home.shortcuts.clientsDesc')}</p>
-            <div className="home-quick-access-footer">
-              <span className="home-quick-access-badge-green">3 {t('home.shortcuts.new')}</span>
-            </div>
-          </div>
-
-          {/* Card 5 - Suppliers */}
-          <div 
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              handleNavigate('suppliers');
-            }}
-            className="home-quick-access-card group"
-          >
-            <div className="home-quick-access-icon-wrapper-emerald">
-              <span className="material-symbols-outlined home-quick-access-icon-emerald">local_shipping</span>
-            </div>
-            <h4 className="home-quick-access-title">{t('home.shortcuts.suppliers')}</h4>
-            <p className="home-quick-access-desc">{t('home.shortcuts.suppliersDesc')}</p>
-            <div className="home-quick-access-footer">
-              <span className="home-quick-access-badge-gray">{t('home.shortcuts.updated')}</span>
-            </div>
-          </div>
-
+          <Card
+            title={t('home.shortcuts.documents')}
+            subtitle={t('home.shortcuts.documentsDesc')}
+            icon="folder_open"
+            iconColor="amber"
+            badge={`15 ${t('home.shortcuts.updated')}`}
+            badgeColor="gray"
+            onClick={() => handleNavigate('documents')}
+          />
+          <Card
+            title={t('home.shortcuts.records')}
+            subtitle={t('home.shortcuts.recordsDesc')}
+            icon="table_view"
+            iconColor="cyan"
+            badge={`23 ${t('home.shortcuts.monthly')}`}
+            badgeColor="gray"
+            onClick={() => handleNavigate('records')}
+          />
+          <Card
+            title={t('home.shortcuts.billing')}
+            subtitle={t('home.shortcuts.billingDesc')}
+            icon="receipt_long"
+            iconColor="purple"
+            badge={`12 ${t('home.shortcuts.pending')}`}
+            badgeColor="red"
+            onClick={() => handleNavigate('billing')}
+          />
+          <Card
+            title={t('home.shortcuts.clients')}
+            subtitle={t('home.shortcuts.clientsDesc')}
+            icon="group"
+            iconColor="blue"
+            badge={`3 ${t('home.shortcuts.new')}`}
+            badgeColor="green"
+            onClick={() => handleNavigate('clients')}
+          />
+          <Card
+            title={t('home.shortcuts.suppliers')}
+            subtitle={t('home.shortcuts.suppliersDesc')}
+            icon="local_shipping"
+            iconColor="emerald"
+            badge={t('home.shortcuts.updated')}
+            badgeColor="gray"
+            onClick={() => handleNavigate('suppliers')}
+          />
         </div>
       </div>
 

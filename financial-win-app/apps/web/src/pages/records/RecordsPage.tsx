@@ -1,5 +1,6 @@
 import React from 'react';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { RegistrosTable } from '../../components/features/registros/RegistrosTable';
 
 export const RecordsPage: React.FC = () => {
   const { t } = useLanguage();
@@ -35,10 +36,8 @@ export const RecordsPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="mt-6">
-            <p className="text-sm text-[#737373] dark:text-[#a3a3a3]">
-              Esta página está en desarrollo. La funcionalidad completa se implementará en la siguiente fase.
-            </p>
+          <div className="mt-8">
+            <RegistrosTable />
           </div>
         </div>
       </div>

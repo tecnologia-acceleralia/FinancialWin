@@ -34,6 +34,8 @@ const translations: Record<Language, Translations> = {
       documents: 'Gestión Documental',
       records: 'Gestión de Registros',
       'ai-extraction': 'Extracción con IA',
+      gastos: 'Gastos',
+      ingresos: 'Ingresos',
       subtitle: {
         dashboard: 'Visión global del rendimiento financiero y alertas prioritarias.',
         billing: 'Procesamiento inteligente de facturas y gestión de flujo de caja.',
@@ -42,6 +44,8 @@ const translations: Record<Language, Translations> = {
         documents: 'Repositorio centralizado y digitalización certificada de archivos.',
         records: 'Visualización y gestión centralizada de todos los registros del sistema.',
         'ai-extraction': 'Extracción automática de datos de documentos con inteligencia artificial.',
+        gastos: 'Gestión y visualización de gastos financieros.',
+        ingresos: 'Gestión y visualización de ingresos financieros.',
       },
       notifications: 'Notificaciones',
       markRead: 'Marcar leídas',
