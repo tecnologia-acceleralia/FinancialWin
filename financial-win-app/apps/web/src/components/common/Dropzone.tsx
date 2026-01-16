@@ -4,12 +4,16 @@ interface DropzoneProps {
   onFilesSelected?: (files: File[]) => void;
   accept?: string;
   multiple?: boolean;
+  title?: string;
+  description?: string;
 }
 
 export const Dropzone: React.FC<DropzoneProps> = ({
   onFilesSelected,
   accept = '.pdf,.jpg,.jpeg,.png',
   multiple = true,
+  title = 'Arrastra tus archivos aquí',
+  description = 'O haz clic para seleccionar archivos desde tu dispositivo',
 }) => {
   const [isDragActive, setIsDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -54,13 +58,20 @@ export const Dropzone: React.FC<DropzoneProps> = ({
         <span className="dropzone-icon">cloud_upload</span>
       </div>
       <h3 className="dropzone-title">
-        Arrastra tus archivos aquí
+        {title}
       </h3>
       <p className="dropzone-description">
-        O haz clic para seleccionar archivos desde tu dispositivo
+        {description}
       </p>
       
-      <button className="btn-ai-primary">
+      <button
+        type="button"
+        className="btn-ai-primary"
+        onClick={(e) => {
+          e.stopPropagation();
+          fileInputRef.current?.click();
+        }}
+      >
         <span className="material-symbols-outlined">folder_open</span>
         Seleccionar archivos
       </button>

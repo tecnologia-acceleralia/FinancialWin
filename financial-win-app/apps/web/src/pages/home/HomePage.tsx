@@ -12,16 +12,22 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
   const navigate = useNavigate();
 
   const handleNavigate = (view: ViewState, subAction?: string) => {
-    if (onNavigate) {
-      onNavigate(view, subAction);
-    } else {
-      // Default navigation using React Router
-      if (view === 'ai-extraction') {
-        navigate('/ai-extraction');
-      } else {
-        navigate('/');
-      }
-    }
+    // Prevent default behavior and stop propagation
+    const routeMap: Record<ViewState, string> = {
+      'dashboard': '/',
+      'ai-extraction': '/ai-extraction',
+      'records': '/records',
+      'billing': '/billing',
+      'clients': '/clients',
+      'suppliers': '/suppliers',
+      'documents': '/documents',
+      'upload-invoice': '/upload-invoice',
+      'tickets': '/tickets',
+      'subscriptions': '/subscriptions',
+    };
+    
+    const route = routeMap[view] || '/';
+    navigate(route);
   };
 
   return (
@@ -38,7 +44,11 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
               {t('home.hero.status')}
             </p>
             <button 
-              onClick={() => handleNavigate('billing')}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleNavigate('billing');
+              }}
               className="home-hero-button"
             >
               <span>{t('home.hero.action')}</span>
@@ -73,7 +83,11 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
           
           {/* Card 1 - Documentación */}
           <div 
-            onClick={() => handleNavigate('documents')}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleNavigate('documents');
+            }}
             className="home-quick-access-card group"
           >
             <div className="home-quick-access-icon-wrapper-amber">
@@ -88,7 +102,11 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
 
           {/* Card 2 - Registros */}
           <div 
-            onClick={() => handleNavigate('records')}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleNavigate('records');
+            }}
             className="home-quick-access-card group"
           >
             <div className="home-quick-access-icon-wrapper-cyan">
@@ -103,7 +121,11 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
 
           {/* Card 3 - Billing (Control Financiero) */}
           <div 
-            onClick={() => handleNavigate('billing')}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleNavigate('billing');
+            }}
             className="home-quick-access-card group"
           >
             <div className="home-quick-access-icon-wrapper-purple">
@@ -118,7 +140,11 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
 
           {/* Card 4 - Clients */}
           <div 
-            onClick={() => handleNavigate('clients')}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleNavigate('clients');
+            }}
             className="home-quick-access-card group"
           >
             <div className="home-quick-access-icon-wrapper-blue">
@@ -133,7 +159,11 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
 
           {/* Card 5 - Suppliers */}
           <div 
-            onClick={() => handleNavigate('suppliers')}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleNavigate('suppliers');
+            }}
             className="home-quick-access-card group"
           >
             <div className="home-quick-access-icon-wrapper-emerald">

@@ -19,6 +19,7 @@ import { OIDCConfig } from './common/config/oidc.config';
 import { StorageModule } from './common/modules/storage.module';
 import { AuthModule } from './auth/auth.module';
 import { ExampleModule } from './modules/example/example.module';
+import { DocumentsModule } from './modules/documents/documents.module';
 import { WebhookController } from './common/controllers/webhook.controller';
 import { ObservabilityModule } from './common/modules/observability.module';
 import { MetricsController } from './common/controllers/metrics.controller';
@@ -80,6 +81,9 @@ import { MetricsController } from './common/controllers/metrics.controller';
 
     // Example module (demonstration module)
     ExampleModule,
+
+    // Documents module
+    DocumentsModule,
   ],
   controllers: [AppController, WebhookController, MetricsController],
   providers: [AppService],

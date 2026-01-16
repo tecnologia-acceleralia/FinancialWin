@@ -1,25 +1,40 @@
 import React, { useState } from 'react';
+import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 import { ViewState } from '../../../types';
 import { useTheme } from '../../../contexts/ThemeContext';
 
 interface AppLayoutProps {
-  children: React.ReactNode;
   currentView: ViewState;
-  onNavigate?: (view: ViewState, subAction?: string) => void;
 }
 
-export const AppLayout: React.FC<AppLayoutProps> = ({ children, currentView, onNavigate }) => {
+export const AppLayout: React.FC<AppLayoutProps> = ({ currentView }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const { theme } = useTheme();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
 
   const handleNavigation = (view: ViewState, subAction?: string) => {
-    if (onNavigate) {
-      onNavigate(view, subAction);
-    }
+    // Default navigation using React Router
+    const routeMap: Record<ViewState, string> = {
+      'dashboard': '/',
+      'ai-extraction': '/ai-extraction',
+      'records': '/records',
+      'billing': '/billing',
+      'clients': '/clients',
+      'suppliers': '/suppliers',
+      'documents': '/documents',
+      'upload-invoice': '/upload-invoice',
+      'tickets': '/tickets',
+      'subscriptions': '/subscriptions',
+    };
+    
+    const route = routeMap[view] || '/';
+    navigate(route);
+    
     if (window.innerWidth < 768) {
       setIsSidebarOpen(false);
     }
@@ -58,7 +73,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, currentView, onN
         <main className="layout-page-container">
           <div className="layout-page-inner">
             <div className="layout-page-content">
-              {children}
+              <Outlet />
             </div>
             
             {/* Static Footer */}

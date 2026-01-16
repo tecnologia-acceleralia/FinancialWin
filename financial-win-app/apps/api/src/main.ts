@@ -34,6 +34,9 @@ async function bootstrap() {
   // Add cookie parser middleware
   app.use(cookieParser());
 
+  // Set global prefix for all routes
+  app.setGlobalPrefix('api');
+
   // Global pipes
   app.useGlobalPipes(
     new ValidationPipe({
