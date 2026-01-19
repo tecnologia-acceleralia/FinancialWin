@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { NavItem, ViewState, NavSubItem } from '../../../types';
 import { useLanguage } from '../../../contexts/LanguageContext';
 
@@ -163,31 +164,46 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, isO
                       {item.subItems!.map((sub) => {
                           const hasThirdLevel = sub.subItems && sub.subItems.length > 0;
                           const isSubExpanded = expandedSubId === sub.action;
+                          
+                          // Usar Link para "Ver Lista" de proveedores
+                          const isSuppliersList = item.id === 'suppliers' && sub.action === 'list';
 
                           return (
                             <div key={sub.action}>
-                                <button
-                                    onClick={(e) => handleSubItemClick(e, item.id, sub)}
-                                    className="sidebar-subitem-button"
-                                >
-                                    <div className="sidebar-subitem-content">
-                                        {sub.icon ? (
-                                            <span className="material-symbols-outlined sidebar-subitem-icon">{sub.icon}</span>
-                                        ) : (
-                                            <>
-                                                {sub.action === 'create' && <span className="material-symbols-outlined sidebar-subitem-icon">add</span>}
-                                                {sub.action === 'list' && <span className="material-symbols-outlined sidebar-subitem-icon">list</span>}
-                                                {sub.action === 'records' && <span className="material-symbols-outlined sidebar-subitem-icon">table_chart</span>}
-                                            </>
+                                {isSuppliersList ? (
+                                    <Link
+                                        to="/proveedores/listado"
+                                        className="sidebar-subitem-button"
+                                    >
+                                        <div className="sidebar-subitem-content">
+                                            <span className="material-symbols-outlined sidebar-subitem-icon">list</span>
+                                            <span>{sub.label}</span>
+                                        </div>
+                                    </Link>
+                                ) : (
+                                    <button
+                                        onClick={(e) => handleSubItemClick(e, item.id, sub)}
+                                        className="sidebar-subitem-button"
+                                    >
+                                        <div className="sidebar-subitem-content">
+                                            {sub.icon ? (
+                                                <span className="material-symbols-outlined sidebar-subitem-icon">{sub.icon}</span>
+                                            ) : (
+                                                <>
+                                                    {sub.action === 'create' && <span className="material-symbols-outlined sidebar-subitem-icon">add</span>}
+                                                    {sub.action === 'list' && <span className="material-symbols-outlined sidebar-subitem-icon">list</span>}
+                                                    {sub.action === 'records' && <span className="material-symbols-outlined sidebar-subitem-icon">table_chart</span>}
+                                                </>
+                                            )}
+                                            <span>{sub.label}</span>
+                                        </div>
+                                        {hasThirdLevel && (
+                                            <span className={`material-symbols-outlined sidebar-subitem-expand-icon ${isSubExpanded ? 'sidebar-subitem-expand-icon-expanded' : ''}`}>
+                                                expand_more
+                                            </span>
                                         )}
-                                        <span>{sub.label}</span>
-                                    </div>
-                                    {hasThirdLevel && (
-                                        <span className={`material-symbols-outlined sidebar-subitem-expand-icon ${isSubExpanded ? 'sidebar-subitem-expand-icon-expanded' : ''}`}>
-                                            expand_more
-                                        </span>
-                                    )}
-                                </button>
+                                    </button>
+                                )}
 
                                 {hasThirdLevel && (
                                     <div className={`sidebar-third-level ${isSubExpanded ? 'sidebar-third-level-expanded' : 'sidebar-third-level-collapsed'}`}>

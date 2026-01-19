@@ -1,19 +1,17 @@
 import React from 'react';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { PageHeader } from '../../components/common/PageHeader';
 
 export const BillingPage: React.FC = () => {
   const { t } = useLanguage();
 
   return (
     <div className="layout-page-container">
+      <PageHeader
+        title="Control Financiero"
+      />
       <div className="studio-container">
         <div className="studio-card">
-          <div className="studio-form-header">
-            <h1 className="studio-form-title text-slate-900 dark:text-white">Control Financiero</h1>
-            <p className="studio-form-subtitle">
-              Gestión de facturación y control financiero
-            </p>
-          </div>
 
           <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="studio-kpi-card">

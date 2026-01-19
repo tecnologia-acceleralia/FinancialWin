@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
-import { Toast, ToastType } from '../components/common/ui/Toast';
+import { Toast, ToastType } from '../components/ui/Toast';
 
 export interface ToastNotification {
   id: string;

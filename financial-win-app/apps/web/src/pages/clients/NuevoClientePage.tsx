@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { PageHeader } from '../../components/common/PageHeader';
 
 interface SeccionInfo {
   id: string;
@@ -49,8 +50,17 @@ export const NuevoClientePage: React.FC = () => {
     navigate('/clients');
   };
 
+  const handleVolver = () => {
+    navigate('/clients');
+  };
+
   return (
     <div className="cliente-page-container">
+      <PageHeader
+        title="Nuevo Cliente"
+        showBackButton={true}
+        onBack={handleVolver}
+      />
       <div className="cliente-page-layout">
         {/* Sidebar de Navegación */}
         <aside className="cliente-sidebar">

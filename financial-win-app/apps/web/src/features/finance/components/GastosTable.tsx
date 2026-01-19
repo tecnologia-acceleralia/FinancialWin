@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 
 interface Gasto {
   id: string;
@@ -64,7 +64,24 @@ const datosPrueba: Gasto[] = [
   },
 ];
 
-export const GastosTable: React.FC = () => {
+interface GastosTableProps {
+  searchTerm?: string;
+}
+
+export const GastosTable: React.FC<GastosTableProps> = ({ searchTerm = '' }) => {
+  const gastosFiltrados = useMemo(() => {
+    if (!searchTerm.trim()) {
+      return datosPrueba;
+    }
+    const busquedaLower = searchTerm.toLowerCase().trim();
+    return datosPrueba.filter(
+      (gasto) =>
+        gasto.proveedor.toLowerCase().includes(busquedaLower) ||
+        gasto.departamento.toLowerCase().includes(busquedaLower) ||
+        gasto.tipo.toLowerCase().includes(busquedaLower) ||
+        gasto.estado.toLowerCase().includes(busquedaLower)
+    );
+  }, [searchTerm]);
   const getEstadoClass = (estado: Gasto['estado']) => {
     switch (estado) {
       case 'Pagado':
@@ -99,7 +116,7 @@ export const GastosTable: React.FC = () => {
           </tr>
         </thead>
         <tbody>
-          {datosPrueba.map((gasto) => (
+          {gastosFiltrados.map((gasto) => (
             <tr key={gasto.id} className="table-row">
               <td>
                 <button className="table-action-button">

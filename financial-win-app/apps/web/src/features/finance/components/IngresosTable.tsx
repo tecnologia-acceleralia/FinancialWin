@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 
 interface Ingreso {
   id: string;
@@ -60,7 +60,23 @@ const datosPrueba: Ingreso[] = [
   },
 ];
 
-export const IngresosTable: React.FC = () => {
+interface IngresosTableProps {
+  searchTerm?: string;
+}
+
+export const IngresosTable: React.FC<IngresosTableProps> = ({ searchTerm = '' }) => {
+  const ingresosFiltrados = useMemo(() => {
+    if (!searchTerm.trim()) {
+      return datosPrueba;
+    }
+    const busquedaLower = searchTerm.toLowerCase().trim();
+    return datosPrueba.filter(
+      (ingreso) =>
+        ingreso.cliente.toLowerCase().includes(busquedaLower) ||
+        ingreso.factura.toLowerCase().includes(busquedaLower) ||
+        ingreso.estado.toLowerCase().includes(busquedaLower)
+    );
+  }, [searchTerm]);
   const getEstadoClass = (estado: Ingreso['estado']) => {
     switch (estado) {
       case 'Pagado':
@@ -94,7 +110,7 @@ export const IngresosTable: React.FC = () => {
           </tr>
         </thead>
         <tbody>
-          {datosPrueba.map((ingreso) => (
+          {ingresosFiltrados.map((ingreso) => (
             <tr key={ingreso.id} className="table-row">
               <td>
                 <button className="table-action-button">

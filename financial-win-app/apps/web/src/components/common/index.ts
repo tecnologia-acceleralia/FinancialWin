@@ -1,12 +1,8 @@
-// Common Components
+// Common Components (Transversal/Shared components)
 export { Layout } from './Layout';
 export { default as ErrorBoundary } from './ErrorBoundary';
+export { PageHeader, type PageHeaderProps, type PageHeaderAction } from './PageHeader';
 export { Dropzone } from './Dropzone';
 export { DocumentForm } from './DocumentForm';
 export { FilePreview } from './FilePreview';
-export { Card } from './ui/Card';
-export type { CardProps } from './ui/Card';
-export { Toast } from './ui/Toast';
-export type { ToastProps, ToastType } from './ui/Toast';
-export { Modal } from './ui/Modal';
-export type { ModalProps } from './ui/Modal';
+export { EntityCard } from './EntityCard';

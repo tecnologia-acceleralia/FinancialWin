@@ -3,6 +3,7 @@ import { Dropzone } from '../../components/common/Dropzone';
 import { DocumentForm } from '../../components/common/DocumentForm';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useGeminiExtraction } from '../../hooks/useGeminiExtraction';
+import { PageHeader, type PageHeaderAction } from '../../components/common/PageHeader';
 import type { ExtractedData } from '../ai-extraction/types';
 
 export const DocumentsPage: React.FC = () => {
@@ -92,18 +93,33 @@ export const DocumentsPage: React.FC = () => {
     }
   };
 
+  const handleSubirDocumento = () => {
+    // Si hay archivos seleccionados o datos extraídos, resetear
+    if (selectedFiles.length > 0 || formData) {
+      reset();
+      setFormData(null);
+      setSelectedFiles([]);
+    }
+    // El dropzone se mostrará automáticamente cuando no haya datos
+  };
+
+  const headerActions: PageHeaderAction[] = [
+    {
+      icon: 'upload_file',
+      label: 'Subir Documento',
+      onClick: handleSubirDocumento,
+      variant: 'primary',
+    },
+  ];
+
   return (
     <div className="layout-page-container">
+      <PageHeader
+        title="Documentación"
+        actions={headerActions}
+      />
       <div className="studio-container">
         <div className="studio-card">
-          <div className="studio-form-header">
-            <h1 className="studio-form-title text-slate-900 dark:text-white">
-              Documentación
-            </h1>
-            <p className="studio-form-subtitle">
-              Sube y gestiona tus documentos financieros
-            </p>
-          </div>
 
           {/* Mensaje de éxito */}
           {successMessage && (

@@ -11,6 +11,9 @@ import { ClientsPage } from './pages/clients/ClientsPage';
 import { NuevoClientePage } from './pages/clients/NuevoClientePage';
 import { ListaClientesPage } from './pages/clients/ListaClientesPage';
 import { SuppliersPage } from './pages/suppliers/SuppliersPage';
+import { NuevoProveedorPage } from './pages/proveedores/NuevoProveedorPage';
+import { ProveedoresDashboardPage } from './pages/proveedores/ProveedoresDashboardPage';
+import ProveedoresListPage from './pages/proveedores/ProveedoresListPage';
 import { DocumentsPage } from './pages/documents/DocumentsPage';
 import { GastosPage } from './pages/control-financiero/GastosPage';
 import { IngresosPage } from './pages/control-financiero/IngresosPage';
@@ -26,7 +29,7 @@ function App() {
     if (path === '/records') return 'records';
     if (path === '/billing') return 'billing';
     if (path === '/clients') return 'clients';
-    if (path === '/suppliers') return 'suppliers';
+    if (path === '/suppliers' || path === '/proveedores' || path.startsWith('/proveedores/')) return 'suppliers';
     if (path === '/documents') return 'documents';
     if (path === '/gastos') return 'gastos';
     if (path === '/ingresos') return 'ingresos';
@@ -51,6 +54,9 @@ function App() {
               <Route path="/clientes/nuevo" element={<NuevoClientePage />} />
               <Route path="/clientes/lista" element={<ListaClientesPage />} />
               <Route path="/suppliers" element={<SuppliersPage />} />
+              <Route path="/proveedores" element={<ProveedoresDashboardPage />} />
+              <Route path="/proveedores/listado" element={<ProveedoresListPage />} />
+              <Route path="/proveedores/nuevo" element={<NuevoProveedorPage />} />
               <Route path="/documents" element={<DocumentsPage />} />
               <Route path="/gastos" element={<GastosPage />} />
               <Route path="/ingresos" element={<IngresosPage />} />

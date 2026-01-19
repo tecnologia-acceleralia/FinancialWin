@@ -2,7 +2,8 @@ import React from 'react';
 import { ViewState } from '../../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useNavigate } from 'react-router-dom';
-import { Card } from '../../components/common';
+import { Card } from '../../components/ui';
+import { PageHeader, type PageHeaderAction } from '../../components/common/PageHeader';
 
 interface HomePageProps {
   onNavigate?: (view: ViewState, subAction?: string) => void;
@@ -33,8 +34,21 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
     navigate(route);
   };
 
+  const headerActions: PageHeaderAction[] = [
+    {
+      icon: 'settings',
+      label: 'Configuración',
+      onClick: () => console.log('Configuración'),
+      variant: 'default',
+    },
+  ];
+
   return (
     <div className="home-container">
+      <PageHeader
+        title="Dashboard"
+        actions={headerActions}
+      />
       {/* Hero Section */}
       <div className="home-hero-grid">
         <div className="brand-hero-card">

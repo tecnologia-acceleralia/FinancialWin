@@ -54,65 +54,51 @@ class ErrorBoundary extends Component<Props, State> {
       }
 
       return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50">
-          <div className="max-w-md w-full bg-white shadow-lg rounded-lg p-6">
-            <div className="flex items-center mb-4">
-              <div className="flex-shrink-0">
-                <svg
-                  className="h-8 w-8 text-red-500"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
-                  />
-                </svg>
+        <div className="error-overlay">
+          <div className="error-card">
+            <div className="error-header">
+              <div className="error-icon-wrapper">
+                <span className="error-icon">warning</span>
               </div>
-              <div className="ml-3">
-                <h3 className="text-lg font-medium text-gray-900">
-                  Algo salió mal
-                </h3>
+              <div className="error-title-container">
+                <h3 className="error-title">Algo salió mal</h3>
               </div>
             </div>
 
-            <div className="mb-4">
+            <div className="error-content">
               {(this.state.error as any)?.isAuthError ||
               (this.state.error as any)?.statusCode === 401 ? (
                 <div>
-                  <p className="text-sm text-gray-600 mb-2">
+                  <p className="error-message-spaced">
                     Tu sesión ha expirado o no estás autenticado.
                   </p>
-                  <p className="text-sm text-gray-600">
+                  <p className="error-message">
                     Redirigiendo al login en unos segundos...
                   </p>
                 </div>
               ) : (
-                <p className="text-sm text-gray-600">
+                <p className="error-message">
                   Ha ocurrido un error inesperado. Por favor, recarga la página
                   o contacta al soporte si el problema persiste.
                 </p>
               )}
             </div>
 
-            {process.env.NODE_ENV === 'development' && this.state.error && (
-              <details className="mb-4">
-                <summary className="text-sm font-medium text-gray-700 cursor-pointer">
+            {import.meta.env.DEV && this.state.error && (
+              <details className="error-details">
+                <summary className="error-details-summary">
                   Detalles del error (desarrollo)
                 </summary>
-                <pre className="mt-2 text-xs text-gray-600 bg-gray-100 p-2 rounded overflow-auto">
+                <pre className="error-details-pre">
                   {this.state.error.stack}
                 </pre>
               </details>
             )}
 
-            <div className="flex space-x-3">
+            <div className="error-actions">
               <button
                 onClick={() => window.location.reload()}
-                className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="btn-ai-primary flex-1"
               >
                 Recargar página
               </button>
@@ -120,7 +106,7 @@ class ErrorBoundary extends Component<Props, State> {
                 onClick={() =>
                   this.setState({ hasError: false, error: undefined })
                 }
-                className="flex-1 bg-gray-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                className="btn-ai-secondary flex-1"
               >
                 Intentar de nuevo
               </button>

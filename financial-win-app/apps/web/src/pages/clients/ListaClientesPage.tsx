@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { EntityCard } from '../../components/common/EntityCard';
+import { PageHeader, type PageHeaderAction } from '../../components/common/PageHeader';
 
 interface Cliente {
   id: string;
@@ -97,152 +99,66 @@ export const ListaClientesPage: React.FC = () => {
     setPaginaActual(pagina);
   };
 
-  const getEstadoClass = (estado: string): string => {
-    switch (estado) {
-      case 'activo':
-        return 'status-activo';
-      case 'pendiente':
-        return 'status-pendiente';
-      case 'inactivo':
-        return 'status-inactivo';
-      default:
-        return 'status-inactivo';
-    }
-  };
-
-  const getEstadoLabel = (estado: string): string => {
-    switch (estado) {
-      case 'activo':
-        return 'Activo';
-      case 'pendiente':
-        return 'Pendiente';
-      case 'inactivo':
-        return 'Inactivo';
-      default:
-        return 'Inactivo';
-    }
-  };
+  // Definir acciones para el PageHeader
+  const headerActions: PageHeaderAction[] = [
+    {
+      icon: 'filter_list',
+      label: 'Filtros',
+      onClick: handleFiltro,
+      variant: 'default',
+    },
+    {
+      icon: vistaGrid ? 'format_list_bulleted' : 'grid_view',
+      label: vistaGrid ? 'Vista lista' : 'Vista grid',
+      onClick: handleVista,
+      variant: 'default',
+    },
+    {
+      icon: 'download',
+      label: 'Descargar',
+      onClick: handleDescarga,
+      variant: 'default',
+    },
+    {
+      icon: 'settings',
+      label: 'Configuración',
+      onClick: handleConfiguracion,
+      variant: 'default',
+    },
+    {
+      icon: 'add',
+      label: 'Nuevo cliente',
+      onClick: handleNuevoCliente,
+      variant: 'primary',
+    },
+  ];
 
   return (
     <div className="clients-list-container">
-      {/* Barra de herramientas superior */}
-      <div className="action-toolbar">
-        {/* Buscador */}
-        <div className="search-input-wrapper">
-          <span className="material-symbols-outlined search-input-icon">search</span>
-          <input
-            type="text"
-            placeholder="Buscar cliente (Nombre, CIF)..."
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-            className="search-input"
-          />
-        </div>
-
-        {/* Grupo de botones */}
-        <div className="toolbar-buttons-group">
-          <button
-            type="button"
-            onClick={handleFiltro}
-            className="toolbar-button"
-            aria-label="Filtros"
-          >
-            <span className="material-symbols-outlined toolbar-button-icon">filter_list</span>
-          </button>
-          <button
-            type="button"
-            onClick={handleVista}
-            className="toolbar-button"
-            aria-label={vistaGrid ? 'Vista lista' : 'Vista grid'}
-          >
-            <span className="material-symbols-outlined toolbar-button-icon">
-              {vistaGrid ? 'format_list_bulleted' : 'grid_view'}
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={handleDescarga}
-            className="toolbar-button"
-            aria-label="Descargar"
-          >
-            <span className="material-symbols-outlined toolbar-button-icon">download</span>
-          </button>
-          <button
-            type="button"
-            onClick={handleConfiguracion}
-            className="toolbar-button"
-            aria-label="Configuración"
-          >
-            <span className="material-symbols-outlined toolbar-button-icon">settings</span>
-          </button>
-          <button
-            type="button"
-            onClick={handleNuevoCliente}
-            className="toolbar-button-primary"
-            aria-label="Nuevo cliente"
-          >
-            <span className="material-symbols-outlined toolbar-button-icon">add</span>
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        title="Lista de Clientes"
+        showBackButton={false}
+        showSearch={true}
+        searchValue={busqueda}
+        onSearchChange={setBusqueda}
+        searchPlaceholder="Buscar cliente (Nombre, CIF)..."
+        actions={headerActions}
+      />
 
       {/* Grid de clientes */}
       <div className="clients-grid">
         {clientesPaginados.map((cliente) => (
-          <div key={cliente.id} className="client-card">
-            {/* Header con avatar, nombre y badge de estado */}
-            <div className="client-card-header">
-              <div className="client-avatar">
-                {obtenerIniciales(cliente.nombre)}
-              </div>
-              <div className="client-name-container">
-                <h3 className="client-card-name">{cliente.nombre}</h3>
-                <div className="client-card-meta">
-                  <span>{cliente.nif}</span>
-                  <span className="client-card-meta-separator">•</span>
-                  <span>{cliente.tipo}</span>
-                </div>
-              </div>
-              {/* Badge de estado */}
-              <span className={getEstadoClass(cliente.estado)}>
-                {getEstadoLabel(cliente.estado)}
-              </span>
-            </div>
-
-            {/* Información financiera */}
-            <div className="client-card-financial">
-              <div className="client-financial-item">
-                <span className="material-symbols-outlined client-financial-icon">
-                  account_balance
-                </span>
-                <span className="client-financial-text">Saldo Bancario</span>
-                <span className="client-financial-amount">
-                  {formatearMoneda(cliente.saldoBancario)}
-                </span>
-              </div>
-              <div className="client-financial-item">
-                <span className="material-symbols-outlined client-financial-icon">
-                  payments
-                </span>
-                <span className="client-financial-text">Pagos Pendientes</span>
-                <span className="client-financial-amount">
-                  {formatearMoneda(cliente.pagosPendientes)}
-                </span>
-              </div>
-            </div>
-
-            {/* Botón ver ficha */}
-            <button
-              type="button"
-              onClick={() => handleVerFicha(cliente.id)}
-              className="client-card-action"
-            >
-              <span className="material-symbols-outlined client-card-action-icon">
-                visibility
-              </span>
-              <span>Ver ficha</span>
-            </button>
-          </div>
+          <EntityCard
+            key={cliente.id}
+            name={cliente.nombre}
+            initials={obtenerIniciales(cliente.nombre)}
+            nif={cliente.nif}
+            type={cliente.tipo}
+            status={cliente.estado}
+            account={formatearMoneda(cliente.saldoBancario)}
+            balance={formatearMoneda(cliente.pagosPendientes)}
+            onDetailClick={() => handleVerFicha(cliente.id)}
+          />
         ))}
       </div>
 

@@ -233,6 +233,18 @@
     @apply bg-white dark:bg-[#131B29] rounded-2xl p-6 border border-[#e5e5e5] dark:border-[#2A3B5A] shadow-card flex flex-col justify-between h-full hover:shadow-lg transition-all cursor-default;
   }
 
+  .kpi-label {
+    @apply text-sm font-semibold text-[#525252] dark:text-[#a3a3a3] uppercase tracking-wider;
+  }
+
+  .kpi-value {
+    @apply text-3xl font-bold text-[#171717] dark:text-[#fafafa] mt-2;
+  }
+
+  .kpi-content {
+    @apply flex items-center justify-between mb-4;
+  }
+
   /* Shadow utilities */
   .shadow-card {
     @apply shadow-sm;
@@ -341,6 +353,200 @@
 
   .badge-status-error {
     @apply badge-processing-status text-red-500;
+  }
+
+  /* ============================================
+     Entity Card - Clientes y entidades
+     ============================================ */
+  .entity-card {
+    background-color: #1a1c2e;
+    border: 1px solid #2d3045;
+    border-radius: 16px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    min-height: 320px;
+  }
+
+  .entity-card-header {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+  }
+
+  .entity-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: #2d3045;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 0.9rem;
+  }
+
+  .entity-info-container {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+    gap: 8px;
+  }
+
+  .entity-name {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #ffffff;
+    margin: 0;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    height: 2.8rem;
+  }
+
+  .entity-subtitle {
+    font-size: 0.875rem;
+    color: #a1a5b7;
+    margin-top: 4px;
+  }
+
+  .status-badge {
+    padding: 4px 12px;
+    border-radius: 8px;
+    font-size: 0.65rem;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    align-self: flex-start;
+  }
+
+  .status-activo {
+    background: rgba(46, 125, 50, 0.2);
+    color: #4caf50;
+  }
+
+  .status-pendiente {
+    background: rgba(239, 108, 0, 0.2);
+    color: #ff9800;
+  }
+
+  .status-inactivo {
+    background: rgba(158, 158, 158, 0.2);
+    color: #9e9e9e;
+  }
+
+  .entity-card-body {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  /* Layout para proveedores (contactos en columna) */
+  .entity-card-body-provider {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .entity-field {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .entity-field-icon {
+    font-family: 'Material Symbols Outlined';
+    font-size: 1.25rem;
+    color: #a1a5b7;
+    flex-shrink: 0;
+  }
+
+  .entity-field-content {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .entity-field-label {
+    font-size: 0.875rem;
+    color: #a1a5b7;
+    line-height: 1.4;
+  }
+
+  .entity-field-value {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #ffffff;
+    line-height: 1.4;
+  }
+
+  /* Campos de contacto para proveedores */
+  .entity-contact-field {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .entity-contact-icon {
+    font-size: 1rem;
+    color: #4a90e2;
+    flex-shrink: 0;
+    line-height: 1;
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .entity-contact-text {
+    font-size: 0.875rem;
+    color: #a1a5b7;
+    line-height: 1.4;
+    word-break: break-word;
+    flex: 1;
+  }
+
+  .entity-card-action {
+    width: 100%;
+    border: 1px solid #323248;
+    border-top: 1px solid #2d3045;
+    background: transparent;
+    color: #a1a5b7;
+    padding: 12px 16px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-weight: 600;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.3s;
+    margin-top: auto;
+  }
+
+  .entity-card-action:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: #3d4054;
+    color: #ffffff;
+  }
+
+  .entity-card-action-icon {
+    font-family: 'Material Symbols Outlined';
+    font-size: 1.125rem;
   }
 
   /* AI Studio - Preview y Visualización */
@@ -1831,6 +2037,10 @@
     @apply home-kpi-icon-wrapper text-orange-600 bg-orange-50 dark:text-orange-400 dark:bg-orange-900/20;
   }
 
+  .home-kpi-icon-wrapper-emerald {
+    @apply home-kpi-icon-wrapper text-emerald-600 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-900/20;
+  }
+
   .home-kpi-icon {
     @apply material-symbols-outlined text-xl;
   }
@@ -2128,6 +2338,15 @@
     @apply text-xl font-bold text-[#171717] dark:text-[#fafafa];
   }
 
+  /* Bloque interno dentro de una sección */
+  .form-section-block {
+    @apply mt-6 first:mt-0;
+  }
+
+  .form-section-block-title {
+    @apply text-sm font-semibold text-[#525252] dark:text-[#a3a3a3] mb-4 uppercase tracking-wider;
+  }
+
   /* Input group - Layout para etiqueta + input */
   .input-group {
     @apply flex flex-col;
@@ -2226,6 +2445,104 @@
   /* Grid de clientes */
   .clients-grid {
     @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6;
+  }
+
+  /* ============================================
+     ClientsPage - Clases Semánticas
+     ============================================ */
+
+  /* Grid de estadísticas de clientes */
+  .clients-stats-grid {
+    @apply mt-8 grid grid-cols-1 md:grid-cols-2 gap-6;
+  }
+
+  /* Contenedor del header de cada estadística */
+  .stat-header {
+    @apply flex items-center justify-between mb-4;
+  }
+
+  /* Etiqueta de la estadística (título pequeño en mayúsculas) */
+  .stat-label {
+    @apply text-sm font-semibold uppercase tracking-wider;
+    color: #525252;
+  }
+
+  .dark .stat-label {
+    color: #a3a3a3;
+  }
+
+  /* Valor de la estadística (número grande) */
+  .stat-value {
+    @apply text-3xl font-bold mt-2;
+    color: #171717;
+  }
+
+  .dark .stat-value {
+    color: #fafafa;
+  }
+
+  /* Contenedor base del icono de estadística */
+  .stat-icon-container {
+    @apply w-12 h-12 rounded-xl flex items-center justify-center;
+  }
+
+  /* Variante azul del contenedor de icono */
+  .stat-icon-container-blue {
+    @apply stat-icon-container;
+    background-color: #dbeafe;
+  }
+
+  .dark .stat-icon-container-blue {
+    background-color: rgba(30, 58, 138, 0.2);
+  }
+
+  /* Variante verde del contenedor de icono */
+  .stat-icon-container-green {
+    @apply stat-icon-container;
+    background-color: #dcfce7;
+  }
+
+  .dark .stat-icon-container-green {
+    background-color: rgba(20, 83, 45, 0.2);
+  }
+
+  /* Icono base de estadística */
+  .stat-icon {
+    @apply material-symbols-outlined text-2xl;
+  }
+
+  /* Variante azul del icono */
+  .stat-icon-blue {
+    @apply stat-icon;
+    color: #2563eb;
+  }
+
+  .dark .stat-icon-blue {
+    color: #60a5fa;
+  }
+
+  /* Variante verde del icono */
+  .stat-icon-green {
+    @apply stat-icon;
+    color: #16a34a;
+  }
+
+  .dark .stat-icon-green {
+    color: #4ade80;
+  }
+
+  /* Descripción de la página de clientes */
+  .clients-page-description {
+    @apply mt-6;
+  }
+
+  .clients-page-description p {
+    @apply text-sm;
+    color: #737373;
+  }
+
+  .dark .clients-page-description p {
+    color: #a3a3a3;
   }
 
   /* Tarjeta de cliente */
@@ -2405,6 +2722,397 @@
 
   .toolbar-button-primary .toolbar-button-icon {
     @apply text-white;
+  }
+
+  /* ============================================
+     Proveedor Form - Contactos Table
+     ============================================ */
+
+  /* Estado vacío de contactos */
+  .contactos-empty-state {
+    @apply flex flex-col items-center justify-center py-12 px-6 text-center;
+  }
+
+  .contactos-empty-text {
+    @apply text-sm text-[#525252] dark:text-[#a3a3a3] mb-4;
+  }
+
+  /* Contenedor de la tabla de contactos */
+  .contactos-table-container {
+    @apply w-full overflow-x-auto;
+  }
+
+  /* Tabla de contactos */
+  .contactos-table {
+    @apply w-full text-left border-collapse;
+  }
+
+  .contactos-table-header {
+    @apply bg-gray-50 dark:bg-[#1B273B] uppercase text-xs font-semibold tracking-wider text-gray-600 dark:text-gray-400 px-4 py-3 border-b border-[#e5e5e5] dark:border-[#2A3B5A];
+  }
+
+  .contactos-table-row {
+    @apply border-b border-[#e5e5e5] dark:border-[#2A3B5A] hover:bg-gray-50 dark:hover:bg-[#1B273B] transition-colors;
+  }
+
+  .contactos-table-row td {
+    @apply px-4 py-3;
+  }
+
+  .contactos-table-row td input {
+    @apply w-full;
+  }
+
+  /* ============================================
+     Proveedores Dashboard - Clases Semánticas
+     ============================================ */
+
+  /* Contenedor principal del dashboard */
+  .proveedores-dashboard-container {
+    @apply w-full p-6 md:p-8 space-y-6;
+  }
+
+  /* Grid de estadísticas */
+  .proveedores-stats-grid {
+    @apply grid grid-cols-1 md:grid-cols-2 gap-6 mt-8;
+  }
+
+  .development-notice {
+    @apply mt-6;
+  }
+
+  .development-notice p {
+    @apply text-sm text-[#737373] dark:text-[#a3a3a3];
+  }
+
+  .proveedores-stat-content {
+    @apply flex flex-col h-full;
+  }
+
+  .proveedores-stat-header {
+    @apply flex items-start gap-3 mb-4;
+  }
+
+  .proveedores-stat-icon-wrapper {
+    @apply w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center flex-shrink-0;
+  }
+
+  .proveedores-stat-icon {
+    @apply text-blue-600 dark:text-blue-400 text-2xl;
+  }
+
+  .proveedores-stat-info {
+    @apply flex-1 min-w-0;
+  }
+
+  .proveedores-stat-label {
+    @apply text-sm font-medium text-slate-600 dark:text-slate-400 mb-1;
+  }
+
+  .proveedores-stat-value {
+    @apply text-3xl font-bold text-slate-900 dark:text-white;
+  }
+
+  .proveedores-stat-footer {
+    @apply flex items-center justify-between mt-auto pt-4 border-t border-slate-200 dark:border-slate-700;
+  }
+
+  .proveedores-stat-subtitle {
+    @apply text-xs text-slate-500 dark:text-slate-400;
+  }
+
+  .proveedores-stat-trend {
+    @apply text-xs font-semibold px-2 py-1 rounded-md;
+  }
+
+  .proveedores-stat-trend-positive {
+    @apply bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400;
+  }
+
+  .proveedores-stat-trend-negative {
+    @apply bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400;
+  }
+
+  /* Grid principal (alertas y actividad) */
+  .proveedores-main-grid {
+    @apply grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6;
+  }
+
+  /* Sección de alertas */
+  .proveedores-alerts-section {
+    @apply w-full;
+  }
+
+  .proveedores-section-header {
+    @apply flex items-center justify-between mb-6;
+  }
+
+  .proveedores-section-title {
+    @apply text-xl font-bold font-poppins text-slate-900 dark:text-white;
+  }
+
+  .proveedores-section-icon {
+    @apply text-slate-400 dark:text-slate-500 text-2xl;
+  }
+
+  .proveedores-alerts-list {
+    @apply space-y-3;
+  }
+
+  .proveedores-alert-item {
+    @apply flex items-start gap-3 p-4 rounded-xl border;
+  }
+
+  .proveedores-alert-item-warning {
+    @apply bg-orange-50 dark:bg-orange-900/10 border-orange-200 dark:border-orange-900/30;
+  }
+
+  .proveedores-alert-item-error {
+    @apply bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-900/30;
+  }
+
+  .proveedores-alert-item-info {
+    @apply bg-blue-50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-900/30;
+  }
+
+  .proveedores-alert-icon {
+    @apply text-xl flex-shrink-0 mt-0.5;
+  }
+
+  .proveedores-alert-item-warning .proveedores-alert-icon {
+    @apply text-orange-600 dark:text-orange-400;
+  }
+
+  .proveedores-alert-item-error .proveedores-alert-icon {
+    @apply text-red-600 dark:text-red-400;
+  }
+
+  .proveedores-alert-item-info .proveedores-alert-icon {
+    @apply text-blue-600 dark:text-blue-400;
+  }
+
+  .proveedores-alert-content {
+    @apply flex-1 min-w-0;
+  }
+
+  .proveedores-alert-title {
+    @apply text-sm font-bold text-slate-900 dark:text-white mb-1;
+  }
+
+  .proveedores-alert-description {
+    @apply text-xs text-slate-600 dark:text-slate-400;
+  }
+
+  /* Sección de actividad */
+  .proveedores-activity-section {
+    @apply w-full;
+  }
+
+  .proveedores-activity-timeline {
+    @apply space-y-4;
+  }
+
+  .proveedores-activity-item {
+    @apply flex items-start gap-4 relative;
+  }
+
+  .proveedores-activity-line {
+    @apply flex flex-col items-center relative;
+  }
+
+  .proveedores-activity-line-connector {
+    @apply absolute top-8 left-1/2 w-0.5 h-full bg-slate-200 dark:bg-slate-700 -translate-x-1/2;
+  }
+
+  .proveedores-activity-icon-wrapper {
+    @apply w-10 h-10 rounded-full bg-purple-50 dark:bg-purple-900/20 flex items-center justify-center flex-shrink-0 relative z-10;
+  }
+
+  .proveedores-activity-icon {
+    @apply text-purple-600 dark:text-purple-400 text-lg;
+  }
+
+  .proveedores-activity-content {
+    @apply flex-1 min-w-0 pt-1;
+  }
+
+  .proveedores-activity-title {
+    @apply text-sm font-bold text-slate-900 dark:text-white mb-1;
+  }
+
+  .proveedores-activity-description {
+    @apply text-xs text-slate-600 dark:text-slate-400 mb-1;
+  }
+
+  .proveedores-activity-date {
+    @apply text-xs text-slate-500 dark:text-slate-500;
+  }
+
+  /* Accesos directos */
+  .proveedores-shortcuts-section {
+    @apply mb-6;
+  }
+
+  .proveedores-shortcuts-grid {
+    @apply grid grid-cols-1 md:grid-cols-2 gap-4;
+  }
+
+  .proveedores-shortcut-card {
+    @apply studio-card p-6 cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all duration-300 text-left;
+    text-decoration: none;
+    display: block;
+    border: none;
+    background: none;
+    width: 100%;
+  }
+
+  .proveedores-shortcut-card:visited {
+    @apply text-slate-900 dark:text-white;
+  }
+
+  .proveedores-shortcut-card:hover {
+    @apply text-slate-900 dark:text-white;
+  }
+
+  .proveedores-shortcut-icon-wrapper {
+    @apply w-14 h-14 rounded-xl bg-gradient-to-br from-[#B84E9D] to-purple-600 flex items-center justify-center mb-4;
+  }
+
+  .proveedores-shortcut-icon {
+    @apply text-white text-2xl;
+  }
+
+  .proveedores-shortcut-title {
+    @apply text-lg font-bold text-slate-900 dark:text-white mb-2;
+  }
+
+  .proveedores-shortcut-description {
+    @apply text-sm text-slate-600 dark:text-slate-400;
+  }
+
+  /* Sugerencia IA */
+  .proveedores-ai-suggestion {
+    @apply studio-card p-6 bg-gradient-to-r from-[#B84E9D]/10 to-purple-600/10 border-2 border-[#B84E9D]/20 dark:border-[#B84E9D]/30;
+  }
+
+  .proveedores-ai-suggestion-content {
+    @apply flex items-start gap-4;
+  }
+
+  .proveedores-ai-suggestion-icon-wrapper {
+    @apply w-12 h-12 rounded-xl bg-gradient-to-br from-[#B84E9D] to-purple-600 flex items-center justify-center flex-shrink-0;
+  }
+
+  .proveedores-ai-suggestion-icon {
+    @apply text-white text-2xl;
+  }
+
+  .proveedores-ai-suggestion-text {
+    @apply flex-1 min-w-0;
+  }
+
+  .proveedores-ai-suggestion-title {
+    @apply text-lg font-bold text-slate-900 dark:text-white mb-2;
+  }
+
+  .proveedores-ai-suggestion-description {
+    @apply text-sm text-slate-700 dark:text-slate-300 leading-relaxed;
+  }
+
+  /* ============================================
+     PageHeader - Componente Reutilizable
+     ============================================ */
+
+  /* Contenedor principal del PageHeader */
+  .page-header-container {
+    @apply w-full mb-6;
+  }
+
+  /* Header con botón volver y título */
+  .page-header {
+    @apply flex items-center justify-between mb-6;
+  }
+
+  .page-header-left {
+    @apply flex items-center gap-4;
+  }
+
+  .page-header-title {
+    @apply text-3xl font-bold font-poppins text-slate-900 dark:text-white;
+  }
+
+  /* ============================================
+     ErrorBoundary - Clases Semánticas
+     ============================================ */
+
+  /* Overlay principal del error */
+  .error-overlay {
+    @apply min-h-screen flex items-center justify-center bg-gray-50;
+  }
+
+  /* Tarjeta del error */
+  .error-card {
+    @apply max-w-md w-full bg-white shadow-lg rounded-lg p-6;
+  }
+
+  /* Header con icono y título */
+  .error-header {
+    @apply flex items-center mb-4;
+  }
+
+  /* Wrapper del icono */
+  .error-icon-wrapper {
+    @apply flex-shrink-0;
+  }
+
+  /* Icono de error (Material Symbols) */
+  .error-icon {
+    @apply material-symbols-outlined h-8 w-8 text-red-500;
+  }
+
+  /* Contenedor del título */
+  .error-title-container {
+    @apply ml-3;
+  }
+
+  /* Título del error */
+  .error-title {
+    @apply text-lg font-medium text-gray-900;
+  }
+
+  /* Contenedor del contenido del mensaje */
+  .error-content {
+    @apply mb-4;
+  }
+
+  /* Mensaje de error */
+  .error-message {
+    @apply text-sm text-gray-600;
+  }
+
+  /* Mensaje de error con margen inferior */
+  .error-message-spaced {
+    @apply error-message mb-2;
+  }
+
+  /* Contenedor de detalles (desarrollo) */
+  .error-details {
+    @apply mb-4;
+  }
+
+  /* Summary del details */
+  .error-details-summary {
+    @apply text-sm font-medium text-gray-700 cursor-pointer;
+  }
+
+  /* Pre con el stack trace */
+  .error-details-pre {
+    @apply mt-2 text-xs text-gray-600 bg-gray-100 p-2 rounded overflow-auto;
+  }
+
+  /* Contenedor de acciones (botones) */
+  .error-actions {
+    @apply flex space-x-3;
   }
 }
 

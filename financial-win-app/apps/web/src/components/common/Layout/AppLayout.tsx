@@ -51,6 +51,22 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ currentView }) => {
       return;
     }
 
+    if (view === 'suppliers' && subAction === 'create') {
+      navigate('/proveedores/nuevo');
+      if (window.innerWidth < 768) {
+        setIsSidebarOpen(false);
+      }
+      return;
+    }
+
+    if (view === 'suppliers' && subAction === 'list') {
+      navigate('/proveedores');
+      if (window.innerWidth < 768) {
+        setIsSidebarOpen(false);
+      }
+      return;
+    }
+
     // Default navigation using React Router
     const routeMap: Record<ViewState, string> = {
       'dashboard': '/',
@@ -58,7 +74,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ currentView }) => {
       'records': '/records',
       'billing': '/billing',
       'clients': '/clients',
-      'suppliers': '/suppliers',
+      'suppliers': '/proveedores',
       'documents': '/documents',
       'upload-invoice': '/upload-invoice',
       'tickets': '/tickets',

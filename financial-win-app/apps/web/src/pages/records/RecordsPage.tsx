@@ -1,44 +1,81 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { RegistrosTable } from '../../components/features/registros/RegistrosTable';
+import { RegistrosTable } from '../../features/finance/components/RegistrosTable';
+import { PageHeader, type PageHeaderAction } from '../../components/common/PageHeader';
+
+// Acciones del header definidas fuera del componente para mejor legibilidad
+const HEADER_ACTIONS: PageHeaderAction[] = [
+  {
+    icon: 'filter_list',
+    label: 'Filtros',
+    onClick: () => console.log('Mostrar filtros'),
+    variant: 'default',
+  },
+  {
+    icon: 'download',
+    label: 'Descargar',
+    onClick: () => console.log('Descargar registros'),
+    variant: 'default',
+  },
+  {
+    icon: 'settings',
+    label: 'Configuración',
+    onClick: () => console.log('Configuración'),
+    variant: 'default',
+  },
+];
+
+// Subcomponente: Resumen de registros (KPI)
+interface RecordsSummaryProps {
+  total: number;
+}
+
+const RecordsSummary: React.FC<RecordsSummaryProps> = ({ total }) => {
+  const formattedTotal = new Intl.NumberFormat('es-ES').format(total);
+
+  return (
+    <div className="studio-kpi-card">
+      <div className="kpi-content">
+        <div>
+          <p className="kpi-label">
+            Total de Registros
+          </p>
+          <h3 className="kpi-value">
+            {formattedTotal}
+          </h3>
+        </div>
+        <div className="home-kpi-icon-wrapper-blue">
+          <span className="material-symbols-outlined home-kpi-icon">
+            table_view
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export const RecordsPage: React.FC = () => {
   const { t } = useLanguage();
+  const [busqueda, setBusqueda] = useState('');
 
   return (
     <div className="layout-page-container">
-      <div className="studio-container">
-        <div className="studio-card">
-          <div className="studio-form-header">
-            <h1 className="studio-form-title text-slate-900 dark:text-white">Registros</h1>
-            <p className="studio-form-subtitle">
-              Gestión y visualización de registros financieros
-            </p>
-          </div>
+      <PageHeader
+        title="Registros"
+        showSearch
+        searchValue={busqueda}
+        onSearchChange={setBusqueda}
+        searchPlaceholder="Buscar registro..."
+        actions={HEADER_ACTIONS}
+      />
 
-          <div className="mt-8">
-            <div className="studio-kpi-card">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <p className="text-sm font-semibold text-[#525252] dark:text-[#a3a3a3] uppercase tracking-wider">
-                    Total de Registros
-                  </p>
-                  <h3 className="text-3xl font-bold text-[#171717] dark:text-[#fafafa] mt-2">
-                    1,234
-                  </h3>
-                </div>
-                <div className="w-12 h-12 rounded-xl bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-blue-600 dark:text-blue-400 text-2xl">
-                    table_view
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
+      <div className="studio-card">
+        <div className="mt-8">
+          <RecordsSummary total={1234} />
+        </div>
 
-          <div className="mt-8">
-            <RegistrosTable />
-          </div>
+        <div className="mt-8">
+          <RegistrosTable />
         </div>
       </div>
     </div>
