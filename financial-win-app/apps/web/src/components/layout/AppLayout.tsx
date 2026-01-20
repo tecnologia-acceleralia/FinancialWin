@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
-import { ViewState } from '../../../types';
-import { useTheme } from '../../../contexts/ThemeContext';
+import { ViewState } from '../../types';
+import { useTheme } from '../../contexts/ThemeContext';
 
 interface AppLayoutProps {
   currentView: ViewState;
@@ -81,6 +81,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ currentView }) => {
       'subscriptions': '/subscriptions',
       'gastos': '/gastos',
       'ingresos': '/ingresos',
+      'settings': '/settings',
     };
     
     const route = routeMap[view] || '/';

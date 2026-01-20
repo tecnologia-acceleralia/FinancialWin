@@ -35,7 +35,8 @@ export type ViewState =
   | 'records'
   | 'ai-extraction'
   | 'gastos'
-  | 'ingresos';
+  | 'ingresos'
+  | 'settings';
 
 export interface NavSubItem {
   label: string;

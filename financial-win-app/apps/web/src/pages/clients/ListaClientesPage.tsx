@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { EntityCard } from '../../components/common/EntityCard';
-import { PageHeader, type PageHeaderAction } from '../../components/common/PageHeader';
+import { EntityCard } from '@/features/entities/components/EntityCard';
+import { PageHeader, type PageHeaderAction } from '../../components/layout';
+import { EntityFilterPanel, type EntityFilterValues } from '@/features/entities/components/EntityFilterPanel';
 
 interface Cliente {
   id: string;
@@ -47,21 +48,92 @@ export const ListaClientesPage: React.FC = () => {
   const [paginaActual, setPaginaActual] = useState(1);
   const [busqueda, setBusqueda] = useState('');
   const [vistaGrid, setVistaGrid] = useState(true);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [filters, setFilters] = useState<EntityFilterValues>({
+    status: [],
+    types: [],
+    balanceRange: { min: null, max: null },
+    paymentsRange: { min: null, max: null },
+  });
   const resultadosPorPagina = 8;
-  const totalResultados = MOCK_CLIENTES.length;
+
+  // Filtrar clientes por búsqueda y filtros avanzados
+  const clientesFiltrados = useMemo(() => {
+    let resultado = MOCK_CLIENTES;
+
+    // Filtro por búsqueda de texto
+    if (busqueda.trim()) {
+      const busquedaLower = busqueda.toLowerCase().trim();
+      resultado = resultado.filter(
+        (cliente) =>
+          cliente.nombre.toLowerCase().includes(busquedaLower) ||
+          cliente.nif.toLowerCase().includes(busquedaLower)
+      );
+    }
+
+    // Filtro por estados
+    if (filters.status.length > 0) {
+      resultado = resultado.filter((cliente) =>
+        filters.status.includes(cliente.estado)
+      );
+    }
+
+    // Filtro por tipos
+    if (filters.types.length > 0) {
+      resultado = resultado.filter((cliente) =>
+        filters.types.includes(cliente.tipo)
+      );
+    }
+
+    // Filtro por rango de saldo bancario
+    if (filters.balanceRange.min !== null) {
+      resultado = resultado.filter(
+        (cliente) => cliente.saldoBancario >= filters.balanceRange.min!
+      );
+    }
+    if (filters.balanceRange.max !== null) {
+      resultado = resultado.filter(
+        (cliente) => cliente.saldoBancario <= filters.balanceRange.max!
+      );
+    }
+
+    // Filtro por rango de pagos pendientes
+    if (filters.paymentsRange.min !== null) {
+      resultado = resultado.filter(
+        (cliente) => cliente.pagosPendientes >= filters.paymentsRange.min!
+      );
+    }
+    if (filters.paymentsRange.max !== null) {
+      resultado = resultado.filter(
+        (cliente) => cliente.pagosPendientes <= filters.paymentsRange.max!
+      );
+    }
+
+    return resultado;
+  }, [busqueda, filters]);
+
+  const totalResultados = clientesFiltrados.length;
   const totalPaginas = Math.ceil(totalResultados / resultadosPorPagina);
   
   const inicio = (paginaActual - 1) * resultadosPorPagina;
   const fin = inicio + resultadosPorPagina;
-  const clientesPaginados = MOCK_CLIENTES.slice(inicio, fin);
+  const clientesPaginados = clientesFiltrados.slice(inicio, fin);
+
+  // Resetear página cuando cambia la búsqueda o filtros
+  React.useEffect(() => {
+    setPaginaActual(1);
+  }, [busqueda, filters]);
 
   const handleNuevoCliente = () => {
     navigate('/clientes/nuevo');
   };
 
   const handleFiltro = () => {
-    // TODO: Implementar filtros
-    console.log('Mostrar filtros');
+    setIsFilterOpen(true);
+  };
+
+  const handleFilterChange = (newFilters: EntityFilterValues) => {
+    setFilters(newFilters);
   };
 
   const handleVista = () => {
@@ -79,8 +151,7 @@ export const ListaClientesPage: React.FC = () => {
   };
 
   const handleVerFicha = (clienteId: string) => {
-    // TODO: Implementar navegación a ficha del cliente
-    console.log('Ver ficha del cliente:', clienteId);
+    navigate(`/cliente/detalle/${clienteId}`);
   };
 
   const handlePaginaAnterior = () => {
@@ -208,6 +279,16 @@ export const ListaClientesPage: React.FC = () => {
           </button>
         </div>
       </div>
+
+      <EntityFilterPanel
+        isOpen={isFilterOpen}
+        onClose={() => setIsFilterOpen(false)}
+        onFilterChange={handleFilterChange}
+        initialFilters={filters}
+        availableStatus={['activo', 'pendiente', 'inactivo']}
+        availableTypes={['Nacional', 'Extranjero']}
+        entityType="clientes"
+      />
     </div>
   );
 };

@@ -36,6 +36,7 @@ const translations: Record<Language, Translations> = {
       'ai-extraction': 'Extracción con IA',
       gastos: 'Gastos',
       ingresos: 'Ingresos',
+      settings: 'Configuración',
       subtitle: {
         dashboard: 'Visión global del rendimiento financiero y alertas prioritarias.',
         billing: 'Procesamiento inteligente de facturas y gestión de flujo de caja.',
@@ -46,6 +47,7 @@ const translations: Record<Language, Translations> = {
         'ai-extraction': 'Extracción automática de datos de documentos con inteligencia artificial.',
         gastos: 'Gestión y visualización de gastos financieros.',
         ingresos: 'Gestión y visualización de ingresos financieros.',
+        settings: 'Gestiona tu perfil y preferencias de usuario',
       },
       notifications: 'Notificaciones',
       markRead: 'Marcar leídas',
@@ -111,6 +113,38 @@ const translations: Record<Language, Translations> = {
         },
       },
     },
+    help: {
+      title: 'Centro de Ayuda',
+      searchPlaceholder: 'Buscar en las preguntas frecuentes...',
+      faqs: {
+        title: 'Preguntas Frecuentes',
+        uploadInvoice: {
+          question: '¿Cómo puedo subir mis facturas y gastos?',
+          answer: 'Puedes arrastrar tus archivos directamente a la zona de "Documentos" o hacer clic en el botón de subida. Una vez subidos, nuestra IA (Gemini) analizará el documento automáticamente para extraer los datos.',
+        },
+        aiFormats: {
+          question: '¿Qué formatos de archivo acepta la plataforma?',
+          answer: 'Actualmente puedes subir documentos en formato PDF, imágenes JPG y PNG. Recomendamos que las imágenes tengan buena iluminación para una extracción de datos óptima.',
+        },
+        dataValidation: {
+          question: '¿Por qué debo validar los documentos después de subirlos?',
+          answer: 'La validación permite asegurar que los datos extraídos por la IA (NIF, importes, fechas) son correctos antes de archivarlos definitivamente en tu contabilidad de Gastos o Ingresos.',
+        },
+      },
+      noResults: 'No se encontraron resultados para tu búsqueda.',
+      support: {
+        technical: {
+          title: 'Soporte Técnico',
+          description: '¿Necesitas ayuda? Nuestro equipo está disponible para asistirte con cualquier problema técnico.',
+          button: 'Abrir Ticket',
+        },
+        documentation: {
+          title: 'Documentación',
+          description: 'Consulta nuestra guía completa para aprender a usar todas las funcionalidades de FinancialWin.',
+          button: 'Ver Guía Completa',
+        },
+      },
+    },
   },
   en: {
     nav: {
@@ -139,6 +173,7 @@ const translations: Record<Language, Translations> = {
       documents: 'Document Management',
       records: 'Records Management',
       'ai-extraction': 'AI Extraction',
+      settings: 'Settings',
       subtitle: {
         dashboard: 'Global view of financial performance and priority alerts.',
         billing: 'Intelligent invoice processing and cash flow management.',
@@ -147,6 +182,7 @@ const translations: Record<Language, Translations> = {
         documents: 'Centralized repository and certified digitization of files.',
         records: 'Visualization and centralized management of all system records.',
         'ai-extraction': 'Automatic data extraction from documents with artificial intelligence.',
+        settings: 'Manage your profile and user preferences',
       },
       notifications: 'Notifications',
       markRead: 'Mark as read',
@@ -212,6 +248,38 @@ const translations: Record<Language, Translations> = {
         },
       },
     },
+    help: {
+      title: 'Help Center',
+      searchPlaceholder: 'Search in frequently asked questions...',
+      faqs: {
+        title: 'Frequently Asked Questions',
+        uploadInvoice: {
+          question: 'How can I upload my invoices and expenses?',
+          answer: 'You can drag your files directly to the "Documents" area or click on the upload button. Once uploaded, our AI (Gemini) will automatically analyze the document to extract the data.',
+        },
+        aiFormats: {
+          question: 'What file formats does the platform accept?',
+          answer: 'Currently you can upload documents in PDF format, JPG and PNG images. We recommend that images have good lighting for optimal data extraction.',
+        },
+        dataValidation: {
+          question: 'Why should I validate documents after uploading them?',
+          answer: 'Validation ensures that the data extracted by the AI (NIF, amounts, dates) is correct before permanently archiving it in your Expenses or Income accounting.',
+        },
+      },
+      noResults: 'No results found for your search.',
+      support: {
+        technical: {
+          title: 'Technical Support',
+          description: 'Need help? Our team is available to assist you with any technical issues.',
+          button: 'Open Ticket',
+        },
+        documentation: {
+          title: 'Documentation',
+          description: 'Check out our complete guide to learn how to use all FinancialWin features.',
+          button: 'View Complete Guide',
+        },
+      },
+    },
   },
 };
 
@@ -231,13 +299,29 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const t = (path: string) => {
-    const keys = path.split('.');
-    let value = translations[language];
-    for (const key of keys) {
-      if (value[key] === undefined) return path;
-      value = value[key];
+    try {
+      const keys = path.split('.');
+      let value: any = translations[language];
+      
+      for (const key of keys) {
+        if (value === null || value === undefined || typeof value !== 'object') {
+          console.warn(`Translation key not found: ${path} (stopped at: ${key})`);
+          return path;
+        }
+        value = value[key];
+      }
+      
+      // Si el valor final es undefined, devolver la clave
+      if (value === undefined || value === null) {
+        console.warn(`Translation value not found for key: ${path}`);
+        return path;
+      }
+      
+      return value;
+    } catch (error) {
+      console.error(`Error accessing translation key: ${path}`, error);
+      return path;
     }
-    return value;
   };
 
   return (

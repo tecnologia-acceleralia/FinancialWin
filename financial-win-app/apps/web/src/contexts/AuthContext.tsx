@@ -41,6 +41,34 @@ interface WindowWithAuthFlags {
   __ERROR_auth_failed_HANDLED__?: boolean;
 }
 
+/**
+ * Detecta si estamos en modo de desarrollo local
+ * Permite usar un bypass de autenticación para desarrollo
+ */
+function isDevelopmentLocal(): boolean {
+  const isDev = import.meta.env.DEV;
+  const isLocalhost = 
+    window.location.hostname === 'localhost' || 
+    window.location.hostname === '127.0.0.1' ||
+    window.location.hostname.includes('localhost');
+  
+  // Permitir bypass si está en desarrollo Y es localhost
+  // También verificar si hay una variable de entorno específica para forzar el bypass
+  const forceDevBypass = (import.meta as any).env?.VITE_DEV_AUTH_BYPASS === 'true';
+  
+  return (isDev && isLocalhost) || forceDevBypass;
+}
+
+/**
+ * Usuario simulado para desarrollo local
+ */
+const DEV_MOCK_USER: User = {
+  sub: 'dev-user-alice',
+  email: 'alice@example.com',
+  name: 'Alice Test User',
+  company_id: 'dev-company-id',
+};
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Initialize state
   const [user, setUser] = useState<User | null>(null);
@@ -59,6 +87,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const checkAuth = useCallback(async (): Promise<boolean> => {
     const windowWithFlags = window as WindowWithAuthFlags;
+
+    // BYPASS DE DESARROLLO: Si estamos en desarrollo local, usar usuario simulado
+    if (isDevelopmentLocal()) {
+      console.log('🔧 [AuthContext] Modo desarrollo local detectado - usando usuario simulado (Alice)');
+      setUser(DEV_MOCK_USER);
+      setAuthenticated(true);
+      setLoading(false);
+      lastActivityRef.current = Date.now();
+      return true;
+    }
 
     // Check if already redirecting (prevent multiple checkAuth calls)
     if (windowWithFlags.__REDIRECTING_TO_LOGIN__) {
@@ -96,6 +134,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         response?: { status?: number };
         statusCode?: number;
       };
+
+      // BYPASS DE DESARROLLO: Si falla en desarrollo local, usar usuario simulado
+      if (isDevelopmentLocal()) {
+        console.warn('⚠️ [AuthContext] Error de autenticación en desarrollo - usando bypass con usuario simulado');
+        setUser(DEV_MOCK_USER);
+        setAuthenticated(true);
+        setLoading(false);
+        return true;
+      }
 
       // Handle 403 Forbidden (access revoked) - redirect immediately
       if (
@@ -376,12 +423,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // For auth_failed, don't redirect immediately - let user see the error or try again
       // For access_revoked, redirect to login
-      if (errorParam === 'access_revoked') {
+      // BYPASS DE DESARROLLO: En desarrollo local, no redirigir
+      if (errorParam === 'access_revoked' && !isDevelopmentLocal()) {
         setTimeout(() => {
-          const API_URL = getApiUrl();
-          const loginUrl = `${API_URL}/auth/login`;
-          window.location.href = loginUrl;
+          try {
+            const API_URL = getApiUrl();
+            const loginUrl = `${API_URL}/auth/login`;
+            window.location.href = loginUrl;
+          } catch (error) {
+            console.error('❌ [AuthContext] Error al obtener URL de login:', error);
+            const loginUrl = 'http://localhost:4009/auth/login';
+            console.warn(`⚠️ [AuthContext] Usando URL de fallback: ${loginUrl}`);
+            window.location.href = loginUrl;
+          }
         }, 100);
+      } else if (isDevelopmentLocal()) {
+        // En desarrollo local, usar bypass en lugar de redirigir
+        console.log('🔧 [AuthContext] Modo desarrollo - usando bypass en lugar de redirigir');
+        setUser(DEV_MOCK_USER);
+        setAuthenticated(true);
+        setRedirecting(false);
+        setLoading(false);
       } else {
         // auth_failed: Clear the flag after a delay to allow retry
         setTimeout(() => {
@@ -401,21 +463,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     // Always call checkAuth - it will check cookie via /auth/me endpoint
+    // En desarrollo local, checkAuth usará el bypass automáticamente
     setTimeout(async () => {
       const authResult = await checkAuth();
 
       // If authentication failed and we're not already redirecting, redirect to login
-      if (!authResult && !windowWithFlags.__REDIRECTING_TO_LOGIN__) {
+      // EXCEPTO en desarrollo local donde usamos bypass
+      if (!authResult && !windowWithFlags.__REDIRECTING_TO_LOGIN__ && !isDevelopmentLocal()) {
         setRedirecting(true);
         setTimeout(() => {
-          const API_URL = getApiUrl();
-          const loginUrl = `${API_URL}/auth/login`;
-          window.location.href = loginUrl;
+          try {
+            const API_URL = getApiUrl();
+            const loginUrl = `${API_URL}/auth/login`;
+            window.location.href = loginUrl;
+          } catch (error) {
+            console.error('❌ [AuthContext] Error al obtener URL de login:', error);
+            // Fallback a localhost si falla
+            const loginUrl = 'http://localhost:4009/auth/login';
+            console.warn(`⚠️ [AuthContext] Usando URL de fallback: ${loginUrl}`);
+            window.location.href = loginUrl;
+          }
         }, 100);
       }
 
       // Start polling and token refresh if authentication succeeded
-      if (authResult) {
+      // En desarrollo local, no hacer polling (no es necesario)
+      if (authResult && !isDevelopmentLocal()) {
         startPolling();
         startTokenRefreshCheck();
       }
@@ -459,17 +532,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(() => {
     const windowWithFlags = window as WindowWithAuthFlags;
+    
+    // BYPASS DE DESARROLLO: En desarrollo local, simular login automático
+    if (isDevelopmentLocal()) {
+      console.log('🔧 [AuthContext] Modo desarrollo - simulando login automático');
+      delete windowWithFlags.__REDIRECTING_TO_LOGIN__;
+      setRedirecting(false);
+      setUser(DEV_MOCK_USER);
+      setAuthenticated(true);
+      setLoading(false);
+      return;
+    }
+    
     // Clear redirect flag before redirecting to allow new login flow
     delete windowWithFlags.__REDIRECTING_TO_LOGIN__;
     setRedirecting(false);
     stopPolling();
-    const API_URL = getApiUrl();
-    const loginUrl = `${API_URL}/auth/login`;
-    window.location.href = loginUrl;
+    
+    try {
+      const API_URL = getApiUrl();
+      const loginUrl = `${API_URL}/auth/login`;
+      window.location.href = loginUrl;
+    } catch (error) {
+      console.error('❌ [AuthContext] Error al obtener URL de login:', error);
+      // Si falla obtener la URL, intentar con localhost
+      const loginUrl = 'http://localhost:4009/auth/login';
+      console.warn(`⚠️ [AuthContext] Usando URL de fallback: ${loginUrl}`);
+      window.location.href = loginUrl;
+    }
   }, [stopPolling]);
 
   const logout = useCallback(() => {
     const windowWithFlags = window as WindowWithAuthFlags;
+    
+    // BYPASS DE DESARROLLO: En desarrollo local, solo limpiar estado local
+    if (isDevelopmentLocal()) {
+      console.log('🔧 [AuthContext] Modo desarrollo - simulando logout (solo limpieza local)');
+      delete windowWithFlags.__REDIRECTING_TO_LOGIN__;
+      setRedirecting(false);
+      stopPolling();
+      stopTokenRefreshCheck();
+      setUser(null);
+      setAuthenticated(false);
+      consecutiveRefreshFailuresRef.current = 0;
+      isRefreshingRef.current = false;
+      return;
+    }
+    
     // Clear redirect flag
     delete windowWithFlags.__REDIRECTING_TO_LOGIN__;
     setRedirecting(false);
@@ -480,9 +589,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     consecutiveRefreshFailuresRef.current = 0;
     isRefreshingRef.current = false;
 
-    const API_URL = getApiUrl();
-    const logoutUrl = `${API_URL}/auth/logout`;
-    window.location.href = logoutUrl;
+    try {
+      const API_URL = getApiUrl();
+      const logoutUrl = `${API_URL}/auth/logout`;
+      window.location.href = logoutUrl;
+    } catch (error) {
+      console.error('❌ [AuthContext] Error al obtener URL de logout:', error);
+      // Fallback a localhost si falla
+      const logoutUrl = 'http://localhost:4009/auth/logout';
+      console.warn(`⚠️ [AuthContext] Usando URL de fallback: ${logoutUrl}`);
+      window.location.href = logoutUrl;
+    }
   }, [stopPolling, stopTokenRefreshCheck]);
 
   const value: AuthContextType = {

@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { PageHeader, type PageHeaderAction } from '../../components/common/PageHeader';
+import { PageHeader, type PageHeaderAction } from '../../components/layout';
 
 // Acciones del header definidas fuera del componente para mejor legibilidad
 const createHeaderActions = (onNuevoProveedor: () => void): PageHeaderAction[] => [

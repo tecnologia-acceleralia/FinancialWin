@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 
 export interface FilePreviewProps {
   file?: File | null;
@@ -19,9 +19,25 @@ export const FilePreview: React.FC<FilePreviewProps> = ({
   fileName,
   mimeType,
 }) => {
+  const [internalUrl, setInternalUrl] = useState<string | null>(null);
+
   const hasFile = file || fileUrl;
   const displayName = fileName || file?.name || 'Documento';
   const displayMimeType = mimeType || file?.type || '';
+
+  // Crear URL del objeto si hay archivo pero no hay URL externa
+  useEffect(() => {
+    if (file && !fileUrl) {
+      const url = URL.createObjectURL(file);
+      setInternalUrl(url);
+      
+      return () => {
+        URL.revokeObjectURL(url);
+      };
+    } else {
+      setInternalUrl(null);
+    }
+  }, [file, fileUrl]);
 
   // Estado vacío elegante
   if (!hasFile) {
@@ -40,31 +56,47 @@ export const FilePreview: React.FC<FilePreviewProps> = ({
     );
   }
 
+  // Usar URL externa si está disponible, sino la interna
+  const previewUrl = fileUrl || internalUrl;
+
   // Vista previa de imagen
-  if (displayMimeType.startsWith('image/') || fileUrl) {
-    const imageUrl = fileUrl || (file ? URL.createObjectURL(file) : null);
-    
-    if (imageUrl) {
+  if (displayMimeType.startsWith('image/') && previewUrl) {
+    return (
+      <div className="studio-preview-image-container">
+        <img
+          src={previewUrl}
+          alt={displayName}
+          className="studio-preview-image"
+        />
+        {file && (
+          <div className="preview-overlay">
+            <span className="material-symbols-outlined">image</span>
+            <span>{displayName}</span>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Vista previa de PDF con iframe/embed
+  if (displayMimeType === 'application/pdf' || displayName.toLowerCase().endsWith('.pdf')) {
+    if (previewUrl) {
       return (
-        <div className="studio-preview-image-container">
-          <img
-            src={imageUrl}
-            alt={displayName}
-            className="studio-preview-image"
+        <div className="studio-preview-pdf-container">
+          <iframe
+            src={previewUrl}
+            title={displayName}
+            className="w-full h-full border-0"
+            style={{ minHeight: '600px' }}
           />
-          {file && (
-            <div className="preview-overlay">
-              <span className="material-symbols-outlined">image</span>
-              <span>{displayName}</span>
-            </div>
-          )}
+          <div className="preview-overlay">
+            <span className="material-symbols-outlined">picture_as_pdf</span>
+            <span>{displayName}</span>
+          </div>
         </div>
       );
     }
-  }
-
-  // Vista previa de PDF (placeholder por ahora)
-  if (displayMimeType === 'application/pdf' || displayName.toLowerCase().endsWith('.pdf')) {
+    
     return (
       <div className="studio-preview-pdf-container">
         <div className="studio-preview-pdf-icon">
@@ -74,12 +106,6 @@ export const FilePreview: React.FC<FilePreviewProps> = ({
         <div className="studio-preview-pdf-subtitle">
           Vista previa de PDF (próximamente)
         </div>
-        {fileUrl && (
-          <div className="preview-overlay">
-            <span className="material-symbols-outlined">picture_as_pdf</span>
-            <span>{displayName}</span>
-          </div>
-        )}
       </div>
     );
   }

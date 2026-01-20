@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import type { FilterValues } from './FilterPanel';
 
 interface Ingreso {
   id: string;
@@ -62,21 +63,77 @@ const datosPrueba: Ingreso[] = [
 
 interface IngresosTableProps {
   searchTerm?: string;
+  filters?: FilterValues;
 }
 
-export const IngresosTable: React.FC<IngresosTableProps> = ({ searchTerm = '' }) => {
+export const IngresosTable: React.FC<IngresosTableProps> = ({ searchTerm = '', filters }) => {
   const ingresosFiltrados = useMemo(() => {
-    if (!searchTerm.trim()) {
-      return datosPrueba;
+    let resultado = datosPrueba;
+
+    // Filtro por búsqueda de texto
+    if (searchTerm.trim()) {
+      const busquedaLower = searchTerm.toLowerCase().trim();
+      resultado = resultado.filter(
+        (ingreso) =>
+          ingreso.cliente.toLowerCase().includes(busquedaLower) ||
+          ingreso.factura.toLowerCase().includes(busquedaLower) ||
+          ingreso.estado.toLowerCase().includes(busquedaLower)
+      );
     }
-    const busquedaLower = searchTerm.toLowerCase().trim();
-    return datosPrueba.filter(
-      (ingreso) =>
-        ingreso.cliente.toLowerCase().includes(busquedaLower) ||
-        ingreso.factura.toLowerCase().includes(busquedaLower) ||
-        ingreso.estado.toLowerCase().includes(busquedaLower)
-    );
-  }, [searchTerm]);
+
+    // Aplicar filtros avanzados si existen
+    if (filters) {
+      // Filtro por rango de fechas
+      if (filters.dateRange.from) {
+        resultado = resultado.filter((ingreso) => {
+          const fechaFactura = new Date(ingreso.fechaFactura);
+          const fechaDesde = new Date(filters.dateRange.from);
+          return fechaFactura >= fechaDesde;
+        });
+      }
+      if (filters.dateRange.to) {
+        resultado = resultado.filter((ingreso) => {
+          const fechaFactura = new Date(ingreso.fechaFactura);
+          const fechaHasta = new Date(filters.dateRange.to);
+          fechaHasta.setHours(23, 59, 59, 999); // Incluir todo el día
+          return fechaFactura <= fechaHasta;
+        });
+      }
+
+      // Filtro por categorías (no aplicable a ingresos, pero mantenemos la estructura)
+      if (filters.categories.length > 0) {
+        // Los ingresos no tienen categorías en el modelo actual
+        // Se puede extender en el futuro
+      }
+
+      // Filtro por estados
+      if (filters.status.length > 0) {
+        resultado = resultado.filter((ingreso) =>
+          filters.status.includes(ingreso.estado)
+        );
+      }
+
+      // Filtro por rango de importe (usando el campo 'total')
+      if (filters.amountRange.min !== null) {
+        resultado = resultado.filter((ingreso) => {
+          const importeNum = parseFloat(
+            ingreso.total.replace(/[€,]/g, '').trim()
+          );
+          return importeNum >= filters.amountRange.min!;
+        });
+      }
+      if (filters.amountRange.max !== null) {
+        resultado = resultado.filter((ingreso) => {
+          const importeNum = parseFloat(
+            ingreso.total.replace(/[€,]/g, '').trim()
+          );
+          return importeNum <= filters.amountRange.max!;
+        });
+      }
+    }
+
+    return resultado;
+  }, [searchTerm, filters]);
   const getEstadoClass = (estado: Ingreso['estado']) => {
     switch (estado) {
       case 'Pagado':

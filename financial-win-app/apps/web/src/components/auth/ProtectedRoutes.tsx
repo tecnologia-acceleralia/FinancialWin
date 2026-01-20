@@ -9,6 +9,21 @@ interface WindowWithRedirectFlag extends globalThis.Window {
   __REDIRECTING_TO_LOGIN__?: boolean;
 }
 
+/**
+ * Detecta si estamos en modo de desarrollo local
+ */
+function isDevelopmentLocal(): boolean {
+  const isDev = import.meta.env.DEV;
+  const isLocalhost = 
+    window.location.hostname === 'localhost' || 
+    window.location.hostname === '127.0.0.1' ||
+    window.location.hostname.includes('localhost');
+  
+  const forceDevBypass = (import.meta as any).env?.VITE_DEV_AUTH_BYPASS === 'true';
+  
+  return (isDev && isLocalhost) || forceDevBypass;
+}
+
 export function ProtectedRoutes({ children }: ProtectedRoutesProps) {
   // ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
   // Ref to prevent multiple redirects
@@ -23,7 +38,13 @@ export function ProtectedRoutes({ children }: ProtectedRoutesProps) {
   const login = authContext.login;
 
   // Auto-redirect when not authenticated and loading is complete
+  // BYPASS DE DESARROLLO: En desarrollo local, no redirigir automáticamente
   useEffect(() => {
+    // En desarrollo local, permitir acceso sin autenticación
+    if (isDevelopmentLocal()) {
+      return;
+    }
+
     const windowWithFlag = window as WindowWithRedirectFlag;
 
     // Only redirect if loading is complete, not authenticated, not already redirecting, and haven't redirected yet
@@ -93,7 +114,8 @@ export function ProtectedRoutes({ children }: ProtectedRoutesProps) {
   }
 
   // If not authenticated, show message while redirecting
-  if (!authenticated) {
+  // BYPASS DE DESARROLLO: En desarrollo local, permitir acceso sin autenticación
+  if (!authenticated && !isDevelopmentLocal()) {
     return (
       <div className="auth-loading-screen">
         <div className="auth-loading-container">
@@ -104,6 +126,12 @@ export function ProtectedRoutes({ children }: ProtectedRoutesProps) {
     );
   }
 
-  // Only render children if authenticated
+  // Only render children if authenticated OR in development local mode
+  // En desarrollo local, el bypass de AuthContext debería autenticar automáticamente
+  // pero por si acaso, permitimos el acceso
+  if (isDevelopmentLocal() && !authenticated) {
+    console.warn('⚠️ [ProtectedRoutes] Modo desarrollo - permitiendo acceso sin autenticación');
+  }
+
   return <>{children}</>;
 }

@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import App from './App.tsx';
-import ErrorBoundary from './components/common/ErrorBoundary';
+import { ErrorBoundary } from './components/layout';
 import { logEnvironmentConfig } from './config/env';
 import './styles/index.css';
 
@@ -57,9 +57,9 @@ root.render(
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
-          {/* <AuthProvider> */}
+          <AuthProvider>
             <App />
-          {/* </AuthProvider> */}
+          </AuthProvider>
         </BrowserRouter>
       </QueryClientProvider>
     </ErrorBoundary>

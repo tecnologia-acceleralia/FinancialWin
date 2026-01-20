@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { useTheme } from '../../../contexts/ThemeContext';
-import { useLanguage } from '../../../contexts/LanguageContext';
-import { ViewState } from '../../../types';
+import { useTheme } from '../../contexts/ThemeContext';
+import { useLanguage } from '../../contexts/LanguageContext';
+import { ViewState } from '../../types';
 
 interface TopBarProps {
   currentView: ViewState;

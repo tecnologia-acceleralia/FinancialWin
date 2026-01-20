@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { NavItem, ViewState, NavSubItem } from '../../../types';
-import { useLanguage } from '../../../contexts/LanguageContext';
+import { Link, useLocation } from 'react-router-dom';
+import { NavItem, ViewState, NavSubItem } from '../../types';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 interface SidebarProps {
   currentView: ViewState;
@@ -14,6 +14,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, isO
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [expandedSubId, setExpandedSubId] = useState<string | null>(null);
   const { t } = useLanguage();
+  const location = useLocation();
+  
+  // Detectar si estamos en la ruta de settings
+  const isSettingsActive = location.pathname === '/settings';
 
   const NAV_ITEMS: NavItem[] = [
     { id: 'dashboard', label: t('nav.dashboard'), icon: 'dashboard' },
@@ -124,12 +128,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, isO
           </div>
         </div>
 
-        <nav className="sidebar-nav">
-          <div className={`sidebar-section-label ${isOpen ? 'sidebar-section-label-open' : 'sidebar-section-label-closed'}`}>
-            {t('nav.operative')}
-          </div>
-          
-          {NAV_ITEMS.map((item) => {
+        <div className="sidebar-content-wrapper">
+          <nav className="sidebar-nav">
+            <div className={`sidebar-section-label ${isOpen ? 'sidebar-section-label-open' : 'sidebar-section-label-closed'}`}>
+              {t('nav.operative')}
+            </div>
+            
+            {NAV_ITEMS.map((item) => {
             const isActive = currentView === item.id || (item.subItems?.some(sub => currentView === item.id));
             const isSelected = currentView === item.id;
             const isExpanded = expandedId === item.id;
@@ -229,25 +234,28 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, isO
               </div>
             );
           })}
-          
-        </nav>
+            
+          </nav>
 
-        <div className="sidebar-footer">
-           <button 
-                className={`sidebar-footer-button ${isOpen ? 'sidebar-footer-button-open' : 'sidebar-footer-button-closed'}`}
+          <div className="sidebar-footer">
+           <Link
+                to="/settings"
+                className={`sidebar-footer-button ${isOpen ? 'sidebar-footer-button-open' : 'sidebar-footer-button-closed'} ${isSettingsActive ? 'sidebar-footer-button-active' : ''}`}
                 title={!isOpen ? t('nav.settings') : ''}
             >
-                <span className={`material-symbols-outlined sidebar-footer-icon ${isOpen ? 'sidebar-footer-icon-open' : ''}`}>settings</span>
+                <span className={`material-symbols-outlined sidebar-footer-icon ${isOpen ? 'sidebar-footer-icon-open' : ''} ${isSettingsActive ? 'sidebar-footer-icon-active' : ''}`}>settings</span>
                 <span className={`sidebar-footer-label ${isOpen ? 'sidebar-footer-label-open' : 'sidebar-footer-label-closed'}`}>{t('nav.settings')}</span>
-            </button>
+            </Link>
             
-            <button 
+            <Link
+                to="/help"
                 className={`sidebar-footer-button ${isOpen ? 'sidebar-footer-button-open' : 'sidebar-footer-button-closed'}`}
                 title={!isOpen ? t('nav.help') : ''}
             >
                 <span className={`material-symbols-outlined sidebar-footer-icon ${isOpen ? 'sidebar-footer-icon-open' : ''}`}>help</span>
                 <span className={`sidebar-footer-label ${isOpen ? 'sidebar-footer-label-open' : 'sidebar-footer-label-closed'}`}>{t('nav.help')}</span>
-            </button>
+            </Link>
+          </div>
         </div>
 
       </div>

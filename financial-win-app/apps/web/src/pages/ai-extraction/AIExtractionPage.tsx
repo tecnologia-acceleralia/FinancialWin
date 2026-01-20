@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Dropzone } from '../../components/common/Dropzone';
-import { DocumentForm } from '../../components/common/DocumentForm';
-import { FilePreview } from '../../components/common/FilePreview';
+import { Dropzone, DocumentForm, FilePreview } from '../../components/forms';
 import { useGeminiExtraction } from '../../hooks/useGeminiExtraction';
 import type { DocumentType, ExtractedData } from './types';
 

@@ -7,16 +7,40 @@
  */
 
 /**
+ * Detecta si estamos en modo de desarrollo local
+ */
+function isDevelopmentLocal(): boolean {
+  if (typeof window === 'undefined') return false;
+  
+  const isDev = import.meta.env.DEV;
+  const isLocalhost = 
+    window.location.hostname === 'localhost' || 
+    window.location.hostname === '127.0.0.1' ||
+    window.location.hostname.includes('localhost');
+  
+  return isDev && isLocalhost;
+}
+
+/**
  * Gets the API URL from environment variables.
- * Throws an error if VITE_API_URL is not defined.
+ * In development local mode, uses a fallback URL if VITE_API_URL is not defined.
  *
  * @returns The API base URL
- * @throws Error if VITE_API_URL is not defined
+ * @throws Error if VITE_API_URL is not defined (except in development local mode)
  */
 export function getApiUrl(): string {
   const apiUrl = (import.meta as any).env?.VITE_API_URL;
 
+  // En desarrollo local, usar fallback si no está definido
   if (!apiUrl) {
+    if (isDevelopmentLocal()) {
+      const fallbackUrl = 'http://localhost:4009';
+      console.warn(
+        `⚠️ [getApiUrl] VITE_API_URL no definido - usando fallback para desarrollo: ${fallbackUrl}`
+      );
+      return fallbackUrl;
+    }
+
     const errorMessage = `
 ❌ CRITICAL CONFIGURATION ERROR ❌
 

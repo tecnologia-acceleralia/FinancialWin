@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import type { FilterValues } from './FilterPanel';
 
 interface Gasto {
   id: string;
@@ -66,22 +67,79 @@ const datosPrueba: Gasto[] = [
 
 interface GastosTableProps {
   searchTerm?: string;
+  filters?: FilterValues;
 }
 
-export const GastosTable: React.FC<GastosTableProps> = ({ searchTerm = '' }) => {
+export const GastosTable: React.FC<GastosTableProps> = ({ searchTerm = '', filters }) => {
   const gastosFiltrados = useMemo(() => {
-    if (!searchTerm.trim()) {
-      return datosPrueba;
+    let resultado = datosPrueba;
+
+    // Filtro por búsqueda de texto
+    if (searchTerm.trim()) {
+      const busquedaLower = searchTerm.toLowerCase().trim();
+      resultado = resultado.filter(
+        (gasto) =>
+          gasto.proveedor.toLowerCase().includes(busquedaLower) ||
+          gasto.departamento.toLowerCase().includes(busquedaLower) ||
+          gasto.tipo.toLowerCase().includes(busquedaLower) ||
+          gasto.estado.toLowerCase().includes(busquedaLower)
+      );
     }
-    const busquedaLower = searchTerm.toLowerCase().trim();
-    return datosPrueba.filter(
-      (gasto) =>
-        gasto.proveedor.toLowerCase().includes(busquedaLower) ||
-        gasto.departamento.toLowerCase().includes(busquedaLower) ||
-        gasto.tipo.toLowerCase().includes(busquedaLower) ||
-        gasto.estado.toLowerCase().includes(busquedaLower)
-    );
-  }, [searchTerm]);
+
+    // Aplicar filtros avanzados si existen
+    if (filters) {
+      // Filtro por rango de fechas
+      if (filters.dateRange.from) {
+        resultado = resultado.filter((gasto) => {
+          const fechaFactura = new Date(gasto.fechaFactura);
+          const fechaDesde = new Date(filters.dateRange.from);
+          return fechaFactura >= fechaDesde;
+        });
+      }
+      if (filters.dateRange.to) {
+        resultado = resultado.filter((gasto) => {
+          const fechaFactura = new Date(gasto.fechaFactura);
+          const fechaHasta = new Date(filters.dateRange.to);
+          fechaHasta.setHours(23, 59, 59, 999); // Incluir todo el día
+          return fechaFactura <= fechaHasta;
+        });
+      }
+
+      // Filtro por categorías (tipo)
+      if (filters.categories.length > 0) {
+        resultado = resultado.filter((gasto) =>
+          filters.categories.includes(gasto.tipo)
+        );
+      }
+
+      // Filtro por estados
+      if (filters.status.length > 0) {
+        resultado = resultado.filter((gasto) =>
+          filters.status.includes(gasto.estado)
+        );
+      }
+
+      // Filtro por rango de importe
+      if (filters.amountRange.min !== null) {
+        resultado = resultado.filter((gasto) => {
+          const importeNum = parseFloat(
+            gasto.importe.replace(/[€,]/g, '').trim()
+          );
+          return importeNum >= filters.amountRange.min!;
+        });
+      }
+      if (filters.amountRange.max !== null) {
+        resultado = resultado.filter((gasto) => {
+          const importeNum = parseFloat(
+            gasto.importe.replace(/[€,]/g, '').trim()
+          );
+          return importeNum <= filters.amountRange.max!;
+        });
+      }
+    }
+
+    return resultado;
+  }, [searchTerm, filters]);
   const getEstadoClass = (estado: Gasto['estado']) => {
     switch (estado) {
       case 'Pagado':

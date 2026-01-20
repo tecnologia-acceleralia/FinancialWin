@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { EntityCard } from '../../components/common/EntityCard';
-import { PageHeader, type PageHeaderAction } from '../../components/common/PageHeader';
+import { EntityCard } from '@/features/entities/components/EntityCard';
+import { PageHeader, type PageHeaderAction } from '../../components/layout';
 import { CategoriaProveedor } from '../../features/entities/types';
+import { EntityFilterPanel, type EntityFilterValues } from '@/features/entities/components/EntityFilterPanel';
 
 interface Proveedor {
   id: string;
@@ -110,20 +111,69 @@ export const ProveedoresListPage: React.FC = () => {
   const navigate = useNavigate();
   const [paginaActual, setPaginaActual] = useState(1);
   const [busqueda, setBusqueda] = useState('');
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [filters, setFilters] = useState<EntityFilterValues>({
+    status: [],
+    types: [],
+    balanceRange: { min: null, max: null },
+    paymentsRange: { min: null, max: null },
+  });
   const resultadosPorPagina = 8;
 
-  // Filtrar proveedores por búsqueda
+  // Filtrar proveedores por búsqueda y filtros avanzados
   const proveedoresFiltrados = useMemo(() => {
-    if (!busqueda.trim()) {
-      return MOCK_PROVEEDORES;
+    let resultado = MOCK_PROVEEDORES;
+
+    // Filtro por búsqueda de texto
+    if (busqueda.trim()) {
+      const busquedaLower = busqueda.toLowerCase().trim();
+      resultado = resultado.filter(
+        (proveedor) =>
+          proveedor.nombre.toLowerCase().includes(busquedaLower) ||
+          proveedor.nif.toLowerCase().includes(busquedaLower)
+      );
     }
-    const busquedaLower = busqueda.toLowerCase().trim();
-    return MOCK_PROVEEDORES.filter(
-      (proveedor) =>
-        proveedor.nombre.toLowerCase().includes(busquedaLower) ||
-        proveedor.nif.toLowerCase().includes(busquedaLower)
-    );
-  }, [busqueda]);
+
+    // Filtro por estados
+    if (filters.status.length > 0) {
+      resultado = resultado.filter((proveedor) =>
+        filters.status.includes(proveedor.estado)
+      );
+    }
+
+    // Filtro por tipos/categorías
+    if (filters.types.length > 0) {
+      resultado = resultado.filter((proveedor) =>
+        filters.types.includes(proveedor.tipo)
+      );
+    }
+
+    // Filtro por rango de saldo bancario
+    if (filters.balanceRange.min !== null) {
+      resultado = resultado.filter(
+        (proveedor) => proveedor.saldoBancario >= filters.balanceRange.min!
+      );
+    }
+    if (filters.balanceRange.max !== null) {
+      resultado = resultado.filter(
+        (proveedor) => proveedor.saldoBancario <= filters.balanceRange.max!
+      );
+    }
+
+    // Filtro por rango de pagos pendientes
+    if (filters.paymentsRange.min !== null) {
+      resultado = resultado.filter(
+        (proveedor) => proveedor.pagosPendientes >= filters.paymentsRange.min!
+      );
+    }
+    if (filters.paymentsRange.max !== null) {
+      resultado = resultado.filter(
+        (proveedor) => proveedor.pagosPendientes <= filters.paymentsRange.max!
+      );
+    }
+
+    return resultado;
+  }, [busqueda, filters]);
 
   const totalResultados = proveedoresFiltrados.length;
   const totalPaginas = Math.ceil(totalResultados / resultadosPorPagina);
@@ -132,10 +182,10 @@ export const ProveedoresListPage: React.FC = () => {
   const fin = inicio + resultadosPorPagina;
   const proveedoresPaginados = proveedoresFiltrados.slice(inicio, fin);
 
-  // Resetear página cuando cambia la búsqueda
+  // Resetear página cuando cambia la búsqueda o filtros
   React.useEffect(() => {
     setPaginaActual(1);
-  }, [busqueda]);
+  }, [busqueda, filters]);
 
   const handleVolver = () => {
     navigate('/proveedores');
@@ -146,8 +196,11 @@ export const ProveedoresListPage: React.FC = () => {
   };
 
   const handleFiltro = () => {
-    // TODO: Implementar filtros
-    console.log('Mostrar filtros');
+    setIsFilterOpen(true);
+  };
+
+  const handleFilterChange = (newFilters: EntityFilterValues) => {
+    setFilters(newFilters);
   };
 
   const handleVista = () => {
@@ -166,8 +219,7 @@ export const ProveedoresListPage: React.FC = () => {
   };
 
   const handleVerFicha = (proveedorId: string) => {
-    // TODO: Implementar navegación a ficha del proveedor
-    console.log('Ver ficha del proveedor:', proveedorId);
+    navigate(`/proveedor/detalle/${proveedorId}`);
   };
 
   const handlePaginaAnterior = () => {
@@ -268,6 +320,16 @@ export const ProveedoresListPage: React.FC = () => {
       ) : (
         <EmptyState />
       )}
+
+      <EntityFilterPanel
+        isOpen={isFilterOpen}
+        onClose={() => setIsFilterOpen(false)}
+        onFilterChange={handleFilterChange}
+        initialFilters={filters}
+        availableStatus={['activo', 'pendiente', 'inactivo']}
+        availableTypes={['Proveedor Externo', 'Staff Interno', 'Licencias']}
+        entityType="proveedores"
+      />
     </div>
   );
 };

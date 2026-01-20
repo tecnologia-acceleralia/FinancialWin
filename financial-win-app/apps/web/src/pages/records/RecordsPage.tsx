@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { RegistrosTable } from '../../features/finance/components/RegistrosTable';
-import { PageHeader, type PageHeaderAction } from '../../components/common/PageHeader';
+import { PageHeader, type PageHeaderAction } from '../../components/layout';
 
 // Acciones del header definidas fuera del componente para mejor legibilidad
 const HEADER_ACTIONS: PageHeaderAction[] = [
@@ -75,7 +75,7 @@ export const RecordsPage: React.FC = () => {
         </div>
 
         <div className="mt-8">
-          <RegistrosTable />
+          <RegistrosTable searchTerm={busqueda} />
         </div>
       </div>
     </div>

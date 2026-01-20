@@ -123,6 +123,31 @@
     @apply inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2;
   }
 
+  /* StatusBadge - Clases semánticas para estados */
+  .status-badge-base {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold;
+  }
+
+  .status-badge-activo {
+    @apply status-badge-base bg-green-100 text-green-800 border border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800;
+  }
+
+  .status-badge-pendiente {
+    @apply status-badge-base bg-orange-100 text-orange-800 border border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800;
+  }
+
+  .status-badge-inactivo {
+    @apply status-badge-base bg-gray-100 text-gray-800 border border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700;
+  }
+
+  .status-badge-error {
+    @apply status-badge-base bg-red-100 text-red-800 border border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800;
+  }
+
+  .status-badge-default {
+    @apply status-badge-base bg-gray-100 text-gray-600 border border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700;
+  }
+
   .badge-draft {
     @apply border-gray-200 bg-gray-100 text-gray-800;
   }
@@ -307,7 +332,7 @@
   }
 
   .input-studio-readonly {
-    @apply w-full px-4 py-2.5 bg-[#fafafa] dark:bg-[#1B273B]/50 border border-[#e5e5e5] dark:border-[#2A3B5A] rounded-lg text-sm font-medium text-[#525252] dark:text-[#d4d4d4] focus:outline-none shadow-none cursor-default;
+    @apply w-full px-4 py-2.5 bg-[#fafafa] dark:bg-[#1B273B]/50 border border-[#e5e5e5] dark:border-[#2A3B5A] rounded-lg text-sm font-medium text-[#525252] dark:text-[#d4d4d4] focus:outline-none shadow-none cursor-default opacity-70;
   }
 
   .label-studio {
@@ -551,7 +576,9 @@
 
   /* AI Studio - Preview y Visualización */
   .preview-container {
-    @apply w-full md:w-1/3 lg:w-5/12 bg-[#525252] dark:bg-[#0B1018] flex flex-col items-center justify-center relative border-b md:border-b-0 md:border-r border-[#e5e5e5] dark:border-[#2A3B5A] overflow-hidden;
+    @apply w-full bg-slate-900/50 flex flex-col relative border border-[#e5e5e5] dark:border-[#2A3B5A] overflow-hidden rounded-xl;
+    height: calc(100vh - 250px);
+    min-height: 600px;
   }
 
   .preview-overlay {
@@ -723,6 +750,84 @@
     @apply text-sm font-medium text-white/70 dark:text-white/60;
   }
 
+  /* ============================================
+     DocumentViewer - Visor Avanzado de Documentos
+     ============================================ */
+
+  /* Contenedor principal del visor - Full Bleed */
+  .document-viewer-container {
+    @apply w-full h-full relative overflow-hidden;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* Contenedor del contenido - Full Bleed sin padding ni márgenes */
+  .document-viewer-content {
+    @apply w-full h-full overflow-auto bg-[#1a1f26];
+    margin: 0;
+    padding: 0;
+    border: none;
+  }
+
+  /* Imagen en el visor - Full Bleed */
+  .document-viewer-image {
+    @apply w-full h-full object-contain;
+    display: block;
+    margin: 0;
+    padding: 0;
+    border: none;
+  }
+
+  /* PDF en el visor - Full Bleed */
+  .document-viewer-pdf {
+    @apply w-full h-full border-0;
+    display: block;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* Estado vacío del visor */
+  .document-viewer-empty {
+    @apply w-full h-full flex flex-col items-center justify-center px-8 py-12 text-center;
+  }
+
+  .document-viewer-empty-icon {
+    @apply w-20 h-20 rounded-2xl bg-white/10 dark:bg-white/5 text-white flex items-center justify-center mb-4;
+  }
+
+  .document-viewer-empty-icon .material-symbols-outlined {
+    @apply text-5xl;
+  }
+
+  .document-viewer-empty-title {
+    @apply text-xl font-bold text-white mb-2;
+  }
+
+  .document-viewer-empty-subtitle {
+    @apply text-sm font-medium text-white/70 dark:text-white/60 max-w-sm;
+  }
+
+  /* Estado genérico del visor */
+  .document-viewer-generic {
+    @apply w-full h-full flex flex-col items-center justify-center px-8 py-12 text-center;
+  }
+
+  .document-viewer-generic-icon {
+    @apply w-20 h-20 rounded-2xl bg-white/10 dark:bg-white/5 text-white flex items-center justify-center mb-4;
+  }
+
+  .document-viewer-generic-icon .material-symbols-outlined {
+    @apply text-5xl;
+  }
+
+  .document-viewer-generic-title {
+    @apply text-lg font-bold text-white mb-2;
+  }
+
+  .document-viewer-generic-subtitle {
+    @apply text-sm font-medium text-white/70 dark:text-white/60;
+  }
+
   /* AI Studio - Progreso */
   .progress-container {
     @apply w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 overflow-hidden;
@@ -770,6 +875,14 @@
 
   .table-row td {
     @apply px-6 py-4 text-sm text-gray-900 dark:text-gray-100;
+  }
+
+  .table-empty-state {
+    @apply text-center;
+  }
+
+  .contactos-empty-icon {
+    @apply text-5xl text-gray-300 dark:text-gray-600 mb-4;
   }
 
   .status-pill {
@@ -850,6 +963,7 @@
   /* Contenedor principal del sidebar */
   .sidebar-container {
     @apply fixed inset-y-0 left-0 z-30 md:relative h-full bg-[#171717] dark:bg-[#0B1018] text-white flex flex-col shadow-xl border-r border-gray-800 dark:border-[#2A3B5A] flex-shrink-0 transition-all duration-300 ease-in-out;
+    overflow: hidden !important;
   }
 
   .sidebar-container-open {
@@ -868,6 +982,7 @@
   /* Contenedor interno del sidebar */
   .sidebar-inner {
     @apply flex flex-col h-full overflow-hidden;
+    overflow-x: hidden !important;
   }
 
   .sidebar-inner-open {
@@ -916,9 +1031,25 @@
     @apply opacity-0 hidden;
   }
 
+  /* Contenedor de contenido (nav + footer) */
+  .sidebar-content-wrapper {
+    @apply flex flex-col flex-1 min-h-0 gap-4;
+    overflow: hidden !important;
+  }
+
   /* Navegación */
   .sidebar-nav {
-    @apply flex-1 py-6 px-3 space-y-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-800 overflow-x-hidden;
+    @apply py-4 px-3 space-y-1 overflow-y-auto overflow-x-hidden;
+    overflow-x: hidden !important;
+    -ms-overflow-style: none !important;
+    scrollbar-width: none !important;
+  }
+
+  /* Ocultar scrollbar del contenedor principal del Sidebar */
+  .sidebar-nav::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
   }
 
   .sidebar-section-label {
@@ -935,11 +1066,11 @@
 
   /* Items de navegación */
   .sidebar-item-wrapper {
-    @apply mb-1;
+    @apply mb-1 overflow-hidden;
   }
 
   .sidebar-item-button {
-    @apply w-full flex items-center py-3 rounded-xl transition-all duration-200 whitespace-nowrap;
+    @apply w-full flex items-center py-2 rounded-xl transition-all duration-200 whitespace-nowrap;
   }
 
   .sidebar-item-button-open {
@@ -1012,7 +1143,7 @@
 
   /* Sub-items */
   .sidebar-submenu {
-    @apply overflow-hidden transition-all duration-300 ease-in-out;
+    @apply overflow-y-hidden overflow-x-hidden transition-all duration-300 ease-in-out;
   }
 
   .sidebar-submenu-expanded {
@@ -1024,7 +1155,22 @@
   }
 
   .sidebar-submenu-container {
-    @apply ml-4 pl-4 border-l border-gray-700 space-y-1;
+    @apply ml-4 pl-4 border-l border-gray-700 space-y-1 overflow-hidden;
+  }
+
+  /* Forzar la ocultación de la barra de scroll en navegadores Webkit (Chrome/Safari) */
+  .sidebar-submenu-container::-webkit-scrollbar,
+  .sidebar-submenu::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+
+  /* Para Firefox - ocultar scrollbar */
+  .sidebar-submenu-container,
+  .sidebar-submenu {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
   }
 
   .sidebar-subitem-button {
@@ -1032,11 +1178,11 @@
   }
 
   .sidebar-subitem-content {
-    @apply flex items-center;
+    @apply flex items-center flex-shrink-0;
   }
 
   .sidebar-subitem-icon {
-    @apply material-symbols-outlined text-[18px] mr-2;
+    @apply material-symbols-outlined text-[18px] mr-2 flex-shrink-0 leading-none;
   }
 
   .sidebar-subitem-expand-icon {
@@ -1049,7 +1195,7 @@
 
   /* Tercer nivel */
   .sidebar-third-level {
-    @apply overflow-hidden transition-all duration-300 ease-in-out;
+    @apply overflow-y-hidden overflow-x-hidden transition-all duration-300 ease-in-out;
   }
 
   .sidebar-third-level-expanded {
@@ -1061,7 +1207,22 @@
   }
 
   .sidebar-third-level-container {
-    @apply ml-2 pl-2 border-l border-gray-700 space-y-1 mt-1;
+    @apply ml-2 pl-2 border-l border-gray-700 space-y-1 mt-1 overflow-hidden;
+  }
+
+  /* Forzar la ocultación de la barra de scroll en navegadores Webkit (Chrome/Safari) - Tercer nivel */
+  .sidebar-third-level-container::-webkit-scrollbar,
+  .sidebar-third-level::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+
+  /* Para Firefox - ocultar scrollbar - Tercer nivel */
+  .sidebar-third-level-container,
+  .sidebar-third-level {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
   }
 
   .sidebar-third-level-button {
@@ -1070,11 +1231,11 @@
 
   /* Footer del sidebar */
   .sidebar-footer {
-    @apply p-3 border-t border-gray-800 dark:border-[#2A3B5A] mt-auto flex-shrink-0 space-y-1;
+    @apply p-3 border-t border-[#2A3B5A] flex-shrink-0 space-y-1;
   }
 
   .sidebar-footer-button {
-    @apply w-full flex items-center py-3 rounded-xl text-gray-400 hover:bg-gray-800/50 hover:text-white transition-all whitespace-nowrap;
+    @apply w-full flex items-center py-2 rounded-xl text-gray-400 hover:bg-gray-800/50 hover:text-white transition-all whitespace-nowrap;
   }
 
   .sidebar-footer-button-open {
@@ -1085,12 +1246,20 @@
     @apply justify-center px-0;
   }
 
+  .sidebar-footer-button-active {
+    @apply bg-gray-800/70 text-white;
+  }
+
   .sidebar-footer-icon {
     @apply material-symbols-outlined text-gray-500;
   }
 
   .sidebar-footer-icon-open {
     @apply mr-3;
+  }
+
+  .sidebar-footer-icon-active {
+    @apply text-[#B84E9D];
   }
 
   .sidebar-footer-label {
@@ -3114,6 +3283,172 @@
   .error-actions {
     @apply flex space-x-3;
   }
+
+  /* ============================================
+     Document Tabs - Sistema de Pestañas Anidadas
+     ============================================ */
+
+  /* Contenedor de pestañas principales */
+  .category-tabs-container {
+    @apply flex items-center gap-2 mb-6 border-b border-[#e5e5e5] dark:border-[#2A3B5A];
+  }
+
+  /* Pestaña principal - Base */
+  .tab-main {
+    @apply flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all border-b-2 border-transparent;
+  }
+
+  /* Pestaña principal - Activa */
+  .tab-main-active {
+    @apply tab-main text-[#B84E9D] border-[#B84E9D] bg-transparent;
+  }
+
+  /* Pestaña principal - Inactiva */
+  .tab-main-inactive {
+    @apply tab-main text-[#525252] dark:text-[#a3a3a3] hover:text-[#B84E9D] hover:border-[#B84E9D]/50;
+  }
+
+  /* Icono de pestaña principal */
+  .tab-main-icon {
+    @apply material-symbols-outlined text-lg;
+  }
+
+  /* Label de pestaña principal */
+  .tab-main-label {
+    @apply font-semibold;
+  }
+
+  /* Contenedor de pestañas secundarias */
+  .subcategory-tabs-container {
+    @apply flex items-center gap-2 flex-wrap;
+  }
+
+  /* Pestaña secundaria - Base (botón redondeado) */
+  .tab-sub {
+    @apply px-4 py-2 rounded-full text-sm font-medium transition-all;
+  }
+
+  /* Pestaña secundaria - Activa */
+  .tab-sub-active {
+    @apply tab-sub bg-[#B84E9D] text-white shadow-md shadow-[#B84E9D]/20;
+  }
+
+  /* Pestaña secundaria - Inactiva */
+  .tab-sub-inactive {
+    @apply tab-sub bg-[#f5f5f5] dark:bg-[#1B273B] text-[#525252] dark:text-[#a3a3a3] hover:bg-[#FCECF6] dark:hover:bg-[#B84E9D]/10 hover:text-[#B84E9D] border border-[#e5e5e5] dark:border-[#2A3B5A];
+  }
+
+  /* ============================================
+     FilterPanel - Panel de Filtros Avanzados
+     ============================================ */
+
+  /* Backdrop del panel de filtros */
+  .filter-panel-backdrop {
+    @apply fixed inset-0 bg-black/50 backdrop-blur-sm z-40 transition-opacity duration-300;
+  }
+
+  /* Panel principal (drawer desde la derecha) */
+  .filter-panel {
+    @apply fixed top-0 right-0 h-full w-full sm:max-w-md bg-white dark:bg-[#131B29] shadow-2xl z-50 flex flex-col transform transition-transform duration-300 ease-out;
+    @apply animate-slide-in-right;
+  }
+
+  /* Header del panel */
+  .filter-panel-header {
+    @apply flex items-center justify-between p-6 border-b border-[#e5e5e5] dark:border-[#2A3B5A] flex-shrink-0;
+  }
+
+  .filter-panel-header-content {
+    @apply flex items-center gap-3;
+  }
+
+  .filter-panel-header-icon {
+    @apply text-[#B84E9D] text-2xl;
+  }
+
+  .filter-panel-title {
+    @apply text-xl font-bold text-[#171717] dark:text-[#fafafa];
+  }
+
+  .filter-panel-close-button {
+    @apply p-2 rounded-lg text-[#525252] dark:text-[#a3a3a3] hover:bg-[#f5f5f5] dark:hover:bg-[#1B273B] transition-colors;
+  }
+
+  .filter-panel-close-button .material-symbols-outlined {
+    @apply text-xl;
+  }
+
+  /* Contenido del panel (scrollable) */
+  .filter-panel-content {
+    @apply flex-1 overflow-y-auto p-6 space-y-6;
+  }
+
+  /* Sección de filtro */
+  .filter-section {
+    @apply space-y-4;
+  }
+
+  .filter-section-header {
+    @apply flex items-center gap-3 mb-4;
+  }
+
+  .filter-section-icon {
+    @apply text-[#B84E9D] text-xl;
+  }
+
+  .filter-section-title {
+    @apply text-base font-bold text-[#171717] dark:text-[#fafafa];
+  }
+
+  .filter-section-content {
+    @apply space-y-3;
+  }
+
+  /* Grupo de fechas */
+  .filter-date-group {
+    @apply grid grid-cols-2 gap-4;
+  }
+
+  /* Grupo de importes */
+  .filter-amount-group {
+    @apply grid grid-cols-2 gap-4;
+  }
+
+  /* Labels de filtro */
+  .filter-label {
+    @apply flex flex-col gap-1.5;
+  }
+
+  .filter-label-text {
+    @apply text-xs font-bold text-[#525252] dark:text-[#a3a3a3] uppercase tracking-wider;
+  }
+
+  /* Inputs de filtro */
+  .filter-input {
+    @apply w-full px-4 py-2.5 bg-white dark:bg-[#1B273B] border border-[#e5e5e5] dark:border-[#2A3B5A] rounded-lg text-sm font-medium text-[#171717] dark:text-[#fafafa] placeholder:text-[#a3a3a3] dark:placeholder:text-[#737373] focus:outline-none focus:ring-2 focus:ring-[#B84E9D] focus:border-[#B84E9D] hover:border-[#a3a3a3] transition-all shadow-sm;
+  }
+
+  /* Grupo de checkboxes */
+  .filter-checkbox-group {
+    @apply flex flex-col gap-3;
+  }
+
+  .filter-checkbox-label {
+    @apply flex items-center gap-3 cursor-pointer p-3 rounded-lg hover:bg-[#f5f5f5] dark:hover:bg-[#1B273B] transition-colors;
+  }
+
+  .filter-checkbox {
+    @apply w-4 h-4 rounded border-[#e5e5e5] dark:border-[#2A3B5A] text-[#B84E9D] focus:ring-[#B84E9D] focus:ring-2 cursor-pointer;
+  }
+
+  .filter-checkbox-text {
+    @apply text-sm font-medium text-[#525252] dark:text-[#a3a3a3];
+  }
+
+  /* Footer del panel */
+  .filter-panel-footer {
+    @apply flex items-center justify-end gap-3 p-6 border-t border-[#e5e5e5] dark:border-[#2A3B5A] flex-shrink-0;
+  }
 }
 
 @layer utilities {
@@ -3203,6 +3538,21 @@
     }
   }
 
+  @keyframes slideInRight {
+    0% {
+      opacity: 0;
+      transform: translateX(100%);
+    }
+    100% {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  .animate-slide-in-right {
+    animation: slideInRight 0.3s ease-out;
+  }
+
   @keyframes fadeInScale {
     0% {
       opacity: 0;
@@ -3251,5 +3601,136 @@
 
   .animate-modal-enter {
     animation: modalEnter 0.3s ease-out;
+  }
+
+  /* ============================================
+     Help Page - Centro de Ayuda
+     ============================================ */
+  .help-page-container {
+    @apply w-full max-w-6xl mx-auto px-6 py-8 space-y-8;
+  }
+
+  .help-header {
+    @apply flex flex-col gap-6 mb-8;
+  }
+
+  .help-title {
+    @apply text-4xl font-bold text-slate-900 dark:text-white;
+  }
+
+  .help-search-container {
+    @apply relative flex items-center;
+  }
+
+  .help-search-icon {
+    @apply absolute left-4 text-slate-400 dark:text-slate-500 text-xl;
+  }
+
+  .help-search-input {
+    @apply w-full pl-12 pr-4 py-3 bg-white dark:bg-[#1B273B] border border-slate-200 dark:border-[#2A3B5A] rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[#B84E9D] focus:border-[#B84E9D] transition-all;
+  }
+
+  .help-faqs-section {
+    @apply space-y-6;
+  }
+
+  .help-section-title {
+    @apply text-2xl font-bold text-slate-900 dark:text-white mb-6;
+  }
+
+  .help-faqs-list {
+    @apply space-y-4;
+  }
+
+  .help-faq-item {
+    @apply studio-card;
+  }
+
+  .help-faq-button {
+    @apply w-full flex items-center justify-between p-6 text-left bg-transparent border-none cursor-pointer transition-all;
+    @apply hover:bg-slate-50 dark:hover:bg-[#1B273B]/50;
+  }
+
+  .help-faq-button-expanded {
+    @apply bg-slate-50 dark:bg-[#1B273B]/50;
+  }
+
+  .help-faq-question {
+    @apply text-lg font-semibold text-slate-900 dark:text-white flex-1 pr-4;
+  }
+
+  .help-faq-icon {
+    @apply text-slate-400 dark:text-slate-500 transition-transform duration-300 ease-in-out flex-shrink-0;
+    transform: rotate(0deg);
+  }
+
+  .help-faq-icon-expanded {
+    @apply transform;
+    transform: rotate(180deg);
+  }
+
+  .help-faq-answer-container {
+    @apply overflow-hidden transition-all duration-300 ease-in-out;
+  }
+
+  .help-faq-answer-collapsed {
+    max-height: 0;
+    opacity: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+
+  .help-faq-answer-expanded {
+    max-height: 500px;
+    opacity: 1;
+  }
+
+  .help-faq-answer {
+    @apply px-6 pb-6 text-slate-700 dark:text-slate-300 leading-relaxed;
+  }
+
+  .help-no-results {
+    @apply flex flex-col items-center justify-center py-12 text-center;
+  }
+
+  .help-no-results-icon {
+    @apply text-6xl text-slate-300 dark:text-slate-600 mb-4;
+  }
+
+  .help-no-results p {
+    @apply text-slate-500 dark:text-slate-400 text-lg;
+  }
+
+  .help-documentation-section {
+    @apply mt-12 flex justify-center;
+  }
+
+  .help-documentation-card {
+    @apply studio-card p-10 flex flex-col items-center text-center space-y-5 hover:shadow-lg transition-all duration-300;
+    @apply rounded-3xl max-w-2xl w-full;
+  }
+
+  .help-documentation-icon-wrapper {
+    @apply w-20 h-20 rounded-full bg-[#B84E9D]/10 dark:bg-[#B84E9D]/20 flex items-center justify-center mb-4;
+  }
+
+  .help-documentation-icon {
+    @apply text-5xl text-[#B84E9D];
+  }
+
+  .help-documentation-icon-spinner {
+    @apply animate-spin;
+  }
+
+  .help-documentation-title {
+    @apply text-xl font-bold text-slate-900 dark:text-white;
+  }
+
+  .help-documentation-description {
+    @apply text-slate-600 dark:text-slate-400 text-base leading-relaxed max-w-lg;
+  }
+
+  .help-documentation-button {
+    @apply mt-4 px-6 py-2.5 bg-[#B84E9D] text-white rounded-lg font-semibold hover:bg-[#9C3C86] transition-colors shadow-md shadow-[#B84E9D]/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#B84E9D];
   }
 }

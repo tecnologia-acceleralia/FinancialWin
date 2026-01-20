@@ -3,7 +3,7 @@ import { ViewState } from '../../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useNavigate } from 'react-router-dom';
 import { Card } from '../../components/ui';
-import { PageHeader, type PageHeaderAction } from '../../components/common/PageHeader';
+import { PageHeader, type PageHeaderAction } from '../../components/layout';
 
 interface HomePageProps {
   onNavigate?: (view: ViewState, subAction?: string) => void;

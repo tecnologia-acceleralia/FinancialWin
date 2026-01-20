@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PageHeader } from '../../components/common/PageHeader';
+import { PageHeader } from '../../components/layout';
 
 interface SeccionInfo {
   id: string;

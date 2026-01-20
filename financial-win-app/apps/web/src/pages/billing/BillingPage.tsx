@@ -1,6 +1,6 @@
 import React from 'react';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { PageHeader } from '../../components/common/PageHeader';
+import { PageHeader } from '../../components/layout';
 
 export const BillingPage: React.FC = () => {
   const { t } = useLanguage();

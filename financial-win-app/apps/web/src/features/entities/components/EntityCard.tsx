@@ -1,4 +1,5 @@
 import React from 'react';
+import { StatusBadge } from '@/components/ui';
 
 type EntityStatus = 'activo' | 'pendiente' | 'inactivo';
 
@@ -29,9 +30,6 @@ export const EntityCard: React.FC<EntityCardProps> = ({
   phone,
   isProvider = false,
 }) => {
-  const statusClassName = `status-badge status-${status.toLowerCase()}`;
-  const statusLabel = `${status.charAt(0).toUpperCase()}${status.slice(1)}`;
-
   return (
     <div className="entity-card">
       <div className="entity-card-header">
@@ -40,7 +38,7 @@ export const EntityCard: React.FC<EntityCardProps> = ({
         
         {/* Contenedor con Badge arriba, Nombre y NIF abajo */}
         <div className="entity-info-container">
-          <span className={statusClassName}>{statusLabel}</span>
+          <StatusBadge status={status} />
           <span className="entity-name">{name}</span>
           <span className="entity-subtitle">
             {nif} • {type}

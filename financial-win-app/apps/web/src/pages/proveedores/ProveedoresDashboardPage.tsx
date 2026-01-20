@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { PageHeader, type PageHeaderAction } from '../../components/common/PageHeader';
+import { PageHeader, type PageHeaderAction } from '../../components/layout';
 
 interface StatCard {
   title: string;

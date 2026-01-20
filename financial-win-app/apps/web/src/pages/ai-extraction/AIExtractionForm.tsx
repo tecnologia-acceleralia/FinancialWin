@@ -1,6 +1,5 @@
 import React from 'react';
-import { DocumentForm } from '../../components/common/DocumentForm';
-import { FilePreview } from '../../components/common/FilePreview';
+import { DocumentForm, FilePreview } from '../../components/forms';
 import type { DocumentType, ExtractedData } from './types';
 
 export interface AIExtractionFormProps {

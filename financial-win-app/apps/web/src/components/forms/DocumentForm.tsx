@@ -7,6 +7,7 @@ export interface DocumentFormProps {
   type: DocumentType;
   onSave?: () => void;
   isSaving?: boolean;
+  isFormValid?: boolean;
 }
 
 /**
@@ -18,7 +19,8 @@ export const DocumentForm: React.FC<DocumentFormProps> = ({
   onChange, 
   type, 
   onSave,
-  isSaving = false 
+  isSaving = false,
+  isFormValid = true
 }) => {
   const updateField = (field: string, value: string) => {
     onChange(field, value);
@@ -96,7 +98,7 @@ export const DocumentForm: React.FC<DocumentFormProps> = ({
                 />
               </div>
 
-              {/* Código postal */}
+              {/* Código postal y Ciudad - Agrupados */}
               <div>
                 <label className="form-label-studio">Código postal</label>
                 <input
@@ -118,7 +120,7 @@ export const DocumentForm: React.FC<DocumentFormProps> = ({
                 />
               </div>
 
-              {/* Fecha */}
+              {/* Fecha y Hora - Agrupados */}
               <div>
                 <label className="form-label-studio">Fecha</label>
                 <input
@@ -145,7 +147,7 @@ export const DocumentForm: React.FC<DocumentFormProps> = ({
                 <h4 className="form-section-title-studio">Desglose Económico</h4>
               </div>
 
-              {/* Base imponible */}
+              {/* Base imponible y IVA - Agrupados */}
               <div>
                 <label className="form-label-studio">Base imponible</label>
                 <input
@@ -312,7 +314,7 @@ export const DocumentForm: React.FC<DocumentFormProps> = ({
                 />
               </div>
 
-              {/* CIF/NIF or VAT based on origin */}
+              {/* CIF/NIF or VAT based on origin y Número Factura - Agrupados */}
               <div>
                 <label className="form-label-studio">
                   {data.origin === 'foreign' ? 'VAT ID' : 'NIF / CIF'}
@@ -358,7 +360,7 @@ export const DocumentForm: React.FC<DocumentFormProps> = ({
                 <h4 className="form-section-title-studio">Desglose Económico</h4>
               </div>
 
-              {/* Base Imponible */}
+              {/* Base Imponible y Tipo de Moneda - Agrupados */}
               <div>
                 <label className="form-label-studio">Base Imponible</label>
                 <input
@@ -383,7 +385,7 @@ export const DocumentForm: React.FC<DocumentFormProps> = ({
                 </select>
               </div>
 
-              {/* IVA */}
+              {/* IVA y Total Factura - Agrupados */}
               <div>
                 <label className="form-label-studio">IVA</label>
                 <input
@@ -422,18 +424,21 @@ export const DocumentForm: React.FC<DocumentFormProps> = ({
       {renderFormFields()}
 
       {onSave && (
-        <div className="mt-8 flex justify-end">
+        <div className="studio-actions">
+          <div className="studio-actions-spacer"></div>
           <button
             type="button"
             onClick={onSave}
-            disabled={isSaving}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors"
+            disabled={isSaving || !isFormValid}
+            className="btn-validate-primary disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isSaving ? 'Guardando...' : 'Validar y Archivar'}
+            <span className="material-symbols-outlined">
+              {isSaving ? 'hourglass_empty' : 'check_circle'}
+            </span>
+            {isSaving ? 'Guardando...' : isFormValid ? 'Validar y Archivar' : 'Completa los campos obligatorios'}
           </button>
         </div>
       )}
     </form>
   );
 };
-
