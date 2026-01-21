@@ -65,12 +65,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, isO
         { label: t('nav.newSupplier'), action: 'create', icon: 'add_business' },
         { label: t('nav.listSuppliers'), action: 'list', icon: 'list' }
       ]
-    },
-    { 
-      id: 'ai-extraction', 
-      label: t('nav.ai-extraction'), 
-      icon: 'auto_awesome'
     }
+    // TODO: Transición a DocumentsPage - Ocultado temporalmente
+    // { 
+    //   id: 'ai-extraction', 
+    //   label: t('nav.ai-extraction'), 
+    //   icon: 'auto_awesome'
+    // }
   ];
 
   const handleParentClick = (item: NavItem) => {

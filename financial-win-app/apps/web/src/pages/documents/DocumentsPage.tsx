@@ -6,7 +6,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { useFinancial } from '../../contexts/FinancialContext';
 import { useGeminiExtraction } from '../../hooks/useGeminiExtraction';
 import { PageHeader, type PageHeaderAction } from '../../components/layout';
-import type { ExtractedData, DocumentType } from '../ai-extraction/types';
+import type { ExtractedData, DocumentType } from '../../types';
 
 // Estructura de datos para las categorías de documentos
 const DOCUMENT_CATEGORIES: Category[] = [
@@ -36,45 +36,6 @@ const DOCUMENT_CATEGORIES: Category[] = [
   },
 ];
 
-// Datos mock para simulación de extracción
-const MOCK_EXTRACTED_DATA: Record<DocumentType, ExtractedData> = {
-  invoices: {
-    origin: 'national',
-    department: 'IT',
-    expenseType: 'Licencias Software',
-    supplier: 'Microsoft Corporation',
-    cif: 'B12345678',
-    invoiceNum: 'INV-2024-001',
-    issueDate: new Date().toISOString().split('T')[0],
-    concept: 'Licencia anual de Microsoft 365',
-    base: '1000.00',
-    currency: 'EUR',
-    vat: '210.00',
-    total: '1210.00',
-  },
-  tickets: {
-    category: 'Viajes y Dietas',
-    department: 'Ventas',
-    establishment: 'Restaurante El Buen Sabor',
-    nif: 'B87654321',
-    address: 'Calle Mayor 123',
-    zip: '28001',
-    city: 'Madrid',
-    date: new Date().toISOString().split('T')[0],
-    time: '14:30',
-    base: '50.00',
-    vat: '10.50',
-    amount: '60.50',
-  },
-  staff: {
-    employee: 'Juan Pérez García',
-    type: 'Nómina',
-    period: new Date().toISOString().slice(0, 7),
-    net: '2500.00',
-    ss: '750.00',
-  },
-};
-
 export const DocumentsPage: React.FC = () => {
   const { t } = useLanguage();
   const { addRecord } = useFinancial();
@@ -82,8 +43,8 @@ export const DocumentsPage: React.FC = () => {
   const [currentFileIndex, setCurrentFileIndex] = useState<number>(0);
   const [formData, setFormData] = useState<ExtractedData | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [extractionError, setExtractionError] = useState<string | null>(null);
   const fileUrlRef = useRef<string | null>(null);
   
   // Estados de navegación por pestañas
@@ -102,6 +63,7 @@ export const DocumentsPage: React.FC = () => {
     error,
     activeBatchId,
     batchQueue,
+    processDocument,
     processFiles,
     getExtractedData,
     reset,
@@ -162,26 +124,42 @@ export const DocumentsPage: React.FC = () => {
     };
   }, []);
 
-  // Simular extracción cuando se seleccionan archivos
-  useEffect(() => {
-    // Solo ejecutar si hay archivos y no hay datos extraídos aún
-    if (selectedFiles.length > 0 && !formData) {
-      setIsAnalyzing(true);
-      
-      // Simular extracción durante 2.5 segundos
-      const timer = setTimeout(() => {
-        // Usar datos mock según el tipo de documento
-        const mockData = { ...MOCK_EXTRACTED_DATA[documentType] };
-        setFormData(mockData);
-        setIsAnalyzing(false);
-      }, 2500);
+  // Hacer que isAnalyzing dependa directamente de isLoading del hook
+  const isAnalyzing = isLoading;
 
-      return () => {
-        clearTimeout(timer);
-      };
+  // Mapear resultados del hook cuando termine la extracción
+  useEffect(() => {
+    // Si el hook terminó de cargar y hay datos en la cola
+    if (!isLoading && batchQueue.length > 0) {
+      // Buscar el primer item con datos extraídos
+      const readyItem = batchQueue.find((item) => item.status === 'ready' && item.data);
+      
+      if (readyItem && readyItem.data) {
+        // Actualizar formData con los datos extraídos
+        setFormData(readyItem.data);
+        setExtractionError(null);
+      } else {
+        // Verificar si hay errores en la cola
+        const errorItem = batchQueue.find((item) => item.status === 'error');
+        if (errorItem && errorItem.error) {
+          setExtractionError(errorItem.error);
+        }
+      }
     }
-    return undefined;
-  }, [selectedFiles.length, formData, documentType]);
+  }, [isLoading, batchQueue]);
+
+  // Manejar errores del hook
+  useEffect(() => {
+    if (error) {
+      setExtractionError(error);
+    } else if (!isLoading) {
+      // Limpiar error cuando termine la carga exitosamente
+      const hasErrors = batchQueue.some((item) => item.status === 'error');
+      if (!hasErrors) {
+        setExtractionError(null);
+      }
+    }
+  }, [error, isLoading, batchQueue]);
 
   // Validar si el formulario tiene los campos obligatorios rellenos
   const isFormValid = useMemo(() => {
@@ -223,12 +201,26 @@ export const DocumentsPage: React.FC = () => {
     return 'Arrastra tus documentos aquí';
   };
 
-  const handleFilesSelected = (files: File[]) => {
+  const handleFilesSelected = async (files: File[]) => {
     setSelectedFiles(files);
     setCurrentFileIndex(0);
     setSuccessMessage(null);
     setFormData(null);
-    // No establecer isAnalyzing aquí, el useEffect lo manejará
+    setExtractionError(null);
+    
+    // Iniciar extracción real con el primer archivo usando processFiles
+    // Esto actualiza correctamente el estado isLoading del hook
+    if (files.length > 0) {
+      try {
+        // Usar processFiles con un solo archivo para que isLoading se actualice correctamente
+        await processFiles([files[0]], documentType);
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : 'Error desconocido al procesar el documento';
+        setExtractionError(errorMessage);
+        console.error('Error al procesar documento:', err);
+      }
+    }
   };
 
   const handleFieldChange = (field: string, value: string) => {
@@ -263,7 +255,7 @@ export const DocumentsPage: React.FC = () => {
       setFormData(null);
       setSelectedFiles([]);
       setCurrentFileIndex(0);
-      setIsAnalyzing(false);
+      setExtractionError(null);
 
       // Limpiar URL del objeto
       if (fileUrlRef.current) {
@@ -291,7 +283,7 @@ export const DocumentsPage: React.FC = () => {
       setFormData(null);
       setSelectedFiles([]);
       setCurrentFileIndex(0);
-      setIsAnalyzing(false);
+      setExtractionError(null);
       
       // Limpiar URL del objeto
       if (fileUrlRef.current) {
@@ -348,9 +340,9 @@ export const DocumentsPage: React.FC = () => {
           )}
 
           {/* Mensaje de error */}
-          {error && (
+          {(error || extractionError) && (
             <div className="mt-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg animate-fade-in">
-              Error: {error}
+              Error: {error || extractionError}
             </div>
           )}
 

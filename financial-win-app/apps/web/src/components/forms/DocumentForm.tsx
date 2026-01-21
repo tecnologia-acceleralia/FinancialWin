@@ -1,5 +1,5 @@
 import React from 'react';
-import type { DocumentType, ExtractedData } from '../../pages/ai-extraction/types';
+import type { DocumentType, ExtractedData } from '../../types';
 
 export interface DocumentFormProps {
   data: ExtractedData;

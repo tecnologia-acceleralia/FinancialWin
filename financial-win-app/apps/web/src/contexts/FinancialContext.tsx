@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import type { ExtractedData } from '../pages/ai-extraction/types';
+import type { ExtractedData } from '../types';
 
 /**
  * Tipo de registro financiero

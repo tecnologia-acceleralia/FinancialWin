@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { GoogleGenAI, Type } from '@google/genai';
-import type { DocumentType, ExtractedData } from '../pages/ai-extraction/types';
+import type { DocumentType, ExtractedData } from '../types';
 
 /**
  * Interfaz para un item en la cola de procesamiento por lotes
@@ -47,12 +47,12 @@ export interface UseGeminiExtractionReturn {
 /**
  * Constantes de configuración
  */
-const GEMINI_MODEL = 'gemini-1.5-flash-latest';
-const SYSTEM_INSTRUCTION = 'You are an expert data extraction assistant for financial documents.';
+const GEMINI_MODEL = 'gemini-3-flash-preview';
+const SYSTEM_INSTRUCTION = 'Eres un experto contable español. Tu misión es extraer datos de facturas con precisión total.\n\nRegla de clasificación: Si el emisor es una aerolínea (ej. Vueling), hotel o restaurante, marca siempre como "Viajes y Dietas". Si es una gestoría o servicios legales (ej. Osta Penedes), marca como "Servicios Profesionales".\n\nDepartamentos permitidos: Marketing, IT, RRHH, Finanzas, Operaciones, Ventas.\nTipos de gasto permitidos: Licencias Software, Consultoría, Material Oficina, Servicios Profesionales, Viajes y Dietas, Otros.\nMonedas permitidas: EUR, USD, GBP.\n\nPrioridad NIF: Busca el NIF/CIF del emisor con cuidado, suele estar cerca del logo o en el pie de página. Formato español esperado (letras A, B, o G seguidas de 8 dígitos). Si no lo encuentras, deja el campo vacío pero continúa extrayendo el resto.\n\nIMPORTANTE: Si no estás seguro de una categoría, elige "Otros" o "Finanzas" en lugar de no devolver nada. Es vital que siempre devuelvas un JSON completo con todos los campos. No dejes ningún campo vacío si puedes inferirlo del documento.\n\nRespuesta: Devuelve exclusivamente el objeto JSON sin texto adicional ni bloques de código markdown.';
 
 // Log global al cargar el módulo para verificar si la API Key está disponible
 if (typeof window !== 'undefined') {
-  console.log('--- TEST API KEY EN CARGA ---', !!import.meta.env.VITE_GEMINI_API_KEY);
+  console.log('🔑 [Gemini] API Key detectada:', !!import.meta.env.VITE_GEMINI_API_KEY);
 }
 
 /**
@@ -202,6 +202,19 @@ const applyDefaults = (data: ExtractedData, documentType: DocumentType): Extract
       if (!result.expenseType) result.expenseType = 'Licencias Software';
       if (!result.currency) result.currency = 'EUR';
       if (!result.origin) result.origin = 'national';
+      // Validar que los valores por defecto estén en los enums permitidos
+      const validDepartments = ['Marketing', 'IT', 'RRHH', 'Finanzas', 'Operaciones', 'Ventas'];
+      const validExpenseTypes = ['Licencias Software', 'Consultoría', 'Material Oficina', 'Servicios Profesionales', 'Viajes y Dietas', 'Otros'];
+      const validCurrencies = ['EUR', 'USD', 'GBP'];
+      if (result.department && !validDepartments.includes(result.department)) {
+        result.department = 'IT';
+      }
+      if (result.expenseType && !validExpenseTypes.includes(result.expenseType)) {
+        result.expenseType = 'Licencias Software';
+      }
+      if (result.currency && !validCurrencies.includes(result.currency)) {
+        result.currency = 'EUR';
+      }
       break;
 
     case 'staff':
@@ -222,7 +235,7 @@ const getPromptAndSchema = (documentType: DocumentType): {
   if (documentType === 'tickets') {
     return {
       promptText:
-        'Analyze this receipt/ticket. Extract the following details: establishment name, Tax ID (NIF) if available, full address, city, zip code, date (YYYY-MM-DD), time (HH:MM), tax base amount, vat amount, total amount, and category. Also infer the department based on the nature of the expense.',
+        'Analyze this receipt/ticket. Extract the following details: establishment name, Tax ID (NIF) if available, full address, city, zip code, date (YYYY-MM-DD), time (HH:MM), tax base amount, vat amount, total amount, and category. Also infer the department based on the nature of the expense. Return ONLY the JSON object. Do not include any conversational text or markdown code blocks like ```json.',
       responseSchema: {
         type: Type.OBJECT,
         properties: {
@@ -249,7 +262,7 @@ const getPromptAndSchema = (documentType: DocumentType): {
   if (documentType === 'staff') {
     return {
       promptText:
-        'Analyze this HR document. Extract employee name, type, period, net amount, and social security.',
+        'Analyze this HR document. Extract employee name, type, period, net amount, and social security. Return ONLY the JSON object. Do not include any conversational text or markdown code blocks like ```json.',
       responseSchema: {
         type: Type.OBJECT,
         properties: {
@@ -266,65 +279,64 @@ const getPromptAndSchema = (documentType: DocumentType): {
   // Default: invoices
   return {
     promptText:
-      "Analyze this invoice or license document. First, determine if it is 'national' or 'foreign' based on the Tax ID. If it has a VAT number (starts with country code e.g. DE, FR, US, GB, etc.), it is 'foreign'. Otherwise 'national'. Then extract strictly: Department (infer), Expense Type, Supplier (IMPORTANT: Remove any company legal suffix like S.L., S.A., SL, SA, S.A.U., SAU from the name), Tax ID (CIF/NIF for national, VAT ID for foreign), Invoice Number, Issue Date, Concept (translate description to Spanish), Tax Base, Currency, VAT Amount, and Total Amount.",
+      "Analiza esta factura o documento de licencia. Determina si es 'national' o 'foreign' basándote en el Tax ID. Si el número VAT empieza con código de país (DE, FR, US, GB, etc.), es 'foreign', en caso contrario es 'national'. Busca patrones de NIF/CIF como 'NIF', 'CIF', 'VAT ID' o 'Tax ID'. Para facturas de aerolíneas como Vueling, busca el NIF español que empieza por B. Extrae: Departamento (inferir), Tipo de Gasto, Proveedor (eliminar sufijos legales como S.L., S.A., SL, SA, SAU), Tax ID (CIF/NIF para nacional, VAT ID para extranjero), Número de Factura, Fecha de Emisión, Concepto (traducir al español), Base Imponible (número en formato string), Moneda, Importe IVA (número en formato string), Importe Total (número en formato string). Return ONLY the JSON object. Do not include any conversational text or markdown code blocks like ```json.",
     responseSchema: {
       type: Type.OBJECT,
       properties: {
         origin: {
           type: Type.STRING,
-          enum: ['national', 'foreign'],
-          description: "Classify as 'foreign' if a VAT ID is present, otherwise 'national'.",
+          description: "Clasificar como 'foreign' si hay un VAT ID presente, en caso contrario 'national'. Valores permitidos: national, foreign.",
         },
         department: {
           type: Type.STRING,
-          description: 'Inferred department (e.g. IT, Marketing, HR).',
+          description: 'Departamento inferido del documento. Valores permitidos: Marketing, IT, RRHH, Finanzas, Operaciones, Ventas. Si no estás seguro, usa "Finanzas".',
         },
         expenseType: {
           type: Type.STRING,
-          description: 'Type of expense (e.g. Licencia Software, Consultoría).',
+          description: 'Tipo de gasto. Valores permitidos: Licencias Software, Consultoría, Material Oficina, Servicios Profesionales, Viajes y Dietas, Otros. Para facturas de aerolíneas como Vueling, debe ser siempre "Viajes y Dietas". Si no estás seguro, usa "Otros".',
         },
         supplier: {
           type: Type.STRING,
-          description: 'Supplier Name without company suffixes (e.g. remove SL, SA, S.L., S.A., SAU).',
+          description: 'Nombre del Proveedor sin sufijos legales (ej: eliminar SL, SA, S.L., S.A., SAU).',
         },
         cif: {
           type: Type.STRING,
-          description: 'Tax ID (CIF/NIF) if national.',
+          description: 'Tax ID (CIF/NIF) si es nacional. Buscar patrones como "NIF", "CIF", "VAT ID" o "Tax ID". Para Vueling, buscar NIF español que empieza por B. Si no lo encuentras, deja vacío.',
         },
         vatId: {
           type: Type.STRING,
-          description: 'VAT ID if foreign.',
+          description: 'VAT ID si es extranjero. Si no existe, deja vacío.',
         },
         invoiceNum: {
           type: Type.STRING,
-          description: 'Invoice Number',
+          description: 'Número de Factura',
         },
         issueDate: {
           type: Type.STRING,
-          description: 'Date YYYY-MM-DD',
+          description: 'Fecha en formato YYYY-MM-DD',
         },
         concept: {
           type: Type.STRING,
-          description: 'Brief description of items or services, translated to Spanish.',
+          description: 'Breve descripción de artículos o servicios, traducido al español.',
         },
         base: {
           type: Type.STRING,
-          description: 'Tax Base amount',
+          description: 'Base Imponible como número en formato string (ej: "100.50")',
         },
         currency: {
           type: Type.STRING,
-          description: 'Currency symbol or code (EUR, USD, €)',
+          description: 'Código de moneda. Valores permitidos: EUR, USD, GBP. Si no puedes determinarlo, usa "EUR".',
         },
         vat: {
           type: Type.STRING,
-          description: 'VAT amount',
+          description: 'Importe de IVA como número en formato string (ej: "21.00")',
         },
         total: {
           type: Type.STRING,
-          description: 'Total amount',
+          description: 'Importe Total como número en formato string (ej: "121.50")',
         },
       },
-      required: ['supplier', 'total', 'invoiceNum', 'origin'],
+      required: ['supplier', 'total', 'invoiceNum', 'origin', 'department', 'expenseType', 'currency'],
     },
   };
 };
@@ -365,6 +377,7 @@ export const useGeminiExtraction = (
         // Validar y obtener API key (solo una vez)
         if (!apiKeyRef.current) {
           apiKeyRef.current = getApiKey();
+          console.log('🔑 [Gemini] API Key detectada:', !!apiKeyRef.current);
         }
 
         // Logs solo en desarrollo
@@ -380,31 +393,84 @@ export const useGeminiExtraction = (
         // 1. Convertir archivo a Base64
         const { data: base64Data, mimeType } = await fileToGenerativePart(file);
 
-        // 2. Inicializar cliente Gemini
-        const genAI = new GoogleGenAI({ apiKey: apiKeyRef.current });
+        // Log del tamaño del Base64
+        console.log('📏 [Gemini] Tamaño del archivo en Base64:', base64Data.length);
+
+        // 2. Inicializar cliente Gemini con la nueva sintaxis de @google/genai
+        const ai = new GoogleGenAI({ 
+          apiKey: apiKeyRef.current
+        });
 
         // 3. Obtener prompt y schema según tipo de documento
         const { promptText, responseSchema } = getPromptAndSchema(docType);
-
-        // 4. Llamar a la API de Gemini
-        const response = await genAI.models.generateContent({
+        
+        // Log de configuración
+        console.log('🔧 [Gemini 3] Configuración:', {
           model: GEMINI_MODEL,
-          contents: {
-            parts: [
-              { inlineData: { mimeType, data: base64Data } },
-              { text: promptText },
-            ],
-          },
-          config: {
-            systemInstruction: SYSTEM_INSTRUCTION,
-            responseMimeType: 'application/json',
-            responseSchema,
-          },
+          hasApiKey: !!apiKeyRef.current,
+          version: 'Gemini 3 Flash Preview',
+          sdk: '@google/genai (nueva sintaxis)'
+        });
+        
+        // Log antes de la llamada
+        console.log('🚀 [Gemini 3] Iniciando petición al modelo:', GEMINI_MODEL);
+        console.log('🔗 [Gemini 3] URL de la petición (modelo):', GEMINI_MODEL);
+
+        // Log del payload (mimeType y prompt completo pero truncado para log)
+        console.log('📦 [Gemini 3] Datos enviados (formato, prompt corto):', {
+          mimeType,
+          promptLength: promptText.length,
+          prompt: promptText.substring(0, 100) + (promptText.length > 100 ? '...' : ''),
         });
 
-        // 5. Limpiar y parsear respuesta JSON
+        // 4. Llamar a generateContent usando la nueva sintaxis de @google/genai
+        // Nueva sintaxis: ai.models.generateContent con contents usando role y parts
+        const response = await ai.models.generateContent({
+          model: GEMINI_MODEL,
+          contents: [
+            { 
+              role: "user", 
+              parts: [
+                { inlineData: { mimeType, data: base64Data } },
+                { text: promptText }
+              ] 
+            }
+          ],
+          config: {
+            systemInstruction: SYSTEM_INSTRUCTION,
+            responseMimeType: "application/json",
+            responseSchema: responseSchema,
+            safetySettings: [
+              { category: 'HARM_CATEGORY_HARASSMENT' as any, threshold: 'BLOCK_NONE' as any },
+              { category: 'HARM_CATEGORY_HATE_SPEECH' as any, threshold: 'BLOCK_NONE' as any },
+              { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT' as any, threshold: 'BLOCK_NONE' as any },
+              { category: 'HARM_CATEGORY_DANGEROUS_CONTENT' as any, threshold: 'BLOCK_NONE' as any }
+            ]
+          }
+        });
+
+        // Log de respuesta exitosa
+        // La respuesta puede tener diferentes estructuras según la librería
+        console.log('✅ [Gemini 3] Estructura de respuesta:', {
+          hasText: !!response.text,
+          responseKeys: Object.keys(response),
+        });
+        
         const responseText = response.text || '';
+        console.log('✅ [Gemini 3] Respuesta recibida:', responseText.substring(0, 200) + (responseText.length > 200 ? '...' : ''));
+
+        // 5. Validar que la respuesta no esté vacía
+        if (!responseText || responseText.trim() === '') {
+          throw new Error('El modelo devolvió una respuesta vacía');
+        }
+
+        // 6. Limpiar y parsear respuesta JSON
         const cleanedText = cleanJsonResponse(responseText);
+
+        // Validar que el texto limpiado no esté vacío antes de intentar parsear
+        if (!cleanedText || cleanedText.trim() === '') {
+          throw new Error('La respuesta de la IA está vacía después de limpiar el formato');
+        }
 
         let parsedData: unknown;
         try {
@@ -412,12 +478,26 @@ export const useGeminiExtraction = (
         } catch (parseError) {
           if (import.meta.env.DEV) {
             console.error('❌ [useGeminiExtraction] Error al parsear JSON:', parseError);
-            console.error('Texto recibido:', cleanedText);
+            console.error('Texto recibido (longitud):', cleanedText.length);
+            console.error('Texto recibido (primeros 500 chars):', cleanedText.substring(0, 500));
           }
+          
+          // Verificar si es un error de JSON vacío o inválido
+          if (parseError instanceof SyntaxError) {
+            if (parseError.message.includes('Unexpected end of JSON input')) {
+              throw new Error('La respuesta de la IA está incompleta o vacía');
+            }
+          }
+          
           throw new Error('La respuesta de la IA no es un JSON válido');
         }
 
-        // 6. Validar estructura mínima
+        // Validar que el objeto parseado no esté vacío
+        if (!parsedData || (typeof parsedData === 'object' && Object.keys(parsedData).length === 0)) {
+          throw new Error('La respuesta de la IA contiene un objeto JSON vacío');
+        }
+
+        // 7. Validar estructura mínima
         if (!validateExtractedData(parsedData, docType)) {
           if (import.meta.env.DEV) {
             console.warn(
@@ -428,7 +508,7 @@ export const useGeminiExtraction = (
           // Continuar de todas formas, pero loggear advertencia
         }
 
-        // 7. Aplicar valores por defecto
+        // 8. Aplicar valores por defecto
         const extractedData = applyDefaults(parsedData as ExtractedData, docType);
 
         if (import.meta.env.DEV) {
@@ -437,6 +517,20 @@ export const useGeminiExtraction = (
 
         return extractedData;
       } catch (err) {
+        // Log de error detallado
+        console.error('❌ [Gemini 3] Error completo:', err);
+        
+        // Log adicional con detalles del error
+        if (err instanceof Error) {
+          console.error('❌ [Gemini 3] Mensaje de error:', err.message);
+          console.error('❌ [Gemini 3] Stack trace:', err.stack);
+        }
+        
+        // Si es un error de respuesta HTTP, loggear más detalles
+        if (err && typeof err === 'object' && 'response' in err) {
+          console.error('❌ [Gemini 3] Detalles de respuesta HTTP:', err);
+        }
+
         const errorMessage =
           err instanceof Error ? err.message : 'Error desconocido al extraer datos';
 
