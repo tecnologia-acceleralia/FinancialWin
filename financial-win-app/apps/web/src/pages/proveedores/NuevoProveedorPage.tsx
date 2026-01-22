@@ -67,7 +67,7 @@ export const NuevoProveedorPage: React.FC = () => {
   };
 
   const handleCancelar = () => {
-    navigate('/suppliers');
+    navigate('/proveedores');
   };
 
   const [shouldNavigateAfterSave, setShouldNavigateAfterSave] = useState<
@@ -85,7 +85,7 @@ export const NuevoProveedorPage: React.FC = () => {
       navigate('/proveedores/nuevo');
       setShouldNavigateAfterSave(null);
     } else if (shouldNavigateAfterSave === 'salir') {
-      navigate('/suppliers');
+      navigate('/proveedores');
       setShouldNavigateAfterSave(null);
     }
   };

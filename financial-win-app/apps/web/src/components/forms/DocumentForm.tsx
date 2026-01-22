@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import type { DocumentType, ExtractedData } from '../../types';
+
+const STORAGE_KEY_CATEGORIES = 'financialwin_expense_categories';
 
 export interface DocumentFormProps {
   data: ExtractedData;
@@ -22,6 +24,23 @@ export const DocumentForm: React.FC<DocumentFormProps> = ({
   isSaving = false,
   isFormValid = true
 }) => {
+  const [expenseCategories, setExpenseCategories] = useState<string[]>([]);
+
+  // Cargar categorías desde localStorage
+  useEffect(() => {
+    const savedCategories = localStorage.getItem(STORAGE_KEY_CATEGORIES);
+    if (savedCategories) {
+      const categories = savedCategories
+        .split(',')
+        .map((cat) => cat.trim())
+        .filter((cat) => cat.length > 0);
+      setExpenseCategories(categories.length > 0 ? categories : ['Otros']);
+    } else {
+      // Valores por defecto si no hay categorías guardadas
+      setExpenseCategories(['Viajes y Dietas', 'Transporte', 'Material Oficina', 'Comidas', 'Otros']);
+    }
+  }, []);
+
   const updateField = (field: string, value: string) => {
     onChange(field, value);
   };
@@ -37,14 +56,14 @@ export const DocumentForm: React.FC<DocumentFormProps> = ({
                 <label className="form-label-studio">Categoría</label>
                 <select
                   className="form-select-studio"
-                  value={data.category || 'Otros'}
+                  value={data.category || expenseCategories[0] || 'Otros'}
                   onChange={(e) => updateField('category', e.target.value)}
                 >
-                  <option>Viajes y Dietas</option>
-                  <option>Transporte</option>
-                  <option>Material Oficina</option>
-                  <option>Comidas</option>
-                  <option>Otros</option>
+                  {expenseCategories.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
                 </select>
               </div>
 

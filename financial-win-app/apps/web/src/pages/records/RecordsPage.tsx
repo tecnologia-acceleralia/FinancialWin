@@ -1,29 +1,9 @@
 import React, { useState } from 'react';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useFinancial } from '../../contexts/FinancialContext';
 import { RegistrosTable } from '../../features/finance/components/RegistrosTable';
 import { PageHeader, type PageHeaderAction } from '../../components/layout';
-
-// Acciones del header definidas fuera del componente para mejor legibilidad
-const HEADER_ACTIONS: PageHeaderAction[] = [
-  {
-    icon: 'filter_list',
-    label: 'Filtros',
-    onClick: () => console.log('Mostrar filtros'),
-    variant: 'default',
-  },
-  {
-    icon: 'download',
-    label: 'Descargar',
-    onClick: () => console.log('Descargar registros'),
-    variant: 'default',
-  },
-  {
-    icon: 'settings',
-    label: 'Configuración',
-    onClick: () => console.log('Configuración'),
-    variant: 'default',
-  },
-];
+import { FilterPanel, type FilterValues } from '../../features/finance/components/FilterPanel';
 
 // Subcomponente: Resumen de registros (KPI)
 interface RecordsSummaryProps {
@@ -56,7 +36,45 @@ const RecordsSummary: React.FC<RecordsSummaryProps> = ({ total }) => {
 
 export const RecordsPage: React.FC = () => {
   const { t } = useLanguage();
+  const { records } = useFinancial();
   const [busqueda, setBusqueda] = useState('');
+  const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
+  const [filters, setFilters] = useState<FilterValues>({
+    dateRange: { from: '', to: '' },
+    categories: [],
+    status: [],
+    erpStatus: [],
+    documentType: [],
+    amountRange: { min: null, max: null },
+  });
+
+  // Mostrar el total de todos los registros (invoices, tickets, staff)
+  const totalRegistros = records.length;
+
+  const headerActions: PageHeaderAction[] = [
+    {
+      icon: 'filter_list',
+      label: 'Filtros',
+      onClick: () => setIsFilterPanelOpen(true),
+      variant: 'default',
+    },
+    {
+      icon: 'download',
+      label: 'Descargar',
+      onClick: () => console.log('Descargar registros'),
+      variant: 'default',
+    },
+    {
+      icon: 'settings',
+      label: 'Configuración',
+      onClick: () => console.log('Configuración'),
+      variant: 'default',
+    },
+  ];
+
+  const handleFilterChange = (newFilters: FilterValues) => {
+    setFilters(newFilters);
+  };
 
   return (
     <div className="layout-page-container">
@@ -66,18 +84,34 @@ export const RecordsPage: React.FC = () => {
         searchValue={busqueda}
         onSearchChange={setBusqueda}
         searchPlaceholder="Buscar registro..."
-        actions={HEADER_ACTIONS}
+        actions={headerActions}
       />
 
       <div className="studio-card">
         <div className="mt-8">
-          <RecordsSummary total={1234} />
+          <RecordsSummary total={totalRegistros} />
+        </div>
+
+        <div className="mt-4 px-2">
+          <p className="text-sm text-[#525252] dark:text-[#a3a3a3]">
+            {totalRegistros === 0 
+              ? 'No hay registros cargados desde la base de datos local'
+              : `${totalRegistros} ${totalRegistros === 1 ? 'registro cargado' : 'registros cargados'} desde la base de datos local`}
+          </p>
         </div>
 
         <div className="mt-8">
-          <RegistrosTable searchTerm={busqueda} />
+          <RegistrosTable searchTerm={busqueda} filters={filters} />
         </div>
       </div>
+
+      <FilterPanel
+        isOpen={isFilterPanelOpen}
+        onClose={() => setIsFilterPanelOpen(false)}
+        onFilterChange={handleFilterChange}
+        initialFilters={filters}
+        type="registros"
+      />
     </div>
   );
 };

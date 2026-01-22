@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { useFinancial, type PaymentStatus } from '../../../contexts/FinancialContext';
 import type { FilterValues } from './FilterPanel';
 
 interface Gasto {
@@ -17,62 +18,78 @@ interface Gasto {
   totalBanco: string;
 }
 
-const datosPrueba: Gasto[] = [
-  {
-    id: '1',
-    estado: 'Pagado',
-    proveedor: 'Amazon AWS',
-    departamento: 'IT',
-    tipo: 'Licencias',
-    fechaFactura: '2024-01-10',
-    fechaPago: '2024-01-15',
-    moneda: 'EUR',
-    via: 'Transferencia',
-    importe: '€1,200.00',
-    variable: '€0.00',
-    iva: '€252.00',
-    totalBanco: '€1,452.00',
-  },
-  {
-    id: '2',
-    estado: 'Registrada',
-    proveedor: 'Google Cloud',
-    departamento: 'Operaciones',
-    tipo: 'Financiero',
-    fechaFactura: '2024-02-11',
-    fechaPago: '2024-02-20',
-    moneda: 'EUR',
-    via: 'Cheque',
-    importe: '€850.00',
-    variable: '€50.00',
-    iva: '€189.00',
-    totalBanco: '€1,089.00',
-  },
-  {
-    id: '3',
-    estado: 'Por Recibir',
-    proveedor: 'Salesforce',
-    departamento: 'Ventas',
-    tipo: 'Proveedor Ext.',
-    fechaFactura: '2024-03-12',
-    fechaPago: '2024-03-25',
-    moneda: 'EUR',
-    via: 'Transferencia',
-    importe: '€2,500.00',
-    variable: '€100.00',
-    iva: '€546.00',
-    totalBanco: '€3,146.00',
-  },
-];
-
 interface GastosTableProps {
   searchTerm?: string;
   filters?: FilterValues;
 }
 
+/**
+ * Convierte un FinancialRecord a un Gasto para la tabla
+ * Solo procesa registros validados (que tienen supplier y total)
+ */
+const convertRecordToGasto = (record: ReturnType<typeof useFinancial>['expenses'][0]): Gasto | null => {
+  // Solo procesar registros validados
+  if (!record.data.supplier || !record.data.total) {
+    return null;
+  }
+
+  const total = parseFloat(record.data.total.toString() || '0');
+  const base = parseFloat(record.data.base?.toString() || '0');
+  const vat = parseFloat(record.data.vat?.toString() || '0');
+  
+  // Mapear paymentStatus a estado de la tabla
+  const getEstado = (status: PaymentStatus | undefined): 'Pagado' | 'Registrada' | 'Por Recibir' => {
+    switch (status) {
+      case 'Pagado':
+        return 'Pagado';
+      case 'Pendiente':
+      default:
+        return 'Registrada';
+    }
+  };
+
+  const formatCurrency = (amount: number): string => {
+    return new Intl.NumberFormat('es-ES', {
+      style: 'currency',
+      currency: record.data.currency || 'EUR',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  };
+
+  return {
+    id: record.id,
+    estado: getEstado(record.paymentStatus),
+    proveedor: record.data.supplier || 'N/A',
+    departamento: record.data.department || 'N/A',
+    tipo: record.data.expenseType || 'Otros',
+    fechaFactura: record.data.issueDate 
+      ? new Date(record.data.issueDate).toLocaleDateString('es-ES')
+      : new Date(record.createdAt).toLocaleDateString('es-ES'),
+    fechaPago: record.paymentStatus === 'Pagado' 
+      ? new Date(record.updatedAt).toLocaleDateString('es-ES')
+      : '-',
+    moneda: record.data.currency || 'EUR',
+    via: 'Transferencia', // Por defecto, se puede extender en el futuro
+    importe: formatCurrency(base),
+    variable: formatCurrency(0), // Por defecto, se puede extender en el futuro
+    iva: formatCurrency(vat),
+    totalBanco: formatCurrency(total),
+  };
+};
+
 export const GastosTable: React.FC<GastosTableProps> = ({ searchTerm = '', filters }) => {
+  const { expenses } = useFinancial();
+
+  // Convertir registros a formato de tabla
+  const gastos = useMemo(() => {
+    return expenses
+      .map(convertRecordToGasto)
+      .filter((gasto): gasto is Gasto => gasto !== null);
+  }, [expenses]);
+
   const gastosFiltrados = useMemo(() => {
-    let resultado = datosPrueba;
+    let resultado = gastos;
 
     // Filtro por búsqueda de texto
     if (searchTerm.trim()) {
@@ -93,6 +110,7 @@ export const GastosTable: React.FC<GastosTableProps> = ({ searchTerm = '', filte
         resultado = resultado.filter((gasto) => {
           const fechaFactura = new Date(gasto.fechaFactura);
           const fechaDesde = new Date(filters.dateRange.from);
+          fechaDesde.setHours(0, 0, 0, 0);
           return fechaFactura >= fechaDesde;
         });
       }
@@ -100,7 +118,7 @@ export const GastosTable: React.FC<GastosTableProps> = ({ searchTerm = '', filte
         resultado = resultado.filter((gasto) => {
           const fechaFactura = new Date(gasto.fechaFactura);
           const fechaHasta = new Date(filters.dateRange.to);
-          fechaHasta.setHours(23, 59, 59, 999); // Incluir todo el día
+          fechaHasta.setHours(23, 59, 59, 999);
           return fechaFactura <= fechaHasta;
         });
       }
@@ -139,7 +157,8 @@ export const GastosTable: React.FC<GastosTableProps> = ({ searchTerm = '', filte
     }
 
     return resultado;
-  }, [searchTerm, filters]);
+  }, [gastos, searchTerm, filters]);
+
   const getEstadoClass = (estado: Gasto['estado']) => {
     switch (estado) {
       case 'Pagado':
@@ -158,49 +177,66 @@ export const GastosTable: React.FC<GastosTableProps> = ({ searchTerm = '', filte
       <table className="finance-table">
         <thead>
           <tr>
-            <th className="table-header">Previsualizar</th>
-            <th className="table-header">Estado</th>
-            <th className="table-header">Proveedor</th>
-            <th className="table-header">Departamento</th>
-            <th className="table-header">Tipo</th>
-            <th className="table-header">Fecha Factura</th>
-            <th className="table-header">Fecha Pago</th>
-            <th className="table-header">Moneda</th>
-            <th className="table-header">Vía</th>
-            <th className="table-header">Importe</th>
-            <th className="table-header">Variable</th>
-            <th className="table-header">IVA</th>
-            <th className="table-header">Total Banco</th>
+            <th className="table-header table-col-compact">Previsualizar</th>
+            <th className="table-header table-col-small">Estado</th>
+            <th className="table-header table-col-text">Proveedor</th>
+            <th className="table-header table-col-medium">Departamento</th>
+            <th className="table-header table-col-medium">Tipo</th>
+            <th className="table-header table-col-small">Fecha Factura</th>
+            <th className="table-header table-col-small">Fecha Pago</th>
+            <th className="table-header table-col-compact">Moneda</th>
+            <th className="table-header table-col-small">Vía</th>
+            <th className="table-header table-col-small">Importe</th>
+            <th className="table-header table-col-small">Variable</th>
+            <th className="table-header table-col-compact">IVA</th>
+            <th className="table-header table-col-small">Total Banco</th>
           </tr>
         </thead>
         <tbody>
-          {gastosFiltrados.map((gasto) => (
-            <tr key={gasto.id} className="table-row">
-              <td>
-                <button className="table-action-button">
-                  <span className="material-symbols-outlined">visibility</span>
-                </button>
+          {gastosFiltrados.length === 0 ? (
+            <tr>
+              <td colSpan={13} className="table-empty-state">
+                <div className="contactos-empty-state">
+                  <span className="material-symbols-outlined contactos-empty-icon">
+                    search_off
+                  </span>
+                  <p className="contactos-empty-text">
+                    No se han encontrado gastos para esta búsqueda
+                  </p>
+                </div>
               </td>
-              <td>
-                <span className={getEstadoClass(gasto.estado)}>
-                  {gasto.estado}
-                </span>
-              </td>
-              <td>{gasto.proveedor}</td>
-              <td>
-                <span className="dept-tag">{gasto.departamento}</span>
-              </td>
-              <td>{gasto.tipo}</td>
-              <td>{gasto.fechaFactura}</td>
-              <td>{gasto.fechaPago}</td>
-              <td>{gasto.moneda}</td>
-              <td>{gasto.via}</td>
-              <td>{gasto.importe}</td>
-              <td>{gasto.variable}</td>
-              <td>{gasto.iva}</td>
-              <td>{gasto.totalBanco}</td>
             </tr>
-          ))}
+          ) : (
+            gastosFiltrados.map((gasto) => (
+              <tr key={gasto.id} className="table-row">
+                <td className="table-col-compact">
+                  <button className="table-action-button">
+                    <span className="material-symbols-outlined">visibility</span>
+                  </button>
+                </td>
+                <td className="table-col-small">
+                  <span className={getEstadoClass(gasto.estado)}>
+                    {gasto.estado}
+                  </span>
+                </td>
+                <td className="table-col-text" title={gasto.proveedor}>
+                  {gasto.proveedor}
+                </td>
+                <td className="table-col-medium">
+                  <span className="dept-tag">{gasto.departamento}</span>
+                </td>
+                <td className="table-col-medium">{gasto.tipo}</td>
+                <td className="table-col-small">{gasto.fechaFactura}</td>
+                <td className="table-col-small">{gasto.fechaPago}</td>
+                <td className="table-col-compact">{gasto.moneda}</td>
+                <td className="table-col-small">{gasto.via}</td>
+                <td className="table-col-small">{gasto.importe}</td>
+                <td className="table-col-small">{gasto.variable}</td>
+                <td className="table-col-compact">{gasto.iva}</td>
+                <td className="table-col-small">{gasto.totalBanco}</td>
+              </tr>
+            ))
+          )}
         </tbody>
       </table>
     </div>

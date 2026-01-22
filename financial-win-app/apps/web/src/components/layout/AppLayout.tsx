@@ -72,7 +72,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ currentView }) => {
       'dashboard': '/',
       'ai-extraction': '/ai-extraction',
       'records': '/records',
-      'billing': '/billing',
+      'billing': '/control-financiero',
       'clients': '/clients',
       'suppliers': '/proveedores',
       'documents': '/documents',

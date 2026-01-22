@@ -11,16 +11,16 @@ import type { ExtractedData, DocumentType } from '../../types';
 // Estructura de datos para las categorías de documentos
 const DOCUMENT_CATEGORIES: Category[] = [
   {
-    id: 'licencias',
-    label: 'Licencias',
-    icon: 'verified',
-    subcategories: ['Nacionales', 'Extranjeras'],
+    id: 'factura',
+    label: 'Factura',
+    icon: 'description',
+    subcategories: [],
   },
   {
     id: 'tickets',
     label: 'Tickets',
     icon: 'receipt',
-    subcategories: [],
+    subcategories: ['Nacionales', 'Extranjeros'],
   },
   {
     id: 'staff',
@@ -48,13 +48,17 @@ export const DocumentsPage: React.FC = () => {
   const fileUrlRef = useRef<string | null>(null);
   
   // Estados de navegación por pestañas
-  const [activeCategory, setActiveCategory] = useState<string>(DOCUMENT_CATEGORIES[0].id);
+  // Inicializar con 'factura' como categoría por defecto
+  const [activeCategory, setActiveCategory] = useState<string>('factura');
   const [activeSubCategory, setActiveSubCategory] = useState<string | null>(null);
 
   // Determinar el tipo de documento según la categoría activa
   const documentType: DocumentType = useMemo(() => {
     if (activeCategory === 'tickets') return 'tickets';
     if (activeCategory === 'staff') return 'staff';
+    if (activeCategory === 'consultor-externo') return 'staff'; // Consultor Externo se mapea a 'staff'
+    if (activeCategory === 'factura') return 'invoices';
+    // Por defecto, usar 'invoices'
     return 'invoices';
   }, [activeCategory]);
 

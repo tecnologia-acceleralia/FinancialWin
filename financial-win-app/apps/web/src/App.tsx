@@ -9,11 +9,10 @@ import { HomePage } from './pages/home/HomePage';
 // TODO: Transición a DocumentsPage - Comentado temporalmente
 // import { AIExtractionPage } from './pages/ai-extraction/AIExtractionPage';
 import { RecordsPage } from './pages/records/RecordsPage';
-import { BillingPage } from './pages/billing/BillingPage';
+import { FinancialDashboardPage } from './pages/control-financiero/FinancialDashboardPage';
 import { ClientsPage } from './pages/clients/ClientsPage';
 import { NuevoClientePage } from './pages/clients/NuevoClientePage';
 import { ListaClientesPage } from './pages/clients/ListaClientesPage';
-import { SuppliersPage } from './pages/suppliers/SuppliersPage';
 import { NuevoProveedorPage } from './pages/proveedores/NuevoProveedorPage';
 import { ProveedoresDashboardPage } from './pages/proveedores/ProveedoresDashboardPage';
 import ProveedoresListPage from './pages/proveedores/ProveedoresListPage';
@@ -34,9 +33,9 @@ function App() {
     // TODO: Transición a DocumentsPage - Comentado temporalmente
     // if (path === '/ai-extraction') return 'ai-extraction';
     if (path === '/records') return 'records';
-    if (path === '/billing') return 'billing';
+    if (path === '/control-financiero') return 'billing';
     if (path === '/clients' || path === '/clientes' || path.startsWith('/clientes/') || path.startsWith('/cliente/')) return 'clients';
-    if (path === '/suppliers' || path === '/proveedores' || path.startsWith('/proveedores/') || path.startsWith('/proveedor/')) return 'suppliers';
+    if (path === '/proveedores' || path.startsWith('/proveedores/') || path.startsWith('/proveedor/')) return 'suppliers';
     if (path === '/documents') return 'documents';
     if (path === '/gastos') return 'gastos';
     if (path === '/ingresos') return 'ingresos';
@@ -60,11 +59,10 @@ function App() {
                   {/* TODO: Transición a DocumentsPage - Comentado temporalmente */}
                   {/* <Route path="/ai-extraction" element={<AIExtractionPage />} /> */}
                   <Route path="/records" element={<RecordsPage />} />
-                  <Route path="/billing" element={<BillingPage />} />
+                  <Route path="/control-financiero" element={<FinancialDashboardPage />} />
                   <Route path="/clients" element={<ClientsPage />} />
                   <Route path="/clientes/nuevo" element={<NuevoClientePage />} />
                   <Route path="/clientes/lista" element={<ListaClientesPage />} />
-                  <Route path="/suppliers" element={<SuppliersPage />} />
                   <Route path="/proveedores" element={<ProveedoresDashboardPage />} />
                   <Route path="/proveedores/listado" element={<ProveedoresListPage />} />
                   <Route path="/proveedores/nuevo" element={<NuevoProveedorPage />} />

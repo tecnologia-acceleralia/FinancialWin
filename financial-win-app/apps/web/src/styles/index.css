@@ -270,6 +270,70 @@
     @apply flex items-center justify-between mb-4;
   }
 
+  /* StatCard - Componente reutilizable para KPIs */
+  .stat-card-icon {
+    @apply w-12 h-12 rounded-xl flex items-center justify-center;
+  }
+
+  .stat-card-icon-size {
+    @apply text-2xl;
+  }
+
+  /* StatCard Compact - Para tarjetas pequeñas en páginas de detalle */
+  .stat-card-compact {
+    @apply bg-white dark:bg-[#131B29] rounded-lg p-3 border border-[#e5e5e5] dark:border-[#2A3B5A];
+  }
+
+  .stat-card-compact-content {
+    @apply flex flex-col gap-1;
+  }
+
+  .stat-card-compact-label {
+    @apply text-xs font-medium text-[#525252] dark:text-[#a3a3a3] uppercase tracking-wider;
+  }
+
+  .stat-card-compact-value {
+    @apply text-lg font-bold text-[#171717] dark:text-[#fafafa];
+  }
+
+  /* Botones de navegación rápida */
+  .btn-quick-nav {
+    @apply btn btn-lg w-full flex items-center justify-center gap-3;
+    @apply bg-gradient-to-r from-primary-50 to-primary-100 dark:from-primary-900/20 dark:to-primary-800/20;
+    @apply text-primary-700 dark:text-primary-300;
+    @apply border border-primary-200 dark:border-primary-700;
+    @apply rounded-xl shadow-sm;
+    @apply transition-all duration-300 ease-in-out;
+    @apply hover:shadow-md hover:scale-[1.02] hover:from-primary-100 hover:to-primary-200;
+    @apply hover:dark:from-primary-800/30 hover:dark:to-primary-700/30;
+    @apply active:scale-[0.98];
+  }
+
+  .btn-quick-nav .material-symbols-outlined {
+    @apply text-xl transition-transform duration-300;
+  }
+
+  .btn-quick-nav:hover .material-symbols-outlined {
+    @apply scale-110;
+  }
+
+  /* Grids semánticos para layouts */
+  .grid-kpi {
+    @apply grid grid-cols-1 md:grid-cols-3 gap-6 mb-8;
+  }
+
+  .grid-charts {
+    @apply grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8;
+  }
+
+  .grid-quick-nav {
+    @apply grid grid-cols-1 md:grid-cols-2 gap-6;
+  }
+
+  .section-spacing {
+    @apply mb-8;
+  }
+
   /* Shadow utilities */
   .shadow-card {
     @apply shadow-sm;
@@ -859,14 +923,45 @@
      ============================================ */
   .table-wrapper {
     @apply overflow-x-auto rounded-xl border border-gray-200 dark:border-[#2A3B5A];
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+
+  /* Scrollbar personalizado - visible solo en hover */
+  .table-wrapper::-webkit-scrollbar {
+    height: 6px;
+    width: 6px;
+  }
+
+  .table-wrapper::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 3px;
+  }
+
+  .table-wrapper::-webkit-scrollbar-thumb {
+    background-color: transparent;
+    border-radius: 3px;
+    transition: background-color 0.2s ease;
+  }
+
+  .table-wrapper:hover::-webkit-scrollbar-thumb {
+    background-color: #d1d5db;
+  }
+
+  .table-wrapper:hover {
+    scrollbar-color: #d1d5db transparent;
   }
 
   .table-main {
     @apply w-full text-left;
+    width: 100%;
+    table-layout: auto;
   }
 
   .table-header {
-    @apply bg-gray-50 dark:bg-[#1B273B] uppercase text-xs font-semibold tracking-wider text-gray-600 dark:text-gray-400 px-6 py-4;
+    @apply bg-gray-50 dark:bg-[#1B273B] uppercase text-xs font-semibold tracking-wider text-gray-600 dark:text-gray-400 px-3 py-2;
+    font-size: 0.75rem;
+    white-space: nowrap;
   }
 
   .table-row {
@@ -874,7 +969,47 @@
   }
 
   .table-row td {
-    @apply px-6 py-4 text-sm text-gray-900 dark:text-gray-100;
+    @apply px-3 py-2 text-gray-900 dark:text-gray-100;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Columnas con ancho fijo para datos pequeños */
+  .table-col-compact {
+    width: 70px;
+    min-width: 70px;
+    max-width: 70px;
+  }
+
+  .table-col-small {
+    width: 90px;
+    min-width: 90px;
+    max-width: 120px;
+  }
+
+  .table-col-medium {
+    width: 120px;
+    min-width: 120px;
+    max-width: 150px;
+  }
+
+  /* Columnas de texto largo - permiten ellipsis */
+  .table-col-text {
+    min-width: 150px;
+    max-width: 220px;
+  }
+
+  /* Columna de estado de pago - ancho mínimo para que quepa "Pendiente" */
+  .table-col-payment-status {
+    width: 150px;
+    min-width: 150px;
+    max-width: 170px;
+    @apply px-2;
+    vertical-align: middle;
   }
 
   .table-empty-state {
@@ -909,19 +1044,185 @@
     @apply text-lg;
   }
 
+  /* Botones de sincronización ERP */
+  .btn-sync {
+    @apply btn btn-sm px-2 py-1 text-xs font-medium;
+  }
+
+  .btn-sync-odoo {
+    @apply btn-sync bg-blue-500 text-white hover:bg-blue-600;
+  }
+
+  .btn-sync-a3 {
+    @apply btn-sync bg-green-500 text-white hover:bg-green-600;
+  }
+
+  .btn-sync:disabled {
+    @apply opacity-50 cursor-not-allowed;
+  }
+
+  .btn-sync-group {
+    @apply flex items-center gap-1;
+  }
+
+  /* Estados de sincronización ERP */
+  .erp-status-pending {
+    @apply status-badge-base bg-gray-100 text-gray-900 border border-gray-200 dark:bg-gray-800/50 dark:text-gray-200 dark:border-gray-700;
+  }
+
+  .erp-status-syncing {
+    @apply status-badge-base bg-blue-100 text-blue-900 border border-blue-200 dark:bg-blue-900/40 dark:text-blue-200 dark:border-blue-800;
+  }
+
+  .erp-status-synced-odoo {
+    @apply status-badge-base bg-blue-100 text-blue-900 border border-blue-200 dark:bg-blue-900/40 dark:text-blue-200 dark:border-blue-800;
+  }
+
+  .erp-status-synced-a3 {
+    @apply status-badge-base bg-green-100 text-green-900 border border-green-200 dark:bg-green-900/40 dark:text-green-200 dark:border-green-800;
+  }
+
+  .erp-status-error {
+    @apply status-badge-base bg-red-100 text-red-900 border border-red-200 dark:bg-red-900/40 dark:text-red-200 dark:border-red-800;
+  }
+
+  /* Contenedor del selector de estado de pago */
+  .payment-status-select-wrapper {
+    @apply flex items-center gap-2 w-full;
+    min-width: 150px;
+  }
+
+  /* Indicador circular de color - Dinámico según estado */
+  .payment-status-indicator {
+    @apply w-2 h-2 rounded-full flex-shrink-0;
+  }
+
+  .payment-status-indicator-pending {
+    @apply bg-orange-500;
+  }
+
+  .payment-status-indicator-paid {
+    @apply bg-green-500;
+  }
+
+  /* Selector de estado de pago - Base (Badge estilo) */
+  .payment-status-select {
+    @apply flex-1 px-4 py-1.5 rounded-full text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-offset-1 transition-all shadow-sm cursor-pointer border;
+    width: 100%;
+    min-width: 130px;
+    appearance: none;
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    padding-right: 2.5rem;
+  }
+
+  /* Selector - Estado Pendiente (Colores suaves en reposo) */
+  .payment-status-select-pending {
+    @apply bg-orange-100 text-orange-800 border-orange-200;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23ea580c' d='M6 9L1 4l1.41-1.41L6 6.17l3.59-3.58L11 4z'/%3E%3C/svg%3E");
+  }
+
+  .payment-status-select-pending:hover,
+  .payment-status-select-pending:focus {
+    @apply bg-orange-200 text-orange-900 border-orange-300 focus:ring-orange-400;
+  }
+
+  /* Selector - Estado Pagado (Colores suaves en reposo) */
+  .payment-status-select-paid {
+    @apply bg-green-100 text-green-800 border-green-200;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2316a34a' d='M6 9L1 4l1.41-1.41L6 6.17l3.59-3.58L11 4z'/%3E%3C/svg%3E");
+  }
+
+  .payment-status-select-paid:hover,
+  .payment-status-select-paid:focus {
+    @apply bg-green-200 text-green-900 border-green-300 focus:ring-green-400;
+  }
+
+  /* Opciones del desplegable - Mejor contraste y legibilidad */
+  .payment-status-select option {
+    @apply bg-white text-gray-900;
+    padding: 0.5rem;
+  }
+
+  .payment-status-select option[value="Pendiente"] {
+    @apply bg-orange-50 text-orange-900;
+  }
+
+  .payment-status-select option[value="Pendiente"]:hover {
+    @apply bg-orange-100;
+  }
+
+  .payment-status-select option[value="Pagado"] {
+    @apply bg-green-50 text-green-900;
+  }
+
+  .payment-status-select option[value="Pagado"]:hover {
+    @apply bg-green-100;
+  }
+
+  /* Fila cuando está pagada - opacidad y texto verde */
+  .table-row-paid {
+    @apply opacity-75;
+  }
+
+  .table-row-paid td {
+    @apply text-green-700 dark:text-green-400;
+  }
+
   /* ============================================
      Gastos Table - Clases Semánticas
      ============================================ */
   .finance-table-wrapper {
     @apply overflow-x-auto rounded-xl border border-gray-200 dark:border-[#2A3B5A] bg-white dark:bg-[#131B29];
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+
+  /* Scrollbar personalizado - visible solo en hover */
+  .finance-table-wrapper::-webkit-scrollbar {
+    height: 6px;
+    width: 6px;
+  }
+
+  .finance-table-wrapper::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 3px;
+  }
+
+  .finance-table-wrapper::-webkit-scrollbar-thumb {
+    background-color: transparent;
+    border-radius: 3px;
+    transition: background-color 0.2s ease;
+  }
+
+  .finance-table-wrapper:hover::-webkit-scrollbar-thumb {
+    background-color: #d1d5db;
+  }
+
+  .finance-table-wrapper:hover {
+    scrollbar-color: #d1d5db transparent;
   }
 
   .finance-table {
     @apply w-full text-left;
+    width: 100%;
+    table-layout: auto;
   }
 
   .finance-table .table-header {
-    @apply bg-gray-50 dark:bg-[#1B273B] uppercase text-xs font-semibold tracking-wider text-gray-600 dark:text-gray-400 px-6 py-4;
+    @apply bg-gray-50 dark:bg-[#1B273B] uppercase text-xs font-semibold tracking-wider text-gray-600 dark:text-gray-400 px-3 py-2;
+    font-size: 0.75rem;
+    white-space: nowrap;
+  }
+
+  .finance-table .table-row td {
+    @apply px-3 py-2 text-gray-900 dark:text-gray-100;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .pill-status {
@@ -3732,5 +4033,26 @@
 
   .help-documentation-button {
     @apply mt-4 px-6 py-2.5 bg-[#B84E9D] text-white rounded-lg font-semibold hover:bg-[#9C3C86] transition-colors shadow-md shadow-[#B84E9D]/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#B84E9D];
+  }
+
+  /* Chart Tooltip - Soporte para dark/light mode */
+  .chart-tooltip {
+    @apply bg-white dark:bg-[#1f2937] border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3;
+  }
+
+  .chart-tooltip-label {
+    @apply text-sm font-semibold text-gray-900 dark:text-white mb-2 pb-2 border-b border-gray-200 dark:border-gray-700;
+  }
+
+  .chart-tooltip-item {
+    @apply text-sm flex items-center justify-between gap-3 py-1;
+  }
+
+  .chart-tooltip-name {
+    @apply text-gray-600 dark:text-gray-400;
+  }
+
+  .chart-tooltip-value {
+    @apply font-semibold text-gray-900 dark:text-white;
   }
 }
