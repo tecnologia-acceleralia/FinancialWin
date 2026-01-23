@@ -38,6 +38,10 @@ export interface Proveedor {
   iban?: string;
   formaPago?: FormaPago;
   plazoPago?: PlazoPago;
+  // Campos A3
+  idContableA3?: string;
+  actividadA3?: string;
+  serieA3?: string;
   // Contactos
   contactos: ContactoProveedor[];
   // Notas
@@ -65,10 +69,63 @@ export interface CreateProveedorDto {
   iban?: string;
   formaPago?: FormaPago;
   plazoPago?: PlazoPago;
+  idContableA3?: string;
+  actividadA3?: string;
+  serieA3?: string;
   contactos: ContactoProveedor[];
   notasInternas?: string;
 }
 
 export interface UpdateProveedorDto extends Partial<CreateProveedorDto> {
   id: string;
+}
+
+// Tipo para Cliente
+export interface Cliente {
+  id?: string;
+  // Datos Generales
+  nif: string;
+  razonSocial: string;
+  direccion?: string;
+  codigoPostal?: string;
+  ciudad?: string;
+  provincia?: string;
+  pais?: string;
+  telefono?: string;
+  email?: string;
+  // Información Contable
+  cuentaContable?: string;
+  contrapartida?: string;
+  claveOperacion347?: string;
+  // Campos A3
+  idContableA3?: string;
+  actividadA3?: string;
+  serieA3?: string;
+  // Datos de Contacto
+  contactoNombre?: string;
+  contactoApellidos?: string;
+  contactoCargo?: string;
+  contactoTelefono?: string;
+  contactoEmail?: string;
+  // Información Comercial
+  descuento?: number;
+  formaPagoDefault?: string;
+  diaPago?: number;
+  limiteCredito?: number;
+  // Facturación
+  formasPagoAceptadas?: string[];
+  plazoPago?: number;
+  retencionIRPF?: number;
+  // Otra Información
+  web?: string;
+  numeroEmpleados?: number;
+  sector?: string;
+  fechaAlta?: string;
+  // Notas
+  notas?: string;
+  // Metadata
+  created_at?: string;
+  updated_at?: string;
+  company_id?: string;
+  is_active?: boolean;
 }

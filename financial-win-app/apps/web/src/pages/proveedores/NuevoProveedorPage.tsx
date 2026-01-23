@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { ProveedorForm } from '../../features/entities/components/ProveedorForm';
 import { Proveedor } from '../../features/entities/types';
 import { PageHeader } from '../../components/layout';
+import { useToast } from '../../contexts/ToastContext';
+
+const STORAGE_KEY = 'zaffra_suppliers';
 
 interface SeccionInfo {
   id: string;
@@ -19,6 +22,7 @@ const SECCIONES: SeccionInfo[] = [
 
 export const NuevoProveedorPage: React.FC = () => {
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const [seccionActiva, setSeccionActiva] = useState<string>(SECCIONES[0].id);
   const seccionesRefs = useRef<Record<string, HTMLElement | null>>({});
   const formRef = useRef<HTMLFormElement>(null);
@@ -67,7 +71,7 @@ export const NuevoProveedorPage: React.FC = () => {
   };
 
   const handleCancelar = () => {
-    navigate('/proveedores');
+    navigate('/proveedores/listado');
   };
 
   const [shouldNavigateAfterSave, setShouldNavigateAfterSave] = useState<
@@ -75,18 +79,44 @@ export const NuevoProveedorPage: React.FC = () => {
   >(null);
 
   const handleSubmit = async (data: Proveedor) => {
-    // TODO: Implementar lógica de guardado con API
-    console.log('Datos del proveedor:', data);
-    // Aquí se llamaría a la API para guardar el proveedor
-    // await saveProveedor(data);
+    try {
+      // Validar campos requeridos
+      if (!data.nombreComercial || !data.razonSocial || !data.cif) {
+        showToast('Por favor, completa los campos obligatorios', 'error');
+        return;
+      }
 
-    // Navegar según la acción seleccionada
-    if (shouldNavigateAfterSave === 'nuevo') {
-      navigate('/proveedores/nuevo');
+      // Obtener proveedores existentes del localStorage
+      const existingData = localStorage.getItem(STORAGE_KEY);
+      const proveedores: Proveedor[] = existingData ? JSON.parse(existingData) : [];
+
+      // Generar ID único si no existe
+      const nuevoProveedor: Proveedor = {
+        ...data,
+        id: data.id || `proveedor-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        created_at: data.created_at || new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      // Agregar el nuevo proveedor
+      proveedores.push(nuevoProveedor);
+
+      // Guardar en localStorage
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(proveedores));
+
+      showToast('Proveedor guardado correctamente', 'success');
+
+      // Navegar según la acción seleccionada
+      if (shouldNavigateAfterSave === 'nuevo') {
+        // Limpiar el formulario recargando la página
+        window.location.href = '/proveedores/nuevo';
+      } else if (shouldNavigateAfterSave === 'salir') {
+        navigate('/proveedores/listado');
+      }
       setShouldNavigateAfterSave(null);
-    } else if (shouldNavigateAfterSave === 'salir') {
-      navigate('/proveedores');
-      setShouldNavigateAfterSave(null);
+    } catch (error) {
+      console.error('Error al guardar proveedor:', error);
+      showToast('Error al guardar el proveedor', 'error');
     }
   };
 
@@ -105,7 +135,7 @@ export const NuevoProveedorPage: React.FC = () => {
   };
 
   const handleVolver = () => {
-    navigate('/proveedores');
+    navigate('/proveedores/listado');
   };
 
   return (

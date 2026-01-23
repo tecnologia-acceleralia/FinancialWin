@@ -60,7 +60,9 @@
 
 @layer components {
   .btn {
-    @apply inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-white;
+    @apply inline-flex items-center justify-center rounded-md text-base font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-white;
+    padding: 0.75rem 1.5rem; /* py-3 px-6 */
+    min-height: 2.75rem; /* 44px - tamaño táctil óptimo */
   }
 
   .btn-primary {
@@ -88,7 +90,9 @@
   }
 
   .btn-lg {
-    @apply h-11 px-8;
+    @apply h-12 px-8 text-lg;
+    padding: 0.875rem 2rem; /* py-3.5 px-8 */
+    min-height: 3rem; /* 48px */
   }
 
   .input {
@@ -925,6 +929,8 @@
     @apply overflow-x-auto rounded-xl border border-gray-200 dark:border-[#2A3B5A];
     scrollbar-width: thin;
     scrollbar-color: transparent transparent;
+    width: 100%;
+    max-width: 100%;
   }
 
   /* Scrollbar personalizado - visible solo en hover */
@@ -956,12 +962,28 @@
     @apply w-full text-left;
     width: 100%;
     table-layout: auto;
+    border-collapse: separate;
+    border-spacing: 0;
   }
 
   .table-header {
-    @apply bg-gray-50 dark:bg-[#1B273B] uppercase text-xs font-semibold tracking-wider text-gray-600 dark:text-gray-400 px-3 py-2;
-    font-size: 0.75rem;
+    @apply bg-gray-50 dark:bg-[#1B273B] uppercase text-xs font-semibold tracking-wider text-gray-600 dark:text-gray-400;
+    font-size: 0.7rem;
+    letter-spacing: 0.05em;
     white-space: nowrap;
+    padding: 0.875rem 1.25rem;
+    min-width: fit-content;
+    position: relative;
+    border-right: 1px solid rgba(229, 231, 235, 0.5);
+  }
+
+  .table-header:last-child {
+    border-right: none;
+  }
+
+  /* Espaciado adicional para evitar solapamiento */
+  .table-header + .table-header {
+    padding-left: 1.5rem;
   }
 
   .table-row {
@@ -969,47 +991,76 @@
   }
 
   .table-row td {
-    @apply px-3 py-2 text-gray-900 dark:text-gray-100;
+    @apply text-gray-900 dark:text-gray-100;
     font-size: 0.85rem;
-    line-height: 1.4;
-    max-width: 200px;
+    line-height: 1.5;
+    padding: 0.875rem 1.25rem;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    border-right: 1px solid rgba(229, 231, 235, 0.3);
+    vertical-align: middle;
+    min-width: fit-content;
   }
 
-  /* Columnas con ancho fijo para datos pequeños */
+  /* Espaciado adicional entre celdas para evitar solapamiento */
+  .table-row td + td {
+    padding-left: 1.5rem;
+  }
+
+  .table-row td:last-child {
+    border-right: none;
+  }
+
+  /* Columnas con ancho flexible - evita solapamiento */
   .table-col-compact {
-    width: 70px;
-    min-width: 70px;
-    max-width: 70px;
+    min-width: 80px;
+    width: auto;
+    max-width: 100px;
+  }
+
+  /* Columna de previsualización - necesita espacio para "PREVISUALIZADO" */
+  .table-col-preview {
+    min-width: 150px;
+    width: auto;
+    max-width: 180px;
   }
 
   .table-col-small {
-    width: 90px;
-    min-width: 90px;
-    max-width: 120px;
+    min-width: 110px;
+    width: auto;
+    max-width: 140px;
+  }
+
+  /* Columna de estado de pago - espacio adicional para badges */
+  .table-col-status {
+    min-width: 180px;
+    width: auto;
+    max-width: 220px;
+    white-space: nowrap;
   }
 
   .table-col-medium {
-    width: 120px;
-    min-width: 120px;
-    max-width: 150px;
+    min-width: 150px;
+    width: auto;
+    max-width: 200px;
   }
 
-  /* Columnas de texto largo - permiten ellipsis */
+  /* Columnas de texto largo - permiten ellipsis pero con espacio suficiente */
   .table-col-text {
-    min-width: 150px;
-    max-width: 220px;
+    min-width: 200px;
+    width: auto;
+    max-width: 320px;
   }
 
   /* Columna de estado de pago - ancho mínimo para que quepa "Pendiente" */
   .table-col-payment-status {
-    width: 150px;
-    min-width: 150px;
-    max-width: 170px;
+    min-width: 160px;
+    width: auto;
+    max-width: 200px;
     @apply px-2;
     vertical-align: middle;
+    white-space: nowrap;
   }
 
   .table-empty-state {
@@ -1044,6 +1095,32 @@
     @apply text-lg;
   }
 
+  /* Enlace clickeable para nombre de proveedor/cliente con icono */
+  .supplier-name-link {
+    @apply flex items-center gap-2 w-full text-left hover:text-primary-600 dark:hover:text-primary-400 transition-colors;
+    @apply text-gray-900 dark:text-gray-100;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    font-size: inherit;
+    font-family: inherit;
+  }
+
+  .supplier-name-text {
+    @apply flex-1 truncate;
+  }
+
+  .supplier-name-icon {
+    @apply text-base text-gray-400 dark:text-gray-500 flex-shrink-0;
+    @apply transition-colors;
+    font-size: 1rem;
+  }
+
+  .supplier-name-link:hover .supplier-name-icon {
+    @apply text-primary-600 dark:text-primary-400;
+  }
+
   /* Botones de sincronización ERP */
   .btn-sync {
     @apply btn btn-sm px-2 py-1 text-xs font-medium;
@@ -1063,6 +1140,55 @@
 
   .btn-sync-group {
     @apply flex items-center gap-1;
+  }
+
+  /* Botón para vincular proveedor/cliente */
+  .btn-link-supplier {
+    @apply btn btn-sm px-2 py-1 text-xs font-medium;
+    @apply bg-orange-100 text-orange-700 hover:bg-orange-200 border border-orange-300;
+    @apply dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800 dark:hover:bg-orange-900/50;
+    @apply flex items-center gap-1.5;
+  }
+
+  .btn-link-icon {
+    @apply text-sm;
+    font-size: 1rem;
+  }
+
+  /* Botón de sincronización A3 mejorado */
+  .btn-sync-a3 {
+    @apply btn btn-sm px-2 py-1 text-xs font-medium;
+    @apply bg-primary-500 text-white hover:bg-primary-600;
+    @apply flex items-center gap-1.5;
+  }
+
+  .btn-sync-icon {
+    @apply text-sm;
+    font-size: 1rem;
+  }
+
+  /* Estado de sincronizado */
+  .sync-status {
+    @apply flex items-center gap-1.5 text-xs font-medium;
+  }
+
+  .sync-status.synced {
+    @apply text-green-600 dark:text-green-400;
+    @apply bg-green-50 dark:bg-green-900/20;
+    @apply px-2 py-1 rounded-md;
+    @apply border border-green-200 dark:border-green-800;
+  }
+
+  .sync-icon {
+    @apply text-sm;
+    font-size: 1rem;
+    @apply text-green-600 dark:text-green-400;
+  }
+
+  .sync-text {
+    @apply text-xs;
+    @apply font-medium;
+    @apply text-green-700 dark:text-green-300;
   }
 
   /* Estados de sincronización ERP */
@@ -1089,7 +1215,8 @@
   /* Contenedor del selector de estado de pago */
   .payment-status-select-wrapper {
     @apply flex items-center gap-2 w-full;
-    min-width: 150px;
+    min-width: 120px;
+    white-space: nowrap;
   }
 
   /* Indicador circular de color - Dinámico según estado */
@@ -1107,13 +1234,18 @@
 
   /* Selector de estado de pago - Base (Badge estilo) */
   .payment-status-select {
-    @apply flex-1 px-4 py-1.5 rounded-full text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-offset-1 transition-all shadow-sm cursor-pointer border;
+    @apply flex-1 rounded-full font-bold focus:outline-none focus:ring-2 focus:ring-offset-1 transition-all shadow-sm cursor-pointer border;
+    font-size: 0.6875rem; /* 11px */
+    line-height: 1.2;
+    padding: 0.5rem 1rem;
+    min-width: 90px;
     width: 100%;
-    min-width: 130px;
     appearance: none;
     background-repeat: no-repeat;
-    background-position: right 0.75rem center;
-    padding-right: 2.5rem;
+    background-position: right 0.625rem center;
+    padding-right: 2.25rem;
+    text-align: center;
+    white-space: nowrap;
   }
 
   /* Selector - Estado Pendiente (Colores suaves en reposo) */
@@ -1176,6 +1308,8 @@
     @apply overflow-x-auto rounded-xl border border-gray-200 dark:border-[#2A3B5A] bg-white dark:bg-[#131B29];
     scrollbar-width: thin;
     scrollbar-color: transparent transparent;
+    width: 100%;
+    max-width: 100%;
   }
 
   /* Scrollbar personalizado - visible solo en hover */
@@ -1207,22 +1341,50 @@
     @apply w-full text-left;
     width: 100%;
     table-layout: auto;
+    border-collapse: separate;
+    border-spacing: 0;
   }
 
   .finance-table .table-header {
-    @apply bg-gray-50 dark:bg-[#1B273B] uppercase text-xs font-semibold tracking-wider text-gray-600 dark:text-gray-400 px-3 py-2;
-    font-size: 0.75rem;
+    @apply bg-gray-50 dark:bg-[#1B273B] uppercase text-xs font-semibold tracking-wider text-gray-600 dark:text-gray-400;
+    font-size: 0.7rem;
+    letter-spacing: 0.05em;
     white-space: nowrap;
+    padding: 0.875rem 1.25rem;
+    min-width: fit-content;
+    position: relative;
+    border-right: 1px solid rgba(229, 231, 235, 0.5);
+  }
+
+  .finance-table .table-header:last-child {
+    border-right: none;
+  }
+
+  /* Espaciado adicional para evitar solapamiento en finance-table */
+  .finance-table .table-header + .table-header {
+    padding-left: 1.5rem;
   }
 
   .finance-table .table-row td {
-    @apply px-3 py-2 text-gray-900 dark:text-gray-100;
+    @apply text-gray-900 dark:text-gray-100;
     font-size: 0.85rem;
-    line-height: 1.4;
-    max-width: 200px;
+    line-height: 1.5;
+    padding: 0.875rem 1.25rem;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    border-right: 1px solid rgba(229, 231, 235, 0.3);
+    vertical-align: middle;
+    min-width: fit-content;
+  }
+
+  /* Espaciado adicional entre celdas en finance-table */
+  .finance-table .table-row td + td {
+    padding-left: 1.5rem;
+  }
+
+  .finance-table .table-row td:last-child {
+    border-right: none;
   }
 
   .pill-status {
@@ -2687,6 +2849,7 @@
   .modal-overlay {
     @apply fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4;
     z-index: 9999 !important;
+    overflow: hidden;
   }
 
   /* Contenedor del contenido del modal */
@@ -2728,11 +2891,184 @@
   /* Contenedor del body del modal */
   .modal-body {
     @apply p-6 overflow-y-auto flex-1;
+    /* Estilo de scrollbar minimalista para modo oscuro */
+    scrollbar-width: thin;
+    scrollbar-color: rgba(148, 163, 184, 0.3) transparent;
+  }
+
+  /* Estilos de scrollbar para navegadores WebKit (Chrome, Safari, Edge) */
+  .modal-body::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .modal-body::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .modal-body::-webkit-scrollbar-thumb {
+    background-color: rgba(148, 163, 184, 0.3);
+    border-radius: 4px;
+  }
+
+  .modal-body::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(148, 163, 184, 0.5);
+  }
+
+  /* Modo oscuro para scrollbar */
+  .dark .modal-body::-webkit-scrollbar-thumb {
+    background-color: rgba(148, 163, 184, 0.2);
+  }
+
+  .dark .modal-body::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(148, 163, 184, 0.4);
   }
 
   /* Footer del modal */
   .modal-footer {
     @apply flex items-center justify-end gap-3 p-6 border-t border-gray-200 flex-shrink-0;
+  }
+
+  /* ============================================
+     Link Supplier Modal - Modal de Vinculación
+     ============================================ */
+  .link-supplier-modal-content {
+    @apply flex flex-col;
+  }
+
+  /* Tabs del modal */
+  .link-supplier-tabs {
+    @apply flex border-b border-gray-200 mb-6;
+  }
+
+  .link-supplier-tab {
+    @apply flex items-center gap-2 px-4 py-3 text-sm font-medium text-gray-600 border-b-2 border-transparent;
+    @apply hover:text-gray-900 hover:border-gray-300 transition-colors;
+    @apply focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2;
+    background: none;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+    cursor: pointer;
+  }
+
+  .link-supplier-tab.active {
+    @apply text-primary-600 border-primary-600;
+  }
+
+  .link-supplier-tab .material-symbols-outlined {
+    @apply text-base;
+    font-size: 1.125rem;
+  }
+
+  /* Contenido de tabs */
+  .link-supplier-tab-content {
+    @apply flex flex-col gap-6;
+  }
+
+  /* Información de la factura */
+  .link-supplier-info {
+    @apply text-sm text-gray-600 mb-4;
+  }
+
+  .link-supplier-info strong {
+    @apply text-gray-900 font-semibold;
+  }
+
+  /* Búsqueda */
+  .link-supplier-search {
+    @apply relative mb-4;
+  }
+
+  .link-supplier-search-icon {
+    @apply absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400;
+    font-size: 1.125rem;
+  }
+
+  .link-supplier-search-input {
+    @apply pl-10;
+  }
+
+  /* Lista de proveedores/clientes */
+  .link-supplier-list {
+    @apply max-h-64 overflow-y-auto border border-gray-200 rounded-lg mb-4;
+    @apply space-y-1 p-2;
+  }
+
+  .link-supplier-item {
+    @apply w-full flex items-center justify-between p-3 rounded-lg;
+    @apply text-left transition-colors;
+    @apply border border-transparent;
+    @apply hover:bg-gray-50 hover:border-gray-300;
+    background: none;
+    cursor: pointer;
+  }
+
+  .link-supplier-item.selected {
+    @apply bg-primary-50 border-primary-300;
+  }
+
+  .link-supplier-item.no-a3-id {
+    @apply opacity-60 cursor-not-allowed;
+  }
+
+  .link-supplier-item.no-a3-id:hover {
+    @apply bg-gray-50;
+  }
+
+  .link-supplier-item-content {
+    @apply flex flex-col gap-1 flex-1;
+  }
+
+  .link-supplier-item-name {
+    @apply text-sm font-medium text-gray-900;
+  }
+
+  .link-supplier-item-a3 {
+    @apply text-xs text-gray-500;
+  }
+
+  .link-supplier-item-check {
+    @apply text-primary-600 text-xl;
+  }
+
+  .link-supplier-item-warning {
+    @apply text-orange-500 text-lg;
+  }
+
+  /* Estado vacío */
+  .link-supplier-empty {
+    @apply flex flex-col items-center justify-center py-8 text-center;
+    @apply text-gray-400;
+  }
+
+  .link-supplier-empty .material-symbols-outlined {
+    @apply text-4xl mb-2;
+  }
+
+  .link-supplier-empty p {
+    @apply text-sm;
+  }
+
+  /* Formulario para crear nuevo */
+  .link-supplier-form {
+    @apply space-y-4 mb-4;
+  }
+
+  .link-supplier-form-group {
+    @apply flex flex-col gap-2;
+  }
+
+  .link-supplier-label {
+    @apply text-sm font-medium text-gray-700;
+  }
+
+  .link-supplier-hint {
+    @apply text-xs text-gray-500 mt-1;
+  }
+
+  /* Acciones del modal */
+  .link-supplier-actions {
+    @apply flex items-center justify-end gap-3 pt-4 border-t border-gray-200;
   }
 
   /* ============================================
@@ -3179,18 +3515,34 @@
   }
 
   .toolbar-button {
-    @apply w-10 h-10 rounded-lg border border-[#e5e5e5] dark:border-[#2A3B5A] bg-white dark:bg-[#1B273B] text-[#525252] dark:text-[#a3a3a3] hover:bg-[#f5f5f5] dark:hover:bg-[#2A3B5A] transition-colors flex items-center justify-center;
+    @apply rounded-lg border border-[#e5e5e5] dark:border-[#2A3B5A] bg-white dark:bg-[#1B273B] text-[#525252] dark:text-[#a3a3a3] hover:bg-[#f5f5f5] dark:hover:bg-[#2A3B5A] transition-colors flex items-center justify-center;
+    min-width: 2.75rem; /* 44px - tamaño táctil óptimo */
+    min-height: 2.75rem; /* 44px */
+    padding: 0.625rem 1rem; /* py-2.5 px-4 */
+    font-size: 0.9375rem; /* text-[15px] */
+    font-weight: 500;
   }
 
   .toolbar-button-icon {
-    @apply material-symbols-outlined text-xl;
+    @apply material-symbols-outlined;
+    font-size: 1.25rem; /* text-xl - 20px */
   }
 
   .toolbar-button-primary {
     @apply toolbar-button bg-[#B84E9D] text-white border-[#B84E9D] hover:bg-[#9C3C86];
+    font-weight: 600; /* font-semibold */
   }
 
   .toolbar-button-primary .toolbar-button-icon {
+    @apply text-white;
+  }
+
+  .toolbar-button-danger {
+    @apply toolbar-button bg-red-600 text-white border-red-600 hover:bg-red-700 dark:bg-red-700 dark:border-red-700 dark:hover:bg-red-800;
+    font-weight: 600; /* font-semibold */
+  }
+
+  .toolbar-button-danger .toolbar-button-icon {
     @apply text-white;
   }
 
@@ -4054,5 +4406,127 @@
 
   .chart-tooltip-value {
     @apply font-semibold text-gray-900 dark:text-white;
+  }
+
+  /* ============================================
+     Confirm Delete Modal - Modal de Confirmación
+     ============================================ */
+
+  .confirm-delete-content {
+    @apply flex flex-col items-center text-center py-4;
+  }
+
+  .confirm-delete-icon-wrapper {
+    @apply w-16 h-16 rounded-full bg-red-100 dark:bg-red-900/20 flex items-center justify-center mb-4;
+  }
+
+  .confirm-delete-icon {
+    @apply material-symbols-outlined text-red-600 dark:text-red-400 text-4xl;
+  }
+
+  .confirm-delete-message {
+    @apply text-base text-gray-700 dark:text-gray-300 mb-2;
+  }
+
+  .confirm-delete-entity-name {
+    @apply text-lg font-semibold text-gray-900 dark:text-white mb-6;
+  }
+
+  .confirm-delete-actions {
+    @apply flex items-center justify-end gap-3 w-full pt-4 border-t border-gray-200 dark:border-gray-700;
+  }
+
+  /* ============================================
+     Edit Entity Modal - Modal de Edición
+     ============================================ */
+
+  .edit-entity-modal-content {
+    @apply flex flex-col;
+    /* Eliminado max-h y overflow-y-auto para evitar scroll duplicado */
+    /* El scroll se maneja en .modal-body */
+    min-height: 100%;
+    padding-bottom: 1rem;
+  }
+
+  /* Botones del modal de edición - tamaño mejorado */
+  .edit-entity-modal-content .btn,
+  .proveedor-form .btn {
+    min-width: 8rem; /* Ancho mínimo para botones en móvil */
+  }
+
+  /* Contenedor de botones del modal - layout mejorado */
+  .edit-entity-modal-content form > div:last-child,
+  .proveedor-form > div:last-child {
+    @apply flex flex-col sm:flex-row gap-3;
+    padding-top: 1.5rem !important;
+    margin-top: 1.5rem !important;
+  }
+
+  .edit-entity-modal-content form > div:last-child .btn,
+  .proveedor-form > div:last-child .btn {
+    @apply flex-1 sm:flex-none;
+  }
+
+  /* Asegurar que los botones del modal tengan buen tamaño en móvil */
+  @media (max-width: 640px) {
+    .edit-entity-modal-content .btn,
+    .proveedor-form .btn {
+      @apply w-full;
+    }
+  }
+
+  .edit-entity-not-implemented {
+    @apply p-6 text-center text-gray-600 dark:text-gray-400;
+  }
+
+  /* ============================================
+     A3 Inspection Modal - Modal de Inspección de Payload A3
+     ============================================ */
+  .a3-inspection-modal-content {
+    @apply flex flex-col gap-6;
+  }
+
+  .a3-inspection-description {
+    @apply text-sm text-gray-600 dark:text-gray-400;
+  }
+
+  .a3-inspection-json-wrapper {
+    @apply rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 overflow-hidden;
+  }
+
+  .a3-inspection-json-header {
+    @apply flex items-center justify-between px-4 py-3 bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700;
+  }
+
+  .a3-inspection-json-title {
+    @apply text-sm font-semibold text-gray-900 dark:text-white;
+  }
+
+  .btn-copy-json {
+    @apply inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md;
+    @apply bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300;
+    @apply border border-gray-300 dark:border-gray-600;
+    @apply hover:bg-gray-50 dark:hover:bg-gray-600;
+    @apply transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2;
+    @apply disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-copy-icon {
+    @apply text-base;
+  }
+
+  .a3-inspection-json-code {
+    @apply p-4 m-0 overflow-x-auto;
+    @apply bg-gray-900 dark:bg-gray-950 text-gray-100;
+    @apply text-xs font-mono leading-relaxed;
+    @apply max-h-96 overflow-y-auto;
+  }
+
+  .a3-inspection-json-code code {
+    @apply text-gray-100;
+  }
+
+  .a3-inspection-actions {
+    @apply flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700;
   }
 }

@@ -1,8 +1,13 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { PageHeader, type PageHeaderAction } from '@/components/layout';
 import { StatusBadge } from '@/components/ui';
 import { formatDateForDisplay } from '@/utils/dateUtils';
+import { useToast } from '@/contexts/ToastContext';
+import { ConfirmDeleteModal } from '@/components/common/ConfirmDeleteModal';
+import { EditEntityModal } from '@/components/common/EditEntityModal';
+import { useFinancial } from '@/contexts/FinancialContext';
+import { Proveedor, Cliente } from '../types';
 
 /**
  * Tipos para la entidad (Cliente o Proveedor)
@@ -206,9 +211,15 @@ const InvoiceStatusBadge: React.FC<{ status: InvoiceStatus }> = ({ status }) => 
  * Página de detalle de entidad (Cliente o Proveedor)
  */
 export const EntityDetailPage: React.FC = () => {
+  // ============================================
+  // TODOS LOS HOOKS DEBEN IR PRIMERO (antes de cualquier return)
+  // ============================================
+  
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const { showToast } = useToast();
+  const { expenses, income } = useFinancial();
   
   // Extraer el tipo desde el pathname: /cliente/detalle/:id o /proveedor/detalle/:id
   const pathSegments = location.pathname.split('/').filter(Boolean);
@@ -222,9 +233,214 @@ export const EntityDetailPage: React.FC = () => {
   // Estado para el buscador de facturas
   const [invoiceSearch, setInvoiceSearch] = useState('');
 
-  // Por ahora usamos datos mock
-  // En producción, aquí se haría un fetch con el id y type
-  const entityData = MOCK_ENTITY_DATA;
+  // Estados para modales
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+
+  // Estados para datos de la entidad
+  const [entityData, setEntityData] = useState<EntityData | null>(null);
+  const [rawEntityData, setRawEntityData] = useState<Proveedor | Cliente | null>(null);
+
+  // Filtrar registros financieros por entity_id
+  const entityRecords = useMemo(() => {
+    if (!id || !type) return [];
+    
+    if (type === 'proveedor') {
+      return expenses.filter((record) => {
+        const supplierId = (record.data as any).supplierId;
+        return supplierId === id;
+      });
+    } else {
+      return income.filter((record) => {
+        const clientId = (record.data as any).clientId;
+        return clientId === id;
+      });
+    }
+  }, [id, type, expenses, income]);
+
+  // Calcular datos financieros reales
+  const financialData = useMemo(() => {
+    if (!entityRecords.length) {
+      return {
+        saldoTotal: 0,
+        facturasPendientes: 0,
+        volumenAnual: 0,
+        facturas: [] as Invoice[],
+      };
+    }
+
+    // Convertir registros a facturas
+    const facturas: Invoice[] = entityRecords
+      .map((record) => {
+        const total = parseFloat(record.data.total?.toString() || '0');
+        const base = parseFloat(record.data.base?.toString() || '0');
+        const vat = parseFloat(record.data.vat?.toString() || '0');
+        const fecha = record.data.issueDate || record.createdAt;
+        const estado: InvoiceStatus = record.paymentStatus === 'Pagado' ? 'pagada' : 'pendiente';
+
+        return {
+          id: record.id,
+          numero: record.data.invoiceNum || `FAC-${record.id.slice(-6)}`,
+          fecha: fecha,
+          concepto: record.data.concept || record.data.category || 'Sin concepto',
+          base: base,
+          iva: vat,
+          total: total,
+          estado: estado,
+        };
+      })
+      .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
+
+    // Calcular saldo total (suma de todas las facturas)
+    const saldoTotal = facturas.reduce((sum, factura) => sum + factura.total, 0);
+
+    // Calcular facturas pendientes (no pagadas)
+    const facturasPendientes = facturas.filter((f) => f.estado !== 'pagada').length;
+
+    // Calcular volumen anual (facturas del año actual)
+    const currentYear = new Date().getFullYear();
+    const volumenAnual = facturas
+      .filter((f) => new Date(f.fecha).getFullYear() === currentYear)
+      .reduce((sum, factura) => sum + factura.total, 0);
+
+    // Últimas 5 facturas
+    const ultimasFacturas = facturas.slice(0, 5);
+
+    return {
+      saldoTotal,
+      facturasPendientes,
+      volumenAnual,
+      facturas: ultimasFacturas,
+    };
+  }, [entityRecords]);
+
+  // Función para convertir entidad a EntityData
+  const convertEntityToEntityData = useMemo(() => {
+    return (entity: Proveedor | Cliente | null): EntityData | null => {
+      if (!entity || !id || !type) return null;
+
+      // Obtener última operación de los registros financieros
+      const ultimaOperacion = entityRecords.length > 0
+        ? entityRecords.sort((a, b) => 
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          )[0].createdAt
+        : entity.updated_at || entity.created_at || new Date().toISOString();
+
+      // Convertir datos del localStorage al formato EntityData
+      return {
+        id: entity.id || '',
+        nombre: type === 'proveedor' 
+          ? (entity as Proveedor).nombreComercial || (entity as Proveedor).razonSocial || ''
+          : (entity as Cliente).razonSocial || '',
+        nif: type === 'proveedor' ? (entity as Proveedor).cif || '' : (entity as Cliente).nif || '',
+        tipo: type,
+        status: entity.is_active === false ? 'inactivo' : 'activo',
+        saldoTotal: financialData.saldoTotal,
+        facturasPendientes: financialData.facturasPendientes,
+        volumenAnual: financialData.volumenAnual,
+        ultimaOperacion: ultimaOperacion,
+        direccionFiscal: {
+          calle: type === 'proveedor' 
+            ? (entity as Proveedor).direccion || ''
+            : (entity as Cliente).direccion || '',
+          ciudad: type === 'proveedor'
+            ? (entity as Proveedor).ciudad || ''
+            : (entity as Cliente).ciudad || '',
+          codigoPostal: type === 'proveedor'
+            ? (entity as Proveedor).zip || ''
+            : (entity as Cliente).codigoPostal || '',
+          pais: type === 'proveedor'
+            ? (entity as Proveedor).pais || 'España'
+            : (entity as Cliente).pais || 'España',
+        },
+        notasInternas: type === 'proveedor'
+          ? (entity as Proveedor).notasInternas
+          : (entity as Cliente).notas,
+        facturas: financialData.facturas,
+        contactos: type === 'proveedor'
+          ? ((entity as Proveedor).contactos || []).map((c) => ({
+              id: c.id || '',
+              nombre: c.nombre,
+              cargo: c.cargo || '',
+              email: c.email || '',
+              telefono: c.telefono || '',
+            }))
+          : MOCK_ENTITY_DATA.contactos, // Por ahora usar mock para clientes
+      };
+    };
+  }, [id, type, entityRecords, financialData]);
+
+  // Cargar datos reales del localStorage
+  useEffect(() => {
+    if (!id || !type) return;
+
+    try {
+      const storageKey = type === 'cliente' ? 'zaffra_clients' : 'zaffra_suppliers';
+      const stored = localStorage.getItem(storageKey);
+      if (!stored) {
+        // Si no hay datos, usar mock para desarrollo
+        setEntityData(MOCK_ENTITY_DATA);
+        return;
+      }
+
+      const entities = JSON.parse(stored) as (Proveedor | Cliente)[];
+      const entity = entities.find((e) => e.id === id);
+
+      if (!entity) {
+        // Si no se encuentra, usar mock
+        setEntityData(MOCK_ENTITY_DATA);
+        return;
+      }
+
+      setRawEntityData(entity);
+    } catch (error) {
+      console.error('Error al cargar entidad:', error);
+      setEntityData(MOCK_ENTITY_DATA);
+    }
+  }, [id, type]);
+
+  // Actualizar entityData cuando cambien rawEntityData o financialData
+  useEffect(() => {
+    if (rawEntityData) {
+      const converted = convertEntityToEntityData(rawEntityData);
+      if (converted) {
+        setEntityData(converted);
+      }
+    }
+  }, [rawEntityData, convertEntityToEntityData]);
+
+  // Filtrar facturas según el buscador (useMemo debe ir después de todos los useState/useEffect)
+  const filteredInvoices = useMemo(() => {
+    if (!entityData) return [];
+    if (!invoiceSearch.trim()) {
+      return entityData.facturas;
+    }
+    const searchLower = invoiceSearch.toLowerCase();
+    return entityData.facturas.filter(
+      (invoice) =>
+        invoice.numero.toLowerCase().includes(searchLower) ||
+        invoice.concepto.toLowerCase().includes(searchLower)
+    );
+  }, [entityData, invoiceSearch]);
+
+  // Escuchar cambios en la entidad para actualizar datos sin recargar
+  useEffect(() => {
+    const handleEntityUpdate = (event: CustomEvent) => {
+      if (!id || !type) return;
+      
+      const updatedEntity = event.detail?.entity;
+      if (updatedEntity && updatedEntity.id === id) {
+        setRawEntityData(updatedEntity);
+      }
+    };
+
+    window.addEventListener('entityUpdated', handleEntityUpdate as EventListener);
+    return () => window.removeEventListener('entityUpdated', handleEntityUpdate as EventListener);
+  }, [id, type]);
+
+  // ============================================
+  // VALIDACIONES Y RETURNS TEMPRANOS (después de todos los hooks)
+  // ============================================
 
   // Validar tipo de entidad
   if (type !== 'cliente' && type !== 'proveedor') {
@@ -238,18 +454,16 @@ export const EntityDetailPage: React.FC = () => {
     );
   }
 
-  // Filtrar facturas según el buscador
-  const filteredInvoices = useMemo(() => {
-    if (!invoiceSearch.trim()) {
-      return entityData.facturas;
-    }
-    const searchLower = invoiceSearch.toLowerCase();
-    return entityData.facturas.filter(
-      (invoice) =>
-        invoice.numero.toLowerCase().includes(searchLower) ||
-        invoice.concepto.toLowerCase().includes(searchLower)
+  // Si no hay datos, mostrar loading
+  if (!entityData) {
+    return (
+      <div className="studio-container p-8">
+        <div className="studio-card p-6">
+          <p className="text-gray-600">Cargando...</p>
+        </div>
+      </div>
     );
-  }, [entityData.facturas, invoiceSearch]);
+  }
 
   // Función para volver a la lista
   const handleBack = () => {
@@ -260,34 +474,87 @@ export const EntityDetailPage: React.FC = () => {
     }
   };
 
+  // Manejar edición
+  const handleEdit = () => {
+    setIsEditModalOpen(true);
+  };
+
+  // Manejar guardado de edición
+  const handleSaveEdit = (updatedData: Proveedor | Cliente) => {
+    if (!id || !type) return;
+
+    try {
+      const storageKey = type === 'cliente' ? 'zaffra_clients' : 'zaffra_suppliers';
+      const stored = localStorage.getItem(storageKey);
+      if (!stored) return;
+
+      const entities = JSON.parse(stored) as (Proveedor | Cliente)[];
+      const updatedEntities = entities.map((e) =>
+        e.id === id ? { ...updatedData, id, updated_at: new Date().toISOString() } : e
+      );
+
+      localStorage.setItem(storageKey, JSON.stringify(updatedEntities));
+      showToast('Datos actualizados correctamente', 'success');
+      
+      // Actualizar datos inmediatamente
+      const updatedEntity = updatedEntities.find((e) => e.id === id);
+      if (updatedEntity) {
+        setRawEntityData(updatedEntity);
+        // Forzar actualización de entityData
+        const event = new CustomEvent('entityUpdated', { detail: { entity: updatedEntity } });
+        window.dispatchEvent(event);
+      }
+    } catch (error) {
+      console.error('Error al actualizar entidad:', error);
+      showToast('Error al actualizar la entidad', 'error');
+    }
+  };
+
+  // Manejar eliminación
+  const handleDelete = () => {
+    setIsDeleteModalOpen(true);
+  };
+
+  // Confirmar eliminación
+  const handleConfirmDelete = () => {
+    if (!id || !type) return;
+
+    try {
+      const storageKey = type === 'cliente' ? 'zaffra_clients' : 'zaffra_suppliers';
+      const stored = localStorage.getItem(storageKey);
+      if (!stored) return;
+
+      const entities = JSON.parse(stored) as (Proveedor | Cliente)[];
+      const filteredEntities = entities.filter((e) => e.id !== id);
+
+      localStorage.setItem(storageKey, JSON.stringify(filteredEntities));
+      showToast('Eliminado correctamente', 'success');
+
+      // Redirigir a la lista
+      if (type === 'cliente') {
+        navigate('/clientes/lista');
+      } else {
+        navigate('/proveedores/listado');
+      }
+    } catch (error) {
+      console.error('Error al eliminar entidad:', error);
+      showToast('Error al eliminar la entidad', 'error');
+    }
+  };
+
   // Acciones del header
   const headerActions: PageHeaderAction[] = [
     {
       icon: 'edit',
-      label: 'Editar Entidad',
-      onClick: () => {
-        // TODO: Implementar navegación a edición
-        console.log('Editar entidad', id);
-      },
+      label: 'Editar Datos',
+      onClick: handleEdit,
       variant: 'default',
     },
     {
-      icon: 'receipt',
-      label: 'Nueva Factura',
-      onClick: () => {
-        // TODO: Implementar creación de factura
-        console.log('Nueva factura', id);
-      },
-      variant: 'primary',
-    },
-    {
-      icon: 'download',
-      label: 'Descargar Extracto',
-      onClick: () => {
-        // TODO: Implementar descarga de extracto
-        console.log('Descargar extracto', id);
-      },
-      variant: 'default',
+      icon: 'delete',
+      label: 'Eliminar',
+      onClick: handleDelete,
+      variant: 'danger',
     },
   ];
 
@@ -447,6 +714,41 @@ export const EntityDetailPage: React.FC = () => {
           {/* Tab: General */}
           {activeTab === 'general' && (
             <div className="space-y-6">
+              {/* Información de A3 */}
+              {rawEntityData && (
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">
+                    Información Contable A3
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="label-studio">ID Contable A3</label>
+                      <div className="input-studio-readonly">
+                        {type === 'proveedor'
+                          ? (rawEntityData as Proveedor).idContableA3 || 'No configurado'
+                          : (rawEntityData as Cliente).idContableA3 || 'No configurado'}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="label-studio">Actividad A3</label>
+                      <div className="input-studio-readonly">
+                        {type === 'proveedor'
+                          ? (rawEntityData as Proveedor).actividadA3 || 'No configurado'
+                          : (rawEntityData as Cliente).actividadA3 || 'No configurado'}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="label-studio">Serie A3</label>
+                      <div className="input-studio-readonly">
+                        {type === 'proveedor'
+                          ? (rawEntityData as Proveedor).serieA3 || 'No configurado'
+                          : (rawEntityData as Cliente).serieA3 || 'No configurado'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Datos Fiscales */}
               <div>
                 <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">
@@ -609,6 +911,27 @@ export const EntityDetailPage: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Modal de Edición */}
+      {rawEntityData && (
+        <EditEntityModal
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          onSave={handleSaveEdit}
+          entity={rawEntityData}
+          type={type}
+        />
+      )}
+
+      {/* Modal de Confirmación de Eliminación */}
+      <ConfirmDeleteModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={handleConfirmDelete}
+        title={`Eliminar ${type === 'proveedor' ? 'Proveedor' : 'Cliente'}`}
+        message={`¿Estás seguro de que quieres eliminar a este ${type === 'proveedor' ? 'proveedor' : 'cliente'}?`}
+        entityName={entityData.nombre}
+      />
     </div>
   );
 };

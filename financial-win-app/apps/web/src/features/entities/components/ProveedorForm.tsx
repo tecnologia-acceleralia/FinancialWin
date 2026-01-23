@@ -33,6 +33,9 @@ export const ProveedorForm = forwardRef<HTMLFormElement, ProveedorFormProps>(
     iban: '',
     formaPago: 'Transferencia',
     plazoPago: 'Contado',
+    idContableA3: '',
+    actividadA3: '',
+    serieA3: '',
     contactos: [],
     notasInternas: '',
     ...initialData,
@@ -359,6 +362,52 @@ export const ProveedorForm = forwardRef<HTMLFormElement, ProveedorFormProps>(
             </div>
           </div>
         </div>
+
+        {/* Bloque: Campos A3 */}
+        <div className="form-section-block">
+          <h4 className="form-section-block-title">Campos A3</h4>
+          <div className="form-grid-2">
+            <div className="input-group">
+              <label htmlFor="id-contable-a3" className="input-group-label">
+                ID Contable A3
+              </label>
+              <input
+                type="text"
+                id="id-contable-a3"
+                className="input-group-input"
+                placeholder="ID Contable A3"
+                value={formData.idContableA3 || ''}
+                onChange={(e) => handleInputChange('idContableA3', e.target.value)}
+              />
+            </div>
+            <div className="input-group">
+              <label htmlFor="actividad-a3" className="input-group-label">
+                Actividad A3
+              </label>
+              <input
+                type="text"
+                id="actividad-a3"
+                className="input-group-input"
+                placeholder="Actividad A3"
+                value={formData.actividadA3 || ''}
+                onChange={(e) => handleInputChange('actividadA3', e.target.value)}
+              />
+            </div>
+            <div className="input-group">
+              <label htmlFor="serie-a3" className="input-group-label">
+                Serie A3
+              </label>
+              <input
+                type="text"
+                id="serie-a3"
+                className="input-group-input"
+                placeholder="Serie A3"
+                value={formData.serieA3 || ''}
+                onChange={(e) => handleInputChange('serieA3', e.target.value)}
+              />
+            </div>
+          </div>
+        </div>
       </section>
 
       {/* Sección: Contactos */}
@@ -506,6 +555,25 @@ export const ProveedorForm = forwardRef<HTMLFormElement, ProveedorFormProps>(
           </div>
         </div>
       </section>
+
+      {/* Botones de Acción */}
+      <div className="flex justify-end gap-3 pt-6 mt-6 border-t border-[#e5e5e5] dark:border-[#2A3B5A]">
+        {onCancel && (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="btn btn-secondary"
+          >
+            Cancelar
+          </button>
+        )}
+        <button
+          type="submit"
+          className="btn btn-primary"
+        >
+          Guardar Cambios
+        </button>
+      </div>
     </form>
   );
   }

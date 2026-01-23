@@ -5,7 +5,7 @@ import { PageHeader, type PageHeaderAction } from '../../components/layout';
 import { CategoriaProveedor } from '../../features/entities/types';
 import { EntityFilterPanel, type EntityFilterValues } from '@/features/entities/components/EntityFilterPanel';
 
-interface Proveedor {
+interface ProveedorListItem {
   id: string;
   nombre: string;
   nif: string;
@@ -16,6 +16,8 @@ interface Proveedor {
   email?: string;
   phone?: string;
 }
+
+const STORAGE_KEY = 'zaffra_suppliers';
 
 // Subcomponente: Paginación
 interface PaginationProps {
@@ -120,9 +122,33 @@ export const ProveedoresListPage: React.FC = () => {
   });
   const resultadosPorPagina = 8;
 
+  // Cargar proveedores del localStorage
+  const proveedores = useMemo(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (!stored) return [];
+      const data: any[] = JSON.parse(stored);
+      // Convertir datos del localStorage al formato esperado por la lista
+      return data.map((p) => ({
+        id: p.id || '',
+        nombre: p.nombreComercial || p.razonSocial || '',
+        nif: p.cif || '',
+        tipo: p.categoria || 'Proveedor Externo',
+        estado: p.is_active === false ? 'inactivo' : 'activo',
+        saldoBancario: 0, // Valor por defecto, se puede calcular después
+        pagosPendientes: 0, // Valor por defecto, se puede calcular después
+        email: p.ordersEmail,
+        phone: p.telefono,
+      })) as ProveedorListItem[];
+    } catch (error) {
+      console.error('Error al cargar proveedores del localStorage:', error);
+      return [];
+    }
+  }, []);
+
   // Filtrar proveedores por búsqueda y filtros avanzados
   const proveedoresFiltrados = useMemo(() => {
-    let resultado = MOCK_PROVEEDORES;
+    let resultado = proveedores;
 
     // Filtro por búsqueda de texto
     if (busqueda.trim()) {
@@ -173,7 +199,7 @@ export const ProveedoresListPage: React.FC = () => {
     }
 
     return resultado;
-  }, [busqueda, filters]);
+  }, [busqueda, filters, proveedores]);
 
   const totalResultados = proveedoresFiltrados.length;
   const totalPaginas = Math.ceil(totalResultados / resultadosPorPagina);
@@ -365,21 +391,4 @@ const formatearTipo = (tipo: CategoriaProveedor): string => {
   return tipoMap[tipo] || tipo;
 };
 
-// ============================================
-// Datos mock
-// ============================================
 
-const MOCK_PROVEEDORES: Proveedor[] = [
-  { id: '1', nombre: 'Proveedor 1 S.L.', nif: 'B48079307', tipo: 'Proveedor Externo', estado: 'activo', saldoBancario: 12500.50, pagosPendientes: 3200.00, email: 'contacto@proveedor1.es', phone: '+34 912 345 678' },
-  { id: '2', nombre: 'Proveedor 2 García', nif: '12345678A', tipo: 'Proveedor Externo', estado: 'pendiente', saldoBancario: 8500.75, pagosPendientes: 1500.00, email: 'info@proveedor2.com', phone: '+34 923 456 789' },
-  { id: '3', nombre: 'Proveedor 3 Tech', nif: 'B98765432', tipo: 'Staff Interno', estado: 'activo', saldoBancario: 25400.00, pagosPendientes: 0.00, email: 'tech@proveedor3.es', phone: '+34 934 567 890' },
-  { id: '4', nombre: 'Proveedor 4 Pérez', nif: '87654321B', tipo: 'Licencias', estado: 'inactivo', saldoBancario: 0.00, pagosPendientes: 0.00, email: 'ventas@proveedor4.com', phone: '+34 945 678 901' },
-  { id: '5', nombre: 'Proveedor 5 Global', nif: 'B11223344', tipo: 'Proveedor Externo', estado: 'activo', saldoBancario: 18900.25, pagosPendientes: 4500.00, email: 'global@proveedor5.es', phone: '+34 956 789 012' },
-  { id: '6', nombre: 'Proveedor 6 Martínez', nif: '22334455C', tipo: 'Staff Interno', estado: 'activo', saldoBancario: 6800.50, pagosPendientes: 1200.00, email: 'info@proveedor6.com', phone: '+34 967 890 123' },
-  { id: '7', nombre: 'Proveedor 7 Solutions', nif: 'B55667788', tipo: 'Proveedor Externo', estado: 'pendiente', saldoBancario: 15400.00, pagosPendientes: 2800.00, email: 'solutions@proveedor7.es', phone: '+34 978 901 234' },
-  { id: '8', nombre: 'Proveedor 8 López', nif: '66778899D', tipo: 'Licencias', estado: 'activo', saldoBancario: 9200.75, pagosPendientes: 0.00, email: 'contacto@proveedor8.com', phone: '+34 989 012 345' },
-  { id: '9', nombre: 'Proveedor 9 Innovación', nif: 'B99887766', tipo: 'Proveedor Externo', estado: 'activo', saldoBancario: 31200.50, pagosPendientes: 5600.00, email: 'innovacion@proveedor9.es', phone: '+34 990 123 456' },
-  { id: '10', nombre: 'Proveedor 10 Sánchez', nif: '88776655E', tipo: 'Staff Interno', estado: 'inactivo', saldoBancario: 0.00, pagosPendientes: 0.00, email: 'info@proveedor10.com', phone: '+34 901 234 567' },
-  { id: '11', nombre: 'Proveedor 11 Software', nif: 'B11223344', tipo: 'Licencias', estado: 'activo', saldoBancario: 15000.00, pagosPendientes: 3000.00, email: 'software@proveedor11.es', phone: '+34 912 345 678' },
-  { id: '12', nombre: 'Proveedor 12 Servicios', nif: '33445566F', tipo: 'Proveedor Externo', estado: 'activo', saldoBancario: 22000.00, pagosPendientes: 5000.00, email: 'servicios@proveedor12.com', phone: '+34 923 456 789' },
-];

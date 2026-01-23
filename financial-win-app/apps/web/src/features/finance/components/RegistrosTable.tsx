@@ -1,8 +1,6 @@
 import React, { useMemo } from 'react';
-import { useFinancial, type FinancialRecord, type ErpStatus, type PaymentStatus } from '../../../contexts/FinancialContext';
-import { erpService, type InvoiceData } from '../../../services/erpIntegrationService';
+import { useFinancial, type FinancialRecord, type ErpStatus } from '../../../contexts/FinancialContext';
 import type { FilterValues } from './FilterPanel';
-import { PaymentStatusSelect } from '../../../components/common/PaymentStatusSelect';
 
 interface RegistrosTableProps {
   searchTerm?: string;
@@ -20,28 +18,7 @@ const isProcessedByGemini = (record: FinancialRecord): boolean => {
 };
 
 export const RegistrosTable: React.FC<RegistrosTableProps> = ({ searchTerm = '', filters }) => {
-  const { records, updateRecord } = useFinancial();
-
-  /**
-   * Convierte ExtractedData a InvoiceData para el servicio ERP
-   */
-  const convertToInvoiceData = (data: FinancialRecord['data']): InvoiceData => {
-    return {
-      supplier: data.supplier,
-      total: data.total,
-      invoiceNum: data.invoiceNum,
-      cif: data.cif,
-      vatId: data.vatId,
-      origin: data.origin,
-      department: data.department,
-      expenseType: data.expenseType,
-      issueDate: data.issueDate,
-      concept: data.concept,
-      base: data.base,
-      currency: data.currency,
-      vat: data.vat,
-    };
-  };
+  const { records } = useFinancial();
 
   /**
    * Obtiene la clase CSS para el estado ERP
@@ -99,49 +76,7 @@ export const RegistrosTable: React.FC<RegistrosTableProps> = ({ searchTerm = '',
     }
   };
 
-  /**
-   * Maneja la sincronización con el sistema ERP
-   */
-  const handleSync = async (docId: string, target: 'odoo' | 'a3') => {
-    const record = records.find((r) => r.id === docId);
-    if (!record || !isProcessedByGemini(record)) {
-      console.warn('Documento no procesado por Gemini o no encontrado');
-      return;
-    }
 
-    // Cambiar estado a 'syncing'
-    updateRecord(docId, { erpStatus: 'syncing' });
-
-    try {
-      // Convertir datos a formato InvoiceData
-      const invoiceData = convertToInvoiceData(record.data);
-
-      // Llamar al servicio correspondiente
-      const response = target === 'odoo' 
-        ? await erpService.sendToOdoo(invoiceData)
-        : await erpService.sendToA3(invoiceData);
-
-      if (response.success) {
-        // Actualizar estado según el sistema sincronizado
-        const newStatus: ErpStatus = target === 'odoo' ? 'synced_odoo' : 'synced_a3';
-        updateRecord(docId, { erpStatus: newStatus });
-      } else {
-        // Error en la sincronización
-        updateRecord(docId, { erpStatus: 'error' });
-      }
-    } catch (error) {
-      console.error(`Error al sincronizar con ${target}:`, error);
-      updateRecord(docId, { erpStatus: 'error' });
-    }
-  };
-
-  /**
-   * Maneja el cambio de estado de pago
-   * Actualiza directamente en el contexto (que persiste en localStorage)
-   */
-  const handlePaymentStatusChange = (docId: string, newStatus: PaymentStatus) => {
-    updateRecord(docId, { paymentStatus: newStatus });
-  };
 
   const getEstadoClass = (estado: string) => {
     switch (estado) {
@@ -197,7 +132,6 @@ export const RegistrosTable: React.FC<RegistrosTableProps> = ({ searchTerm = '',
       return {
         id: record.id,
         estado,
-        paymentStatus: record.paymentStatus || 'Pendiente',
         tipoDocumento: getDocumentTypeLabel(record.documentType),
         documentType: record.documentType, // Guardar documentType original para filtrado
         departamento: record.data.department || 'N/A',
@@ -361,7 +295,6 @@ export const RegistrosTable: React.FC<RegistrosTableProps> = ({ searchTerm = '',
         <thead>
           <tr>
             <th className="table-header table-col-small">Estado Validación</th>
-            <th className="table-header table-col-payment-status">Estado</th>
             <th className="table-header table-col-medium">Tipo Documento</th>
             <th className="table-header table-col-medium">Departamento</th>
             <th className="table-header table-col-text">Nombre Documento</th>
@@ -369,14 +302,13 @@ export const RegistrosTable: React.FC<RegistrosTableProps> = ({ searchTerm = '',
             <th className="table-header table-col-text">Usuario</th>
             <th className="table-header table-col-small">Importe</th>
             <th className="table-header table-col-medium">Estado ERP</th>
-            <th className="table-header table-col-medium">Sincronizar</th>
             <th className="table-header table-col-compact">Acción</th>
           </tr>
         </thead>
         <tbody>
           {registrosFiltrados.length === 0 ? (
             <tr>
-              <td colSpan={11} className="table-empty-state">
+              <td colSpan={9} className="table-empty-state">
                 <div className="contactos-empty-state">
                   <span className="material-symbols-outlined contactos-empty-icon">
                     search_off
@@ -390,24 +322,13 @@ export const RegistrosTable: React.FC<RegistrosTableProps> = ({ searchTerm = '',
           ) : (
             registrosFiltrados.map((registro) => {
               const isSyncing = registro.erpStatus === 'syncing';
-              const canSync = registro.isProcessed && !isSyncing;
-              const isPaid = registro.paymentStatus === 'Pagado';
               
               return (
-                <tr 
-                  key={registro.id} 
-                  className={`table-row ${isPaid ? 'table-row-paid' : ''}`}
-                >
+                <tr key={registro.id} className="table-row">
                   <td className="table-col-small">
                     <span className={getEstadoClass(registro.estado)}>
                       {registro.estado}
                     </span>
-                  </td>
-                  <td className="table-col-payment-status">
-                    <PaymentStatusSelect
-                      value={registro.paymentStatus as PaymentStatus}
-                      onChange={(newStatus) => handlePaymentStatusChange(registro.id, newStatus)}
-                    />
                   </td>
                   <td className="table-col-medium">{registro.tipoDocumento}</td>
                   <td className="table-col-medium">{registro.departamento}</td>
@@ -428,28 +349,6 @@ export const RegistrosTable: React.FC<RegistrosTableProps> = ({ searchTerm = '',
                       )}
                       {getErpStatusText(registro.erpStatus as ErpStatus)}
                     </span>
-                  </td>
-                  <td className="table-col-medium">
-                    <div className="btn-sync-group">
-                      <button
-                        className="btn-sync-odoo"
-                        onClick={() => handleSync(registro.id, 'odoo')}
-                        disabled={!canSync}
-                        title={canSync ? 'Sincronizar con Odoo' : 'Documento no procesado o sincronizando'}
-                      >
-                        <span className="material-symbols-outlined text-sm">sync</span>
-                        <span>Odoo</span>
-                      </button>
-                      <button
-                        className="btn-sync-a3"
-                        onClick={() => handleSync(registro.id, 'a3')}
-                        disabled={!canSync}
-                        title={canSync ? 'Sincronizar con A3' : 'Documento no procesado o sincronizando'}
-                      >
-                        <span className="material-symbols-outlined text-sm">sync</span>
-                        <span>A3</span>
-                      </button>
-                    </div>
                   </td>
                   <td className="table-col-compact">
                     <button className="table-action-button">

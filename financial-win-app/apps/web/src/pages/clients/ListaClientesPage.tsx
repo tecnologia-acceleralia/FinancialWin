@@ -4,7 +4,7 @@ import { EntityCard } from '@/features/entities/components/EntityCard';
 import { PageHeader, type PageHeaderAction } from '../../components/layout';
 import { EntityFilterPanel, type EntityFilterValues } from '@/features/entities/components/EntityFilterPanel';
 
-interface Cliente {
+interface ClienteListItem {
   id: string;
   nombre: string;
   nif: string;
@@ -14,18 +14,7 @@ interface Cliente {
   pagosPendientes: number;
 }
 
-const MOCK_CLIENTES: Cliente[] = [
-  { id: '1', nombre: 'Empresa 1 S.L.', nif: 'B48079307', tipo: 'Nacional', estado: 'activo', saldoBancario: 12500.50, pagosPendientes: 3200.00 },
-  { id: '2', nombre: 'Cliente 2 García', nif: '12345678A', tipo: 'Nacional', estado: 'pendiente', saldoBancario: 8500.75, pagosPendientes: 1500.00 },
-  { id: '3', nombre: 'Empresa 3 Tech', nif: 'B98765432', tipo: 'Nacional', estado: 'activo', saldoBancario: 25400.00, pagosPendientes: 0.00 },
-  { id: '4', nombre: 'Cliente 4 Pérez', nif: '87654321B', tipo: 'Nacional', estado: 'inactivo', saldoBancario: 0.00, pagosPendientes: 0.00 },
-  { id: '5', nombre: 'Empresa 5 Global', nif: 'B11223344', tipo: 'Extranjero', estado: 'activo', saldoBancario: 18900.25, pagosPendientes: 4500.00 },
-  { id: '6', nombre: 'Cliente 6 Martínez', nif: '22334455C', tipo: 'Nacional', estado: 'activo', saldoBancario: 6800.50, pagosPendientes: 1200.00 },
-  { id: '7', nombre: 'Empresa 7 Solutions', nif: 'B55667788', tipo: 'Nacional', estado: 'pendiente', saldoBancario: 15400.00, pagosPendientes: 2800.00 },
-  { id: '8', nombre: 'Cliente 8 López', nif: '66778899D', tipo: 'Nacional', estado: 'activo', saldoBancario: 9200.75, pagosPendientes: 0.00 },
-  { id: '9', nombre: 'Empresa 9 Innovación', nif: 'B99887766', tipo: 'Nacional', estado: 'activo', saldoBancario: 31200.50, pagosPendientes: 5600.00 },
-  { id: '10', nombre: 'Cliente 10 Sánchez', nif: '88776655E', tipo: 'Nacional', estado: 'inactivo', saldoBancario: 0.00, pagosPendientes: 0.00 },
-];
+const STORAGE_KEY = 'zaffra_clients';
 
 const obtenerIniciales = (nombre: string): string => {
   const palabras = nombre.split(' ');
@@ -57,9 +46,31 @@ export const ListaClientesPage: React.FC = () => {
   });
   const resultadosPorPagina = 8;
 
+  // Cargar clientes del localStorage
+  const clientes = useMemo(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (!stored) return [];
+      const data: any[] = JSON.parse(stored);
+      // Convertir datos del localStorage al formato esperado por la lista
+      return data.map((c) => ({
+        id: c.id || '',
+        nombre: c.razonSocial || '',
+        nif: c.nif || '',
+        tipo: (c.pais && c.pais !== 'España') ? 'Extranjero' : 'Nacional',
+        estado: c.is_active === false ? 'inactivo' : 'activo',
+        saldoBancario: 0, // Valor por defecto, se puede calcular después
+        pagosPendientes: 0, // Valor por defecto, se puede calcular después
+      })) as ClienteListItem[];
+    } catch (error) {
+      console.error('Error al cargar clientes del localStorage:', error);
+      return [];
+    }
+  }, []);
+
   // Filtrar clientes por búsqueda y filtros avanzados
   const clientesFiltrados = useMemo(() => {
-    let resultado = MOCK_CLIENTES;
+    let resultado = clientes;
 
     // Filtro por búsqueda de texto
     if (busqueda.trim()) {
@@ -110,7 +121,7 @@ export const ListaClientesPage: React.FC = () => {
     }
 
     return resultado;
-  }, [busqueda, filters]);
+  }, [busqueda, filters, clientes]);
 
   const totalResultados = clientesFiltrados.length;
   const totalPaginas = Math.ceil(totalResultados / resultadosPorPagina);

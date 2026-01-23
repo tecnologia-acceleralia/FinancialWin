@@ -7,7 +7,7 @@ export interface PageHeaderAction {
   icon: string | LucideIcon | React.ReactNode;
   label: string;
   onClick: () => void;
-  variant?: 'default' | 'primary';
+  variant?: 'default' | 'primary' | 'danger';
 }
 
 export interface PageHeaderProps {
@@ -68,12 +68,18 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
                 return null;
               };
 
+              const getButtonClassName = () => {
+                if (action.variant === 'primary') return 'toolbar-button-primary';
+                if (action.variant === 'danger') return 'toolbar-button-danger';
+                return 'toolbar-button';
+              };
+
               return (
                 <button
                   key={index}
                   type="button"
                   onClick={action.onClick}
-                  className={action.variant === 'primary' ? 'toolbar-button-primary' : 'toolbar-button'}
+                  className={getButtonClassName()}
                   aria-label={action.label}
                   title={action.label}
                 >
