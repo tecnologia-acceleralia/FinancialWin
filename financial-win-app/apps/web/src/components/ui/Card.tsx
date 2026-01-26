@@ -23,6 +23,9 @@ const BADGE_COLORS = {
   gray: 'base-card-badge-gray',
   red: 'base-card-badge-red',
   green: 'base-card-badge-green',
+  pink: 'base-card-badge-pink',
+  blue: 'base-card-badge-blue',
+  emerald: 'base-card-badge-emerald',
 } as const;
 
 export interface CardProps {
@@ -31,7 +34,7 @@ export interface CardProps {
   icon?: string;
   iconColor?: 'amber' | 'cyan' | 'purple' | 'blue' | 'emerald';
   badge?: string;
-  badgeColor?: 'gray' | 'red' | 'green';
+  badgeColor?: 'gray' | 'red' | 'green' | 'pink' | 'blue' | 'emerald';
   onClick?: ((e: React.MouseEvent<HTMLDivElement>) => void) | (() => void);
   children?: React.ReactNode;
   className?: string;

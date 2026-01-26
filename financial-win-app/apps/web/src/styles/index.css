@@ -81,6 +81,84 @@
     @apply bg-danger text-white hover:bg-red-700;
   }
 
+  .btn-delete {
+    @apply inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors;
+    @apply text-gray-500 hover:text-red-600 hover:bg-red-50;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2;
+    @apply disabled:opacity-50 disabled:pointer-events-none;
+    padding: 0.5rem;
+    min-width: 2rem;
+    min-height: 2rem;
+  }
+
+  .btn-delete .material-symbols-outlined {
+    @apply text-lg;
+    font-size: 1.125rem;
+  }
+
+  .btn-view {
+    @apply inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors;
+    @apply text-gray-500 hover:text-primary-600 hover:bg-primary-50;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2;
+    @apply disabled:opacity-50 disabled:pointer-events-none;
+    padding: 0.5rem;
+    min-width: 2rem;
+    min-height: 2rem;
+  }
+
+  .btn-view .material-symbols-outlined {
+    @apply text-lg;
+    font-size: 1.125rem;
+  }
+
+  /* Contenedor de acciones en tabla */
+  .table-actions {
+    @apply flex items-center gap-2;
+  }
+
+  .btn-delete-bulk {
+    @apply inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors;
+    @apply bg-red-600 text-white hover:bg-red-700;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2;
+    @apply disabled:opacity-50 disabled:pointer-events-none;
+    padding: 0.625rem 1rem;
+  }
+
+  .table-checkbox {
+    @apply w-4 h-4 rounded border-gray-300 dark:border-[#2A3B5A] text-[#B84E9D] focus:ring-[#B84E9D] focus:ring-2;
+    @apply cursor-pointer;
+  }
+
+  .bulk-actions-bar {
+    @apply flex items-center justify-between gap-4 p-4 mb-4 rounded-md;
+    @apply bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800;
+  }
+
+  .bulk-actions-text {
+    @apply text-sm font-medium text-red-700 dark:text-red-300;
+  }
+
+  .record-type-selector {
+    @apply flex gap-3 mb-6;
+  }
+
+  .record-type-button {
+    @apply flex-1 inline-flex items-center justify-center gap-2 rounded-md text-base font-semibold transition-colors;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2;
+    @apply disabled:opacity-50 disabled:pointer-events-none;
+    padding: 0.75rem 1.5rem;
+    min-height: 2.75rem;
+    @apply border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50;
+  }
+
+  .record-type-button-active {
+    @apply bg-[#B84E9D] text-white border-[#B84E9D] hover:bg-[#9C3C86];
+  }
+
+  .record-type-button-icon {
+    @apply text-xl;
+  }
+
   .btn-sm {
     @apply h-9 px-3;
   }
@@ -300,6 +378,64 @@
     @apply text-lg font-bold text-[#171717] dark:text-[#fafafa];
   }
 
+  /* Pendientes de Tesorería */
+  .treasury-pending-item {
+    @apply flex items-center justify-between p-4 rounded-lg border border-gray-200 dark:border-gray-700;
+    @apply bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors;
+  }
+
+  .treasury-pending-item-content {
+    @apply flex-1 flex flex-col gap-2;
+  }
+
+  .treasury-pending-item-header {
+    @apply flex items-center gap-3;
+  }
+
+  .treasury-pending-item-type {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold uppercase tracking-wider;
+  }
+
+  .treasury-pending-item-type-income {
+    @apply bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400;
+  }
+
+  .treasury-pending-item-type-expense {
+    @apply bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400;
+  }
+
+  .treasury-pending-item-icon {
+    @apply text-sm;
+  }
+
+  .treasury-pending-item-date {
+    @apply text-sm text-gray-500 dark:text-gray-400;
+  }
+
+  .treasury-pending-item-details {
+    @apply flex items-center gap-2 flex-wrap;
+  }
+
+  .treasury-pending-item-supplier {
+    @apply font-medium text-slate-900 dark:text-white;
+  }
+
+  .treasury-pending-item-invoice {
+    @apply text-sm text-gray-500 dark:text-gray-400;
+  }
+
+  .treasury-pending-item-amount {
+    @apply text-lg font-bold;
+  }
+
+  .treasury-pending-item-amount-income {
+    @apply text-green-600 dark:text-green-400;
+  }
+
+  .treasury-pending-item-amount-expense {
+    @apply text-orange-600 dark:text-orange-400;
+  }
+
   /* Botones de navegación rápida */
   .btn-quick-nav {
     @apply btn btn-lg w-full flex items-center justify-center gap-3;
@@ -480,6 +616,10 @@
     color: #ffffff;
     font-weight: 700;
     font-size: 0.9rem;
+  }
+
+  .entity-avatar-pink {
+    background: #b84e9d;
   }
 
   .entity-info-container {
@@ -2301,7 +2441,7 @@
 
   /* Contenedor principal de la página */
   .home-container {
-    @apply space-y-8 animate-fade-in;
+    @apply space-y-8 animate-fade-in overflow-x-hidden;
   }
 
   /* Grid principal de hero */
@@ -2373,11 +2513,22 @@
   }
 
   .home-hero-button {
-    @apply px-5 py-3 bg-white text-[#581c87] font-semibold text-base rounded-xl shadow-md hover:bg-[#fdf2f8] transition-colors flex items-center gap-2;
+    @apply px-5 py-3 font-semibold text-base rounded-xl shadow-md transition-colors flex items-center gap-2;
+    background-color: #B84E9D;
+    color: white;
+  }
+
+  .home-hero-button:hover {
+    background-color: #9C3C86;
+    color: white;
   }
 
   .home-hero-button-icon {
     @apply material-symbols-outlined text-base;
+  }
+
+  .home-hero-actions {
+    @apply flex flex-col sm:flex-row gap-3 mt-6;
   }
 
   /* Card de próximos vencimientos */
@@ -2419,6 +2570,84 @@
 
   .home-next-due-progress-text {
     @apply text-xs text-slate-600 dark:text-gray-500 text-right;
+  }
+
+  /* Variantes de color para IVA trimestral */
+  .home-next-due-time-payable {
+    @apply text-orange-600 dark:text-orange-400;
+  }
+
+  .home-next-due-time-refundable {
+    @apply text-blue-600 dark:text-blue-400;
+  }
+
+  .home-next-due-progress-fill-payable {
+    @apply bg-orange-500;
+  }
+
+  .home-next-due-progress-fill-refundable {
+    @apply bg-blue-500;
+  }
+
+  /* Icono de calendario interactivo */
+  .home-next-due-icon-button {
+    @apply cursor-pointer transition-colors duration-200;
+  }
+
+  .home-next-due-icon-button:hover {
+    @apply text-[#B84E9D];
+  }
+
+  /* Popover Container */
+  .popover-container {
+    @apply relative inline-block;
+  }
+
+  .popover-trigger {
+    @apply cursor-pointer;
+  }
+
+  .popover-content {
+    @apply absolute top-full right-0 z-50 p-3 rounded-lg shadow-lg border-2;
+    @apply bg-white dark:bg-[#1B273B] border-[#B84E9D];
+    @apply w-64 max-h-[85vh] overflow-y-auto;
+    @apply mt-2 origin-top-right;
+    @apply transition-all duration-200 ease-out;
+  }
+
+  /* Responsive: En móviles, el popover se ajusta al ancho disponible */
+  @media (max-width: 640px) {
+    .popover-content {
+      @apply w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)];
+      @apply left-1/2 -translate-x-1/2;
+      @apply fixed top-1/2 -translate-y-1/2;
+      @apply max-h-[80vh] right-auto origin-center;
+    }
+  }
+
+  /* Contenido del popover de trimestre */
+  .quarter-popover-header {
+    @apply mb-2.5 pb-2.5 border-b border-gray-200 dark:border-[#2A3B5A];
+  }
+
+  .quarter-popover-title {
+    @apply text-sm font-semibold text-slate-900 dark:text-white mb-1;
+  }
+
+  .quarter-popover-period {
+    @apply text-xs text-gray-600 dark:text-gray-400;
+  }
+
+  .quarter-popover-item {
+    @apply mb-2 last:mb-0;
+  }
+
+  .quarter-popover-label {
+    @apply text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5;
+  }
+
+  .quarter-popover-value {
+    @apply text-sm text-slate-900 dark:text-white leading-relaxed;
   }
 
   /* Sección de acceso rápido */
@@ -2557,6 +2786,25 @@
 
   .base-card-badge-green {
     @apply base-card-badge bg-green-50 dark:bg-green-900/20 text-green-600;
+  }
+
+  /* Badge corporativo rosa - Estilo profesional con clases Tailwind específicas */
+  .base-card-badge-pink {
+    @apply inline-flex items-center justify-center;
+    background-color: rgba(184, 78, 157, 0.1);
+    color: #B84E9D;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+
+  .base-card-badge-blue {
+    @apply base-card-badge bg-blue-50 dark:bg-blue-900/20 text-blue-600;
+  }
+
+  .base-card-badge-emerald {
+    @apply base-card-badge bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600;
   }
 
   /* Cards de acceso rápido (mantener compatibilidad) */
@@ -2871,7 +3119,7 @@
   }
 
   .modal-content-xl {
-    @apply w-full max-w-xl;
+    @apply w-full max-w-6xl;
   }
 
   /* Header del modal */
@@ -2919,13 +3167,40 @@
     background-color: rgba(148, 163, 184, 0.2);
   }
 
-  .dark .modal-body::-webkit-scrollbar-thumb:hover {
+  .dark   .modal-body::-webkit-scrollbar-thumb:hover {
     background-color: rgba(148, 163, 184, 0.4);
   }
 
   /* Footer del modal */
   .modal-footer {
     @apply flex items-center justify-end gap-3 p-6 border-t border-gray-200 flex-shrink-0;
+  }
+
+  /* Contenedor del modal de documento */
+  .document-modal-content {
+    @apply w-full;
+    min-height: 500px;
+    max-height: calc(85vh - 120px);
+    overflow: auto;
+  }
+
+  .document-modal-content .document-viewer-container {
+    @apply h-full w-full;
+  }
+
+  .document-modal-content .document-viewer-content {
+    @apply h-full w-full;
+  }
+
+  .document-modal-content .document-viewer-pdf {
+    @apply w-full;
+    min-height: 500px;
+    height: calc(85vh - 120px);
+    border: none;
+  }
+
+  .document-modal-content .document-viewer-image {
+    @apply w-full h-auto max-h-[calc(85vh-120px)] object-contain mx-auto;
   }
 
   /* ============================================
@@ -3254,12 +3529,78 @@
   }
 
   /* ============================================
+     Entity Table View - Vista de Tabla
+     ============================================ */
+  .entity-table-container {
+    @apply w-full overflow-x-auto;
+  }
+
+  .entity-table {
+    @apply w-full border-collapse;
+    background-color: #1a1c2e;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .entity-table thead {
+    background-color: #2d3045;
+  }
+
+  .entity-table-th {
+    @apply px-4 py-3 text-left text-sm font-semibold;
+    color: #a1a5b7;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid #323248;
+  }
+
+  .entity-table-row {
+    border-bottom: 1px solid #2d3045;
+    transition: background-color 0.2s;
+  }
+
+  .entity-table-row:hover {
+    background-color: #232538;
+  }
+
+  .entity-table-td {
+    @apply px-4 py-3 text-sm;
+    color: #ffffff;
+    border-bottom: 1px solid #2d3045;
+  }
+
+  .entity-table-name-cell {
+    @apply flex items-center gap-3;
+  }
+
+  .entity-table-avatar-small {
+    @apply w-8 h-8 rounded-full flex items-center justify-center;
+    background: #b84e9d;
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 0.75rem;
+    flex-shrink: 0;
+  }
+
+  .entity-table-name {
+    @apply font-semibold;
+    color: #ffffff;
+  }
+
+  /* ============================================
+     Entity Cards View - Vista de Tarjetas
+     ============================================ */
+  .entity-cards-grid {
+    @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6;
+  }
+
+  /* ============================================
      ClientsPage - Clases Semánticas
      ============================================ */
 
   /* Grid de estadísticas de clientes */
   .clients-stats-grid {
-    @apply mt-8 grid grid-cols-1 md:grid-cols-2 gap-6;
+    @apply mt-8 grid grid-cols-1 md:grid-cols-2 gap-8;
   }
 
   /* Contenedor del header de cada estadística */
@@ -3285,6 +3626,15 @@
 
   .dark .stat-value {
     color: #fafafa;
+  }
+
+  /* Valor monetario destacado (rosa corporativo cuando > 0) */
+  .stat-value-money-highlight {
+    color: #B84E9D;
+  }
+
+  .dark .stat-value-money-highlight {
+    color: #fce7f3;
   }
 
   /* Contenedor base del icono de estadística */
@@ -3468,7 +3818,7 @@
 
   /* Contenedor de paginación */
   .pagination-container {
-    @apply mt-8 flex items-center justify-between border-t border-[#e5e5e5] dark:border-[#2A3B5A] pt-6;
+    @apply w-full flex items-center justify-between border-t border-[#e5e5e5] dark:border-[#2A3B5A] pt-6 pb-4 bg-white dark:bg-[#131B29] px-4 mt-0 flex-shrink-0;
   }
 
   .pagination-info {
@@ -3487,8 +3837,88 @@
     @apply pagination-button bg-[#B84E9D] text-white border-[#B84E9D] hover:bg-[#9C3C86];
   }
 
+  .pagination-number-button {
+    @apply w-8 h-8 rounded-full border border-[#e5e5e5] dark:border-[#2A3B5A] bg-white dark:bg-[#1B273B] text-sm font-medium text-[#525252] dark:text-[#a3a3a3] hover:bg-[#f5f5f5] dark:hover:bg-[#2A3B5A] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center;
+  }
+
+  .pagination-number-button-active {
+    @apply pagination-number-button bg-[#B84E9D] text-white border-[#B84E9D] hover:bg-[#9C3C86];
+  }
+
+  /* Botones Hero de Acción para Dashboard de Clientes */
+  .client-hero-actions-grid {
+    @apply grid grid-cols-1 md:grid-cols-2 gap-8 mt-8;
+  }
+
+  .client-hero-action-card {
+    @apply studio-card p-6 rounded-2xl cursor-pointer hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col items-center justify-center text-center gap-4;
+    @apply bg-gradient-to-br from-[#B84E9D]/10 to-purple-600/10 border-2 border-[#B84E9D]/20 dark:border-[#B84E9D]/30;
+  }
+
+  .client-hero-action-icon {
+    @apply w-16 h-16 rounded-2xl flex items-center justify-center text-3xl;
+    background-color: #B84E9D;
+    color: white;
+  }
+
+  .client-hero-action-title {
+    @apply text-xl font-bold font-poppins;
+    color: #171717;
+  }
+
+  .dark .client-hero-action-title {
+    color: #fafafa;
+  }
+
+  .client-hero-action-description {
+    @apply text-sm;
+    color: #525252;
+  }
+
+  .dark .client-hero-action-description {
+    color: #a3a3a3;
+  }
+
+  /* Variante rosa del contenedor de icono de estadística */
+  .stat-icon-container-pink {
+    @apply stat-icon-container;
+    background-color: #fce7f3;
+  }
+
+  .dark .stat-icon-container-pink {
+    background-color: rgba(184, 78, 157, 0.2);
+  }
+
+  .stat-icon-pink {
+    @apply material-symbols-outlined;
+    color: #B84E9D;
+  }
+
+  /* Variante naranja del contenedor de icono de estadística */
+  .stat-icon-container-orange {
+    @apply stat-icon-container;
+    background-color: #fff3e0;
+  }
+
+  .dark .stat-icon-container-orange {
+    background-color: rgba(251, 146, 60, 0.2);
+  }
+
+  .stat-icon-orange {
+    @apply material-symbols-outlined;
+    color: #f97316;
+  }
+
+  .pagination-ellipsis {
+    @apply w-8 h-8 flex items-center justify-center text-sm text-[#525252] dark:text-[#a3a3a3] font-medium;
+  }
+
   .pagination-button-icon {
     @apply material-symbols-outlined text-lg;
+  }
+
+  .pagination-select {
+    @apply h-8 px-3 rounded-lg border border-[#e5e5e5] dark:border-[#2A3B5A] bg-white dark:bg-[#1B273B] text-sm font-medium text-[#525252] dark:text-[#a3a3a3] hover:bg-[#f5f5f5] dark:hover:bg-[#2A3B5A] focus:outline-none focus:ring-2 focus:ring-[#B84E9D] focus:border-[#B84E9D] transition-colors cursor-pointer;
   }
 
   /* Barra de herramientas superior */

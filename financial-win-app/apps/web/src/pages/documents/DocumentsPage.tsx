@@ -5,7 +5,7 @@ import { CategoryTabs, type Category, SubCategoryTabs } from '../../components/u
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useFinancial } from '../../contexts/FinancialContext';
 import { useGeminiExtraction } from '../../hooks/useGeminiExtraction';
-import { PageHeader, type PageHeaderAction } from '../../components/layout';
+import { PageHeader } from '../../components/layout';
 import type { ExtractedData, DocumentType } from '../../types';
 
 // Estructura de datos para las categorías de documentos
@@ -45,6 +45,7 @@ export const DocumentsPage: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [extractionError, setExtractionError] = useState<string | null>(null);
+  const [recordType, setRecordType] = useState<'expense' | 'income'>('expense');
   const fileUrlRef = useRef<string | null>(null);
   
   // Estados de navegación por pestañas
@@ -243,12 +244,51 @@ export const DocumentsPage: React.FC = () => {
     setSuccessMessage(null);
 
     try {
+      // Preparar datos según el tipo de registro
+      let dataToSave: ExtractedData = formData;
+
+      // Si es un ingreso, mapear supplier como cliente
+      if (recordType === 'income' && formData.supplier) {
+        dataToSave = {
+          ...formData,
+          // Para ingresos, el supplier se trata como el nombre del cliente
+          // Mantenemos supplier en los datos pero conceptualmente es el cliente
+        };
+      }
+
+      // Convertir el archivo a Base64 o mantener la URL local
+      let fileUrl: string | undefined;
+      if (fileUrlRef.current) {
+        // Si ya tenemos una URL local (object URL), convertirla a Base64 para persistencia
+        try {
+          const response = await fetch(fileUrlRef.current);
+          const blob = await response.blob();
+          const reader = new FileReader();
+          fileUrl = await new Promise<string>((resolve, reject) => {
+            reader.onloadend = () => {
+              if (typeof reader.result === 'string') {
+                resolve(reader.result);
+              } else {
+                reject(new Error('Error al convertir archivo a Base64'));
+              }
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+        } catch (error) {
+          console.error('Error al convertir archivo a Base64:', error);
+          // Si falla, usar la URL local como fallback
+          fileUrl = fileUrlRef.current;
+        }
+      }
+
       // Guardar en el contexto financiero
       addRecord({
-        type: 'expense',
-        data: formData,
+        type: recordType,
+        data: dataToSave,
         documentType,
         fileName: currentFile.name,
+        fileUrl: fileUrl,
       });
 
       // Mostrar mensaje de éxito
@@ -260,6 +300,7 @@ export const DocumentsPage: React.FC = () => {
       setSelectedFiles([]);
       setCurrentFileIndex(0);
       setExtractionError(null);
+      setRecordType('expense'); // Resetear a 'expense' para el siguiente documento
 
       // Limpiar URL del objeto
       if (fileUrlRef.current) {
@@ -281,31 +322,6 @@ export const DocumentsPage: React.FC = () => {
     }
   };
 
-  const handleSubirDocumento = () => {
-    if (selectedFiles.length > 0 || formData) {
-      reset();
-      setFormData(null);
-      setSelectedFiles([]);
-      setCurrentFileIndex(0);
-      setExtractionError(null);
-      
-      // Limpiar URL del objeto
-      if (fileUrlRef.current) {
-        URL.revokeObjectURL(fileUrlRef.current);
-        fileUrlRef.current = null;
-      }
-    }
-  };
-
-  const headerActions: PageHeaderAction[] = [
-    {
-      icon: 'upload_file',
-      label: 'Subir Documento',
-      onClick: handleSubirDocumento,
-      variant: 'primary',
-    },
-  ];
-
   // Determinar si debemos mostrar la vista de extracción (Split View)
   // Se muestra cuando hay archivos seleccionados
   const showExtractionView = selectedFiles.length > 0;
@@ -314,7 +330,6 @@ export const DocumentsPage: React.FC = () => {
     <div className="layout-page-container">
       <PageHeader
         title="Documentación"
-        actions={headerActions}
       />
       <div className="studio-container">
         <div className="studio-card">
@@ -390,14 +405,40 @@ export const DocumentsPage: React.FC = () => {
                       </p>
                     </div>
                   ) : formData ? (
-                    <DocumentForm
-                      data={formData}
-                      onChange={handleFieldChange}
-                      type={documentType}
-                      onSave={handleSave}
-                      isSaving={isSaving}
-                      isFormValid={isFormValid}
-                    />
+                    <>
+                      {/* Selector de tipo de registro */}
+                      <div className="record-type-selector">
+                        <button
+                          type="button"
+                          className={`record-type-button ${recordType === 'expense' ? 'record-type-button-active' : ''}`}
+                          onClick={() => setRecordType('expense')}
+                        >
+                          <span className="material-symbols-outlined record-type-button-icon">
+                            shopping_cart
+                          </span>
+                          Gasto (Compra)
+                        </button>
+                        <button
+                          type="button"
+                          className={`record-type-button ${recordType === 'income' ? 'record-type-button-active' : ''}`}
+                          onClick={() => setRecordType('income')}
+                        >
+                          <span className="material-symbols-outlined record-type-button-icon">
+                            payments
+                          </span>
+                          Ingreso (Venta)
+                        </button>
+                      </div>
+
+                      <DocumentForm
+                        data={formData}
+                        onChange={handleFieldChange}
+                        type={documentType}
+                        onSave={handleSave}
+                        isSaving={isSaving}
+                        isFormValid={isFormValid}
+                      />
+                    </>
                   ) : null}
                 </div>
               </div>

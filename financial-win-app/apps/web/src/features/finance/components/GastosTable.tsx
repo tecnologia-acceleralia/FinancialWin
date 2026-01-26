@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { useFinancial, type PaymentStatus, type ErpStatus } from '../../../contexts/FinancialContext';
 import type { FilterValues } from './FilterPanel';
 import { PaymentStatusSelect } from '../../../components/common/PaymentStatusSelect';
@@ -6,6 +6,8 @@ import { findSupplierByName } from '../../../utils/supplierMatching';
 import { a3Service, type A3InvoicePayload, type SupplierA3Data } from '../../../services/a3Service';
 import { LinkSupplierModal } from '../../../components/common/LinkSupplierModal';
 import { A3InspectionModal } from '../../../components/common/A3InspectionModal';
+import { DocumentModal } from '../../../components/common/DocumentModal';
+import { DataTablePagination } from '../../../components/common/DataTablePagination';
 import { useToast } from '../../../contexts/ToastContext';
 
 interface Gasto {
@@ -165,12 +167,16 @@ const convertRecordToGasto = (record: ReturnType<typeof useFinancial>['expenses'
 };
 
 export const GastosTable: React.FC<GastosTableProps> = ({ searchTerm = '', filters }) => {
-  const { expenses, updateRecord } = useFinancial();
+  const { expenses, updateRecord, deleteRecord } = useFinancial();
   const { showToast } = useToast();
   const [linkingInvoiceId, setLinkingInvoiceId] = useState<string | null>(null);
   const [syncingInvoiceId, setSyncingInvoiceId] = useState<string | null>(null);
   const [inspectingInvoiceId, setInspectingInvoiceId] = useState<string | null>(null);
   const [inspectionPayload, setInspectionPayload] = useState<A3InvoicePayload | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [viewingDocumentId, setViewingDocumentId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   /**
    * Maneja el cambio de estado de pago
@@ -178,6 +184,48 @@ export const GastosTable: React.FC<GastosTableProps> = ({ searchTerm = '', filte
    */
   const handlePaymentStatusChange = (recordId: string, newStatus: PaymentStatus) => {
     updateRecord(recordId, { paymentStatus: newStatus });
+  };
+
+  /**
+   * Maneja la eliminación de un registro
+   * Pide confirmación antes de eliminar
+   */
+  const handleDelete = (recordId: string, proveedor: string) => {
+    if (window.confirm(`¿Estás seguro de que deseas eliminar el registro de ${proveedor}?`)) {
+      deleteRecord(recordId);
+      showToast('Registro eliminado correctamente', 'success');
+    }
+  };
+
+  /**
+   * Maneja la selección/deselección de una fila
+   */
+  const handleToggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  /**
+   * Maneja la eliminación masiva de registros seleccionados
+   */
+  const handleBulkDelete = () => {
+    const count = selectedIds.size;
+    if (count === 0) return;
+
+    if (window.confirm(`¿Estás seguro de que quieres eliminar los ${count} registros seleccionados?`)) {
+      selectedIds.forEach((id) => {
+        deleteRecord(id);
+      });
+      setSelectedIds(new Set());
+      showToast(`${count} registro${count > 1 ? 's' : ''} eliminado${count > 1 ? 's' : ''} correctamente`, 'success');
+    }
   };
 
   /**
@@ -402,6 +450,56 @@ export const GastosTable: React.FC<GastosTableProps> = ({ searchTerm = '', filte
     return resultado;
   }, [gastos, searchTerm, filters]);
 
+  // Resetear a página 1 cuando cambian los filtros o búsqueda
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filters]);
+
+  // Calcular datos paginados
+  const totalPages = Math.ceil(gastosFiltrados.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const gastosPaginados = useMemo(() => {
+    return gastosFiltrados.slice(startIndex, endIndex);
+  }, [gastosFiltrados, startIndex, endIndex]);
+
+  // Ajustar página actual si está fuera de rango
+  React.useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(1);
+    }
+  }, [currentPage, totalPages]);
+
+  // Handlers de paginación
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handleItemsPerPageChange = (newItemsPerPage: number) => {
+    setItemsPerPage(newItemsPerPage);
+    setCurrentPage(1); // Resetear a página 1 al cambiar items por página
+  };
+
+  // Limpiar selección cuando cambian los filtros (eliminar IDs que ya no están visibles)
+  React.useEffect(() => {
+    const visibleIds = new Set(gastosFiltrados.map((g) => g.id));
+    setSelectedIds((prev) => {
+      const filtered = new Set([...prev].filter((id) => visibleIds.has(id)));
+      return filtered.size !== prev.size ? filtered : prev;
+    });
+  }, [gastosFiltrados]);
+
+  /**
+   * Maneja la selección/deselección de todas las filas
+   */
+  const handleToggleSelectAll = useCallback(() => {
+    if (selectedIds.size === gastosFiltrados.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(gastosFiltrados.map((g) => g.id)));
+    }
+  }, [selectedIds.size, gastosFiltrados]);
+
   const getEstadoClass = (estado: Gasto['estado']) => {
     switch (estado) {
       case 'Pagado':
@@ -508,10 +606,34 @@ export const GastosTable: React.FC<GastosTableProps> = ({ searchTerm = '', filte
   };
 
   return (
-    <div className="finance-table-wrapper">
-      <table className="finance-table">
+    <div className="flex flex-col">
+      {selectedIds.size > 0 && (
+        <div className="bulk-actions-bar">
+          <span className="bulk-actions-text">
+            {selectedIds.size} registro{selectedIds.size > 1 ? 's' : ''} seleccionado{selectedIds.size > 1 ? 's' : ''}
+          </span>
+          <button
+            className="btn-delete-bulk"
+            onClick={handleBulkDelete}
+          >
+            <span className="material-symbols-outlined">delete</span>
+            <span>Eliminar seleccionados</span>
+          </button>
+        </div>
+      )}
+      <div className="finance-table-wrapper">
+        <table className="finance-table">
         <thead>
           <tr>
+            <th className="table-header table-col-compact">
+              <input
+                type="checkbox"
+                className="table-checkbox"
+                checked={gastosFiltrados.length > 0 && selectedIds.size === gastosFiltrados.length}
+                onChange={handleToggleSelectAll}
+                aria-label="Seleccionar todos"
+              />
+            </th>
             <th className="table-header table-col-status">Estado</th>
             <th className="table-header table-col-text">Proveedor</th>
             <th className="table-header table-col-medium">Departamento</th>
@@ -525,12 +647,13 @@ export const GastosTable: React.FC<GastosTableProps> = ({ searchTerm = '', filte
             <th className="table-header table-col-compact">IVA</th>
             <th className="table-header table-col-small">Total Banco</th>
             <th className="table-header table-col-medium">Sincronización A3</th>
+            <th className="table-header table-col-compact">Acciones</th>
           </tr>
         </thead>
         <tbody>
           {gastosFiltrados.length === 0 ? (
             <tr>
-              <td colSpan={13} className="table-empty-state">
+              <td colSpan={15} className="table-empty-state">
                 <div className="contactos-empty-state">
                   <span className="material-symbols-outlined contactos-empty-icon">
                     search_off
@@ -542,8 +665,17 @@ export const GastosTable: React.FC<GastosTableProps> = ({ searchTerm = '', filte
               </td>
             </tr>
           ) : (
-            gastosFiltrados.map((gasto) => (
+            gastosPaginados.map((gasto) => (
               <tr key={gasto.id} className="table-row">
+                <td className="table-col-compact">
+                  <input
+                    type="checkbox"
+                    className="table-checkbox"
+                    checked={selectedIds.has(gasto.id)}
+                    onChange={() => handleToggleSelect(gasto.id)}
+                    aria-label={`Seleccionar ${gasto.proveedor}`}
+                  />
+                </td>
                 <td className="table-col-status">
                   <PaymentStatusSelect
                     value={gasto.estado === 'Pagado' ? 'Pagado' : 'Pendiente'}
@@ -557,20 +689,7 @@ export const GastosTable: React.FC<GastosTableProps> = ({ searchTerm = '', filte
                   />
                 </td>
                 <td className="table-col-text" title={gasto.proveedor}>
-                  <button
-                    className="supplier-name-link"
-                    onClick={() => {
-                      // TODO: Implementar modal de previsualización
-                      const record = expenses.find((e) => e.id === gasto.id);
-                      if (record) {
-                        console.log('Abrir previsualización:', record.id, record.fileUrl);
-                        // Aquí se abrirá el modal de previsualización
-                      }
-                    }}
-                  >
-                    <span className="supplier-name-text">{gasto.proveedor}</span>
-                    <span className="material-symbols-outlined supplier-name-icon">visibility</span>
-                  </button>
+                  <span className="supplier-name-text">{gasto.proveedor}</span>
                 </td>
                 <td className="table-col-medium">
                   <span className="dept-tag">{gasto.departamento}</span>
@@ -587,11 +706,47 @@ export const GastosTable: React.FC<GastosTableProps> = ({ searchTerm = '', filte
                 <td className="table-col-medium">
                   {renderEstadoA3(gasto)}
                 </td>
+                <td className="table-col-compact">
+                  <div className="table-actions">
+                    {(() => {
+                      const record = expenses.find((e) => e.id === gasto.id);
+                      // Soporta tanto fileUrl como fileData
+                      const hasDocument = record?.fileUrl || (record?.data as any)?.fileData;
+                      return hasDocument ? (
+                        <button
+                          className="btn-view"
+                          title="Ver documento"
+                          onClick={() => setViewingDocumentId(gasto.id)}
+                        >
+                          <span className="material-symbols-outlined">visibility</span>
+                        </button>
+                      ) : null;
+                    })()}
+                    <button
+                      className="btn-delete"
+                      title="Eliminar registro"
+                      onClick={() => handleDelete(gasto.id, gasto.proveedor)}
+                    >
+                      <span className="material-symbols-outlined">delete</span>
+                    </button>
+                  </div>
+                </td>
               </tr>
             ))
           )}
         </tbody>
       </table>
+      </div>
+
+      {/* Controles de paginación */}
+      <DataTablePagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalItems={gastosFiltrados.length}
+        itemsPerPage={itemsPerPage}
+        onPageChange={handlePageChange}
+        onItemsPerPageChange={handleItemsPerPageChange}
+      />
 
       {/* Modal de vinculación */}
       {linkingInvoiceId && (() => {
@@ -622,6 +777,40 @@ export const GastosTable: React.FC<GastosTableProps> = ({ searchTerm = '', filte
           payload={inspectionPayload}
         />
       )}
+
+      {/* Modal de visualización de documento */}
+      {viewingDocumentId && (() => {
+        const record = expenses.find((e) => e.id === viewingDocumentId);
+        if (!record) return null;
+        
+        // Soporta tanto fileUrl como fileData (si existe en el futuro)
+        const fileUrl = record.fileUrl || (record.data as any)?.fileData || null;
+        if (!fileUrl) return null;
+        
+        // Determinar mimeType desde fileName o fileUrl
+        const fileName = record.fileName || '';
+        let mimeType: string | undefined;
+        
+        if (fileName.toLowerCase().endsWith('.pdf')) {
+          mimeType = 'application/pdf';
+        } else if (fileName.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/)) {
+          mimeType = `image/${fileName.split('.').pop()?.toLowerCase()}`;
+        } else if (fileUrl.startsWith('data:')) {
+          // Si es data URL, extraer el mimeType
+          const match = fileUrl.match(/^data:([^;]+);/);
+          if (match) mimeType = match[1];
+        }
+        
+        return (
+          <DocumentModal
+            isOpen={!!viewingDocumentId}
+            onClose={() => setViewingDocumentId(null)}
+            fileUrl={fileUrl}
+            fileName={record.fileName}
+            mimeType={mimeType}
+          />
+        );
+      })()}
     </div>
   );
 };

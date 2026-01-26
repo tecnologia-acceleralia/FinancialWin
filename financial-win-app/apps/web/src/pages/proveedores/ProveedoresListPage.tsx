@@ -1,118 +1,31 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { EntityCard } from '@/features/entities/components/EntityCard';
-import { PageHeader, type PageHeaderAction } from '../../components/layout';
-import { CategoriaProveedor } from '../../features/entities/types';
+import { CategoriaProveedor, Proveedor } from '../../features/entities/types';
 import { EntityFilterPanel, type EntityFilterValues } from '@/features/entities/components/EntityFilterPanel';
-
-interface ProveedorListItem {
-  id: string;
-  nombre: string;
-  nif: string;
-  tipo: CategoriaProveedor;
-  estado: 'activo' | 'pendiente' | 'inactivo';
-  saldoBancario: number;
-  pagosPendientes: number;
-  email?: string;
-  phone?: string;
-}
+import { DataTablePagination } from '../../components/common/DataTablePagination';
+import { EmptyState } from '../../components/common/EmptyState';
+import {
+  ListViewHeader,
+  type ViewType,
+  EntityTableView,
+  EntityCardsView,
+  type EntityTableItem,
+  type EntityCardItem,
+} from '../../components/common';
+import { exportToExcel, type ExportColumn } from '../../utils/exportToExcel';
 
 const STORAGE_KEY = 'zaffra_suppliers';
-
-// Subcomponente: Paginación
-interface PaginationProps {
-  paginaActual: number;
-  totalPaginas: number;
-  inicio: number;
-  fin: number;
-  totalResultados: number;
-  onPaginaAnterior: () => void;
-  onPaginaSiguiente: () => void;
-  onIrAPagina: (pagina: number) => void;
-}
-
-const Pagination: React.FC<PaginationProps> = ({
-  paginaActual,
-  totalPaginas,
-  inicio,
-  fin,
-  totalResultados,
-  onPaginaAnterior,
-  onPaginaSiguiente,
-  onIrAPagina,
-}) => {
-  if (totalPaginas <= 1) return null;
-
-  return (
-    <div className="pagination-container">
-      <div className="pagination-info">
-        Mostrando {inicio + 1} a {Math.min(fin, totalResultados)} de {totalResultados} resultados
-      </div>
-      <div className="pagination-controls">
-        <button
-          type="button"
-          onClick={onPaginaAnterior}
-          disabled={paginaActual === 1}
-          className="pagination-button"
-          aria-label="Página anterior"
-        >
-          <span className="material-symbols-outlined pagination-button-icon">
-            chevron_left
-          </span>
-        </button>
-
-        {Array.from({ length: totalPaginas }, (_, i) => i + 1).map((pagina) => (
-          <button
-            key={pagina}
-            type="button"
-            onClick={() => onIrAPagina(pagina)}
-            className={
-              pagina === paginaActual
-                ? 'pagination-button-active'
-                : 'pagination-button'
-            }
-          >
-            {pagina}
-          </button>
-        ))}
-
-        <button
-          type="button"
-          onClick={onPaginaSiguiente}
-          disabled={paginaActual === totalPaginas}
-          className="pagination-button"
-          aria-label="Página siguiente"
-        >
-          <span className="material-symbols-outlined pagination-button-icon">
-            chevron_right
-          </span>
-        </button>
-      </div>
-    </div>
-  );
-};
-
-// Subcomponente: Estado vacío
-const EmptyState: React.FC = () => {
-  return (
-    <div className="flex flex-col items-center justify-center py-12 text-center">
-      <span className="material-symbols-outlined text-6xl text-gray-400 mb-4">
-        search_off
-      </span>
-      <p className="text-lg font-semibold text-gray-600 dark:text-gray-400 mb-2">
-        No se encontraron proveedores
-      </p>
-      <p className="text-sm text-gray-500 dark:text-gray-500">
-        Intenta ajustar los términos de búsqueda
-      </p>
-    </div>
-  );
-};
+const VIEW_TYPE_STORAGE_KEY = 'proveedores_view_type';
 
 export const ProveedoresListPage: React.FC = () => {
   const navigate = useNavigate();
-  const [paginaActual, setPaginaActual] = useState(1);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [busqueda, setBusqueda] = useState('');
+  const [viewType, setViewType] = useState<ViewType>(() => {
+    const stored = localStorage.getItem(VIEW_TYPE_STORAGE_KEY);
+    return (stored === 'table' || stored === 'cards' ? stored : 'cards') as ViewType;
+  });
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [filters, setFilters] = useState<EntityFilterValues>({
     status: [],
@@ -120,35 +33,44 @@ export const ProveedoresListPage: React.FC = () => {
     balanceRange: { min: null, max: null },
     paymentsRange: { min: null, max: null },
   });
-  const resultadosPorPagina = 8;
+
+  // Persistir el tipo de vista en localStorage
+  useEffect(() => {
+    localStorage.setItem(VIEW_TYPE_STORAGE_KEY, viewType);
+  }, [viewType]);
 
   // Cargar proveedores del localStorage
   const proveedores = useMemo(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (!stored) return [];
-      const data: any[] = JSON.parse(stored);
-      // Convertir datos del localStorage al formato esperado por la lista
-      return data.map((p) => ({
-        id: p.id || '',
-        nombre: p.nombreComercial || p.razonSocial || '',
-        nif: p.cif || '',
-        tipo: p.categoria || 'Proveedor Externo',
-        estado: p.is_active === false ? 'inactivo' : 'activo',
-        saldoBancario: 0, // Valor por defecto, se puede calcular después
-        pagosPendientes: 0, // Valor por defecto, se puede calcular después
-        email: p.ordersEmail,
-        phone: p.telefono,
-      })) as ProveedorListItem[];
+      const data: Proveedor[] = JSON.parse(stored);
+      return data.filter((p) => p.is_active !== false);
     } catch (error) {
       console.error('Error al cargar proveedores del localStorage:', error);
       return [];
     }
   }, []);
 
+  // Convertir proveedores al formato de lista
+  const proveedoresLista = useMemo(() => {
+    return proveedores.map((p): EntityTableItem & EntityCardItem => ({
+      id: p.id || '',
+      nombre: p.nombreComercial || p.razonSocial || '',
+      nif: p.cif || '',
+      tipo: p.categoria || 'Proveedor Externo',
+      estado: p.is_active === false ? 'inactivo' : 'activo',
+      saldoBancario: 0,
+      pagosPendientes: 0,
+      email: p.ordersEmail,
+      phone: p.telefono,
+      ciudad: p.ciudad,
+    }));
+  }, [proveedores]);
+
   // Filtrar proveedores por búsqueda y filtros avanzados
   const proveedoresFiltrados = useMemo(() => {
-    let resultado = proveedores;
+    let resultado = proveedoresLista;
 
     // Filtro por búsqueda de texto
     if (busqueda.trim()) {
@@ -170,48 +92,66 @@ export const ProveedoresListPage: React.FC = () => {
     // Filtro por tipos/categorías
     if (filters.types.length > 0) {
       resultado = resultado.filter((proveedor) =>
-        filters.types.includes(proveedor.tipo)
+        filters.types.includes(proveedor.tipo as CategoriaProveedor)
       );
     }
 
     // Filtro por rango de saldo bancario
     if (filters.balanceRange.min !== null) {
       resultado = resultado.filter(
-        (proveedor) => proveedor.saldoBancario >= filters.balanceRange.min!
+        (proveedor) => (proveedor.saldoBancario ?? 0) >= filters.balanceRange.min!
       );
     }
     if (filters.balanceRange.max !== null) {
       resultado = resultado.filter(
-        (proveedor) => proveedor.saldoBancario <= filters.balanceRange.max!
+        (proveedor) => (proveedor.saldoBancario ?? 0) <= filters.balanceRange.max!
       );
     }
 
     // Filtro por rango de pagos pendientes
     if (filters.paymentsRange.min !== null) {
       resultado = resultado.filter(
-        (proveedor) => proveedor.pagosPendientes >= filters.paymentsRange.min!
+        (proveedor) => (proveedor.pagosPendientes ?? 0) >= filters.paymentsRange.min!
       );
     }
     if (filters.paymentsRange.max !== null) {
       resultado = resultado.filter(
-        (proveedor) => proveedor.pagosPendientes <= filters.paymentsRange.max!
+        (proveedor) => (proveedor.pagosPendientes ?? 0) <= filters.paymentsRange.max!
       );
     }
 
     return resultado;
-  }, [busqueda, filters, proveedores]);
+  }, [busqueda, filters, proveedoresLista]);
 
-  const totalResultados = proveedoresFiltrados.length;
-  const totalPaginas = Math.ceil(totalResultados / resultadosPorPagina);
-
-  const inicio = (paginaActual - 1) * resultadosPorPagina;
-  const fin = inicio + resultadosPorPagina;
-  const proveedoresPaginados = proveedoresFiltrados.slice(inicio, fin);
+  // Calcular paginación
+  const totalPages = Math.ceil(proveedoresFiltrados.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const proveedoresPaginados = useMemo(() => {
+    return proveedoresFiltrados.slice(startIndex, endIndex);
+  }, [proveedoresFiltrados, startIndex, endIndex]);
 
   // Resetear página cuando cambia la búsqueda o filtros
-  React.useEffect(() => {
-    setPaginaActual(1);
+  useEffect(() => {
+    setCurrentPage(1);
   }, [busqueda, filters]);
+
+  // Ajustar página actual si está fuera de rango
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(1);
+    }
+  }, [currentPage, totalPages]);
+
+  // Handlers de paginación
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handleItemsPerPageChange = (newItemsPerPage: number) => {
+    setItemsPerPage(newItemsPerPage);
+    setCurrentPage(1);
+  };
 
   const handleVolver = () => {
     navigate('/proveedores');
@@ -229,78 +169,44 @@ export const ProveedoresListPage: React.FC = () => {
     setFilters(newFilters);
   };
 
-  const handleVista = () => {
-    // TODO: Implementar cambio de vista
-    console.log('Cambiar vista');
-  };
-
-  const handleDescarga = () => {
-    // TODO: Implementar descarga
-    console.log('Descargar lista');
-  };
-
-  const handleConfiguracion = () => {
-    // TODO: Implementar configuración
-    console.log('Configuración');
-  };
-
   const handleVerFicha = (proveedorId: string) => {
     navigate(`/proveedor/detalle/${proveedorId}`);
   };
 
-  const handlePaginaAnterior = () => {
-    if (paginaActual > 1) {
-      setPaginaActual(paginaActual - 1);
+  // Función de exportación a Excel
+  const handleDescarga = () => {
+    if (proveedoresFiltrados.length === 0) {
+      return;
     }
-  };
 
-  const handlePaginaSiguiente = () => {
-    if (paginaActual < totalPaginas) {
-      setPaginaActual(paginaActual + 1);
-    }
-  };
+    const year = new Date().getFullYear();
+    const filename = `Lista_Proveedores_${year}`;
 
-  const handleIrAPagina = (pagina: number) => {
-    setPaginaActual(pagina);
-  };
+    // Preparar datos para exportación
+    const dataToExport = proveedoresFiltrados.map((proveedor) => ({
+      nombre: proveedor.nombre,
+      nif: proveedor.nif,
+      email: proveedor.email || '',
+      phone: proveedor.phone || '',
+      ciudad: proveedor.ciudad || '',
+    }));
 
-  // Definir acciones para el PageHeader
-  const headerActions: PageHeaderAction[] = [
-    {
-      icon: 'filter_list',
-      label: 'Filtros',
-      onClick: handleFiltro,
-      variant: 'default',
-    },
-    {
-      icon: 'grid_view',
-      label: 'Cambiar vista',
-      onClick: handleVista,
-      variant: 'default',
-    },
-    {
-      icon: 'download',
-      label: 'Descargar',
-      onClick: handleDescarga,
-      variant: 'default',
-    },
-    {
-      icon: 'settings',
-      label: 'Configuración',
-      onClick: handleConfiguracion,
-      variant: 'default',
-    },
-    {
-      icon: 'add',
-      label: 'Nuevo proveedor',
-      onClick: handleNuevoProveedor,
-      variant: 'primary',
-    },
-  ];
+    type ExportData = typeof dataToExport[0];
+
+    const columns: ExportColumn<ExportData>[] = [
+      { key: 'nombre', label: 'Nombre/Razón Social' },
+      { key: 'nif', label: 'NIF' },
+      { key: 'email', label: 'Email' },
+      { key: 'phone', label: 'Teléfono' },
+      { key: 'ciudad', label: 'Ciudad' },
+    ];
+
+    exportToExcel(dataToExport, filename, columns);
+  };
 
   return (
-    <div className="clients-list-container">
-      <PageHeader
+    <div className="clients-list-container flex flex-col h-full">
+      <ListViewHeader
         title="Lista de Proveedores"
         showBackButton
         onBack={handleVolver}
@@ -308,44 +214,49 @@ export const ProveedoresListPage: React.FC = () => {
         searchValue={busqueda}
         onSearchChange={setBusqueda}
         searchPlaceholder="Buscar proveedor (Nombre, CIF)..."
-        actions={headerActions}
+        viewType={viewType}
+        onViewTypeChange={setViewType}
+        onFilterClick={handleFiltro}
+        onDownloadClick={handleDescarga}
+        onAddClick={handleNuevoProveedor}
       />
 
-      {proveedoresPaginados.length > 0 ? (
-        <>
-          <div className="clients-grid">
-            {proveedoresPaginados.map((proveedor) => (
-              <EntityCard
-                key={proveedor.id}
-                name={proveedor.nombre}
-                initials={obtenerIniciales(proveedor.nombre)}
-                nif={proveedor.nif}
-                type={formatearTipo(proveedor.tipo)}
-                status={proveedor.estado}
-                account={formatearMoneda(proveedor.saldoBancario)}
-                balance={formatearMoneda(proveedor.pagosPendientes)}
-                email={proveedor.email}
-                phone={proveedor.phone}
-                isProvider
-                onDetailClick={() => handleVerFicha(proveedor.id)}
-              />
-            ))}
-          </div>
+      <div className="flex flex-col flex-grow gap-8 py-6 min-h-0">
+        {proveedoresPaginados.length > 0 ? (
+          <>
+            <div className="flex-grow overflow-y-auto pb-4">
+              {viewType === 'table' ? (
+                <EntityTableView
+                  items={proveedoresPaginados}
+                  onItemClick={handleVerFicha}
+                  isProvider={true}
+                />
+              ) : (
+                <EntityCardsView
+                  items={proveedoresPaginados}
+                  onItemClick={handleVerFicha}
+                  isProvider={true}
+                />
+              )}
+            </div>
 
-          <Pagination
-            paginaActual={paginaActual}
-            totalPaginas={totalPaginas}
-            inicio={inicio}
-            fin={fin}
-            totalResultados={totalResultados}
-            onPaginaAnterior={handlePaginaAnterior}
-            onPaginaSiguiente={handlePaginaSiguiente}
-            onIrAPagina={handleIrAPagina}
+            <DataTablePagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={proveedoresFiltrados.length}
+              itemsPerPage={itemsPerPage}
+              onPageChange={handlePageChange}
+              onItemsPerPageChange={handleItemsPerPageChange}
+            />
+          </>
+        ) : (
+          <EmptyState
+            title="No se encontraron proveedores"
+            description="Intenta ajustar los términos de búsqueda"
+            icon="search_off"
           />
-        </>
-      ) : (
-        <EmptyState />
-      )}
+        )}
+      </div>
 
       <EntityFilterPanel
         isOpen={isFilterOpen}
@@ -361,34 +272,3 @@ export const ProveedoresListPage: React.FC = () => {
 };
 
 export default ProveedoresListPage;
-
-// ============================================
-// Funciones de formateo
-// ============================================
-
-const obtenerIniciales = (nombre: string): string => {
-  const palabras = nombre.split(' ');
-  if (palabras.length >= 2) {
-    return (palabras[0][0] + palabras[1][0]).toUpperCase();
-  }
-  return nombre.substring(0, 2).toUpperCase();
-};
-
-const formatearMoneda = (cantidad: number): string => {
-  return new Intl.NumberFormat('es-ES', {
-    style: 'currency',
-    currency: 'EUR',
-    minimumFractionDigits: 2,
-  }).format(cantidad);
-};
-
-const formatearTipo = (tipo: CategoriaProveedor): string => {
-  const tipoMap: Record<CategoriaProveedor, string> = {
-    'Proveedor Externo': 'Externo',
-    'Staff Interno': 'Staff',
-    'Licencias': 'Licencia',
-  };
-  return tipoMap[tipo] || tipo;
-};
-
-

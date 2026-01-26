@@ -1,42 +1,31 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { EntityCard } from '@/features/entities/components/EntityCard';
-import { PageHeader, type PageHeaderAction } from '../../components/layout';
+import { Cliente } from '../../features/entities/types';
 import { EntityFilterPanel, type EntityFilterValues } from '@/features/entities/components/EntityFilterPanel';
-
-interface ClienteListItem {
-  id: string;
-  nombre: string;
-  nif: string;
-  tipo: 'Nacional' | 'Extranjero';
-  estado: 'activo' | 'pendiente' | 'inactivo';
-  saldoBancario: number;
-  pagosPendientes: number;
-}
+import { DataTablePagination } from '../../components/common/DataTablePagination';
+import { EmptyState } from '../../components/common/EmptyState';
+import {
+  ListViewHeader,
+  type ViewType,
+  EntityTableView,
+  EntityCardsView,
+  type EntityTableItem,
+  type EntityCardItem,
+} from '../../components/common';
+import { exportToExcel, type ExportColumn } from '../../utils/exportToExcel';
 
 const STORAGE_KEY = 'zaffra_clients';
-
-const obtenerIniciales = (nombre: string): string => {
-  const palabras = nombre.split(' ');
-  if (palabras.length >= 2) {
-    return (palabras[0][0] + palabras[1][0]).toUpperCase();
-  }
-  return nombre.substring(0, 2).toUpperCase();
-};
-
-const formatearMoneda = (cantidad: number): string => {
-  return new Intl.NumberFormat('es-ES', {
-    style: 'currency',
-    currency: 'EUR',
-    minimumFractionDigits: 2,
-  }).format(cantidad);
-};
+const VIEW_TYPE_STORAGE_KEY = 'clientes_view_type';
 
 export const ListaClientesPage: React.FC = () => {
   const navigate = useNavigate();
-  const [paginaActual, setPaginaActual] = useState(1);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [busqueda, setBusqueda] = useState('');
-  const [vistaGrid, setVistaGrid] = useState(true);
+  const [viewType, setViewType] = useState<ViewType>(() => {
+    const stored = localStorage.getItem(VIEW_TYPE_STORAGE_KEY);
+    return (stored === 'table' || stored === 'cards' ? stored : 'cards') as ViewType;
+  });
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [filters, setFilters] = useState<EntityFilterValues>({
     status: [],
@@ -44,33 +33,44 @@ export const ListaClientesPage: React.FC = () => {
     balanceRange: { min: null, max: null },
     paymentsRange: { min: null, max: null },
   });
-  const resultadosPorPagina = 8;
+
+  // Persistir el tipo de vista en localStorage
+  useEffect(() => {
+    localStorage.setItem(VIEW_TYPE_STORAGE_KEY, viewType);
+  }, [viewType]);
 
   // Cargar clientes del localStorage
   const clientes = useMemo(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (!stored) return [];
-      const data: any[] = JSON.parse(stored);
-      // Convertir datos del localStorage al formato esperado por la lista
-      return data.map((c) => ({
-        id: c.id || '',
-        nombre: c.razonSocial || '',
-        nif: c.nif || '',
-        tipo: (c.pais && c.pais !== 'España') ? 'Extranjero' : 'Nacional',
-        estado: c.is_active === false ? 'inactivo' : 'activo',
-        saldoBancario: 0, // Valor por defecto, se puede calcular después
-        pagosPendientes: 0, // Valor por defecto, se puede calcular después
-      })) as ClienteListItem[];
+      const data: Cliente[] = JSON.parse(stored);
+      return data.filter((c) => c.is_active !== false);
     } catch (error) {
       console.error('Error al cargar clientes del localStorage:', error);
       return [];
     }
   }, []);
 
+  // Convertir clientes al formato de lista
+  const clientesLista = useMemo(() => {
+    return clientes.map((c): EntityTableItem & EntityCardItem => ({
+      id: c.id || '',
+      nombre: c.razonSocial || '',
+      nif: c.nif || '',
+      tipo: (c.pais && c.pais !== 'España') ? 'Extranjero' : 'Nacional',
+      estado: c.is_active === false ? 'inactivo' : 'activo',
+      saldoBancario: 0,
+      pagosPendientes: 0,
+      email: c.email,
+      phone: c.telefono,
+      ciudad: c.ciudad,
+    }));
+  }, [clientes]);
+
   // Filtrar clientes por búsqueda y filtros avanzados
   const clientesFiltrados = useMemo(() => {
-    let resultado = clientes;
+    let resultado = clientesLista;
 
     // Filtro por búsqueda de texto
     if (busqueda.trim()) {
@@ -99,41 +99,59 @@ export const ListaClientesPage: React.FC = () => {
     // Filtro por rango de saldo bancario
     if (filters.balanceRange.min !== null) {
       resultado = resultado.filter(
-        (cliente) => cliente.saldoBancario >= filters.balanceRange.min!
+        (cliente) => (cliente.saldoBancario ?? 0) >= filters.balanceRange.min!
       );
     }
     if (filters.balanceRange.max !== null) {
       resultado = resultado.filter(
-        (cliente) => cliente.saldoBancario <= filters.balanceRange.max!
+        (cliente) => (cliente.saldoBancario ?? 0) <= filters.balanceRange.max!
       );
     }
 
     // Filtro por rango de pagos pendientes
     if (filters.paymentsRange.min !== null) {
       resultado = resultado.filter(
-        (cliente) => cliente.pagosPendientes >= filters.paymentsRange.min!
+        (cliente) => (cliente.pagosPendientes ?? 0) >= filters.paymentsRange.min!
       );
     }
     if (filters.paymentsRange.max !== null) {
       resultado = resultado.filter(
-        (cliente) => cliente.pagosPendientes <= filters.paymentsRange.max!
+        (cliente) => (cliente.pagosPendientes ?? 0) <= filters.paymentsRange.max!
       );
     }
 
     return resultado;
-  }, [busqueda, filters, clientes]);
+  }, [busqueda, filters, clientesLista]);
 
-  const totalResultados = clientesFiltrados.length;
-  const totalPaginas = Math.ceil(totalResultados / resultadosPorPagina);
-  
-  const inicio = (paginaActual - 1) * resultadosPorPagina;
-  const fin = inicio + resultadosPorPagina;
-  const clientesPaginados = clientesFiltrados.slice(inicio, fin);
+  // Calcular paginación
+  const totalPages = Math.ceil(clientesFiltrados.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const clientesPaginados = useMemo(() => {
+    return clientesFiltrados.slice(startIndex, endIndex);
+  }, [clientesFiltrados, startIndex, endIndex]);
 
   // Resetear página cuando cambia la búsqueda o filtros
-  React.useEffect(() => {
-    setPaginaActual(1);
+  useEffect(() => {
+    setCurrentPage(1);
   }, [busqueda, filters]);
+
+  // Ajustar página actual si está fuera de rango
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(1);
+    }
+  }, [currentPage, totalPages]);
+
+  // Handlers de paginación
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handleItemsPerPageChange = (newItemsPerPage: number) => {
+    setItemsPerPage(newItemsPerPage);
+    setCurrentPage(1);
+  };
 
   const handleNuevoCliente = () => {
     navigate('/clientes/nuevo');
@@ -147,148 +165,92 @@ export const ListaClientesPage: React.FC = () => {
     setFilters(newFilters);
   };
 
-  const handleVista = () => {
-    setVistaGrid(!vistaGrid);
-  };
-
-  const handleDescarga = () => {
-    // TODO: Implementar descarga
-    console.log('Descargar lista');
-  };
-
-  const handleConfiguracion = () => {
-    // TODO: Implementar configuración
-    console.log('Configuración');
-  };
-
   const handleVerFicha = (clienteId: string) => {
     navigate(`/cliente/detalle/${clienteId}`);
   };
 
-  const handlePaginaAnterior = () => {
-    if (paginaActual > 1) {
-      setPaginaActual(paginaActual - 1);
+  // Función de exportación a Excel
+  const handleDescarga = () => {
+    if (clientesFiltrados.length === 0) {
+      return;
     }
-  };
 
-  const handlePaginaSiguiente = () => {
-    if (paginaActual < totalPaginas) {
-      setPaginaActual(paginaActual + 1);
-    }
-  };
+    const year = new Date().getFullYear();
+    const filename = `Lista_Clientes_${year}`;
 
-  const handleIrAPagina = (pagina: number) => {
-    setPaginaActual(pagina);
-  };
+    // Preparar datos para exportación
+    const dataToExport = clientesFiltrados.map((cliente) => ({
+      nombre: cliente.nombre,
+      nif: cliente.nif,
+      email: cliente.email || '',
+      phone: cliente.phone || '',
+      ciudad: cliente.ciudad || '',
+    }));
 
-  // Definir acciones para el PageHeader
-  const headerActions: PageHeaderAction[] = [
-    {
-      icon: 'filter_list',
-      label: 'Filtros',
-      onClick: handleFiltro,
-      variant: 'default',
-    },
-    {
-      icon: vistaGrid ? 'format_list_bulleted' : 'grid_view',
-      label: vistaGrid ? 'Vista lista' : 'Vista grid',
-      onClick: handleVista,
-      variant: 'default',
-    },
-    {
-      icon: 'download',
-      label: 'Descargar',
-      onClick: handleDescarga,
-      variant: 'default',
-    },
-    {
-      icon: 'settings',
-      label: 'Configuración',
-      onClick: handleConfiguracion,
-      variant: 'default',
-    },
-    {
-      icon: 'add',
-      label: 'Nuevo cliente',
-      onClick: handleNuevoCliente,
-      variant: 'primary',
-    },
-  ];
+    type ExportData = typeof dataToExport[0];
+
+    const columns: ExportColumn<ExportData>[] = [
+      { key: 'nombre', label: 'Nombre/Razón Social' },
+      { key: 'nif', label: 'NIF' },
+      { key: 'email', label: 'Email' },
+      { key: 'phone', label: 'Teléfono' },
+      { key: 'ciudad', label: 'Ciudad' },
+    ];
+
+    exportToExcel(dataToExport, filename, columns);
+  };
 
   return (
-    <div className="clients-list-container">
-      <PageHeader
+    <div className="clients-list-container flex flex-col h-full">
+      <ListViewHeader
         title="Lista de Clientes"
         showBackButton={false}
         showSearch={true}
         searchValue={busqueda}
         onSearchChange={setBusqueda}
         searchPlaceholder="Buscar cliente (Nombre, CIF)..."
-        actions={headerActions}
+        viewType={viewType}
+        onViewTypeChange={setViewType}
+        onFilterClick={handleFiltro}
+        onDownloadClick={handleDescarga}
+        onAddClick={handleNuevoCliente}
       />
 
-      {/* Grid de clientes */}
-      <div className="clients-grid">
-        {clientesPaginados.map((cliente) => (
-          <EntityCard
-            key={cliente.id}
-            name={cliente.nombre}
-            initials={obtenerIniciales(cliente.nombre)}
-            nif={cliente.nif}
-            type={cliente.tipo}
-            status={cliente.estado}
-            account={formatearMoneda(cliente.saldoBancario)}
-            balance={formatearMoneda(cliente.pagosPendientes)}
-            onDetailClick={() => handleVerFicha(cliente.id)}
+      <div className="flex flex-col flex-grow gap-8 py-6 min-h-0">
+        {clientesPaginados.length > 0 ? (
+          <>
+            <div className="flex-grow overflow-y-auto pb-4">
+              {viewType === 'table' ? (
+                <EntityTableView
+                  items={clientesPaginados}
+                  onItemClick={handleVerFicha}
+                  isProvider={false}
+                />
+              ) : (
+                <EntityCardsView
+                  items={clientesPaginados}
+                  onItemClick={handleVerFicha}
+                  isProvider={false}
+                />
+              )}
+            </div>
+
+            <DataTablePagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={clientesFiltrados.length}
+              itemsPerPage={itemsPerPage}
+              onPageChange={handlePageChange}
+              onItemsPerPageChange={handleItemsPerPageChange}
+            />
+          </>
+        ) : (
+          <EmptyState
+            title="No se encontraron clientes"
+            description="Intenta ajustar los términos de búsqueda"
+            icon="search_off"
           />
-        ))}
-      </div>
-
-      {/* Paginación */}
-      <div className="pagination-container">
-        <div className="pagination-info">
-          Mostrando {inicio + 1} a {Math.min(fin, totalResultados)} de {totalResultados} resultados
-        </div>
-        <div className="pagination-controls">
-          <button
-            type="button"
-            onClick={handlePaginaAnterior}
-            disabled={paginaActual === 1}
-            className="pagination-button"
-            aria-label="Página anterior"
-          >
-            <span className="material-symbols-outlined pagination-button-icon">
-              chevron_left
-            </span>
-          </button>
-
-          {Array.from({ length: totalPaginas }, (_, i) => i + 1).map((pagina) => (
-            <button
-              key={pagina}
-              type="button"
-              onClick={() => handleIrAPagina(pagina)}
-              className={
-                pagina === paginaActual
-                  ? 'pagination-button-active'
-                  : 'pagination-button'
-              }
-            >
-              {pagina}
-            </button>
-          ))}
-
-          <button
-            type="button"
-            onClick={handlePaginaSiguiente}
-            disabled={paginaActual === totalPaginas}
-            className="pagination-button"
-            aria-label="Página siguiente"
-          >
-            <span className="material-symbols-outlined pagination-button-icon">
-              chevron_right
-            </span>
-          </button>
-        </div>
+        )}
       </div>
 
       <EntityFilterPanel

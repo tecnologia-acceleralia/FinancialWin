@@ -1,6 +1,7 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useFinancial, type FinancialRecord, type ErpStatus } from '../../../contexts/FinancialContext';
 import type { FilterValues } from './FilterPanel';
+import { DataTablePagination } from '../../../components/common/DataTablePagination';
 
 interface RegistrosTableProps {
   searchTerm?: string;
@@ -19,6 +20,8 @@ const isProcessedByGemini = (record: FinancialRecord): boolean => {
 
 export const RegistrosTable: React.FC<RegistrosTableProps> = ({ searchTerm = '', filters }) => {
   const { records } = useFinancial();
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   /**
    * Obtiene la clase CSS para el estado ERP
@@ -289,9 +292,40 @@ export const RegistrosTable: React.FC<RegistrosTableProps> = ({ searchTerm = '',
     return resultado;
   }, [registrosFormateados, searchTerm, filters]);
 
+  // Resetear a página 1 cuando cambian los filtros o búsqueda
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filters]);
+
+  // Calcular datos paginados
+  const totalPages = Math.ceil(registrosFiltrados.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const registrosPaginados = useMemo(() => {
+    return registrosFiltrados.slice(startIndex, endIndex);
+  }, [registrosFiltrados, startIndex, endIndex]);
+
+  // Ajustar página actual si está fuera de rango
+  React.useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(1);
+    }
+  }, [currentPage, totalPages]);
+
+  // Handlers de paginación
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handleItemsPerPageChange = (newItemsPerPage: number) => {
+    setItemsPerPage(newItemsPerPage);
+    setCurrentPage(1); // Resetear a página 1 al cambiar items por página
+  };
+
   return (
-    <div className="table-wrapper">
-      <table className="table-main">
+    <div className="flex flex-col">
+      <div className="table-wrapper">
+        <table className="table-main">
         <thead>
           <tr>
             <th className="table-header table-col-small">Estado Validación</th>
@@ -320,7 +354,7 @@ export const RegistrosTable: React.FC<RegistrosTableProps> = ({ searchTerm = '',
               </td>
             </tr>
           ) : (
-            registrosFiltrados.map((registro) => {
+            registrosPaginados.map((registro) => {
               const isSyncing = registro.erpStatus === 'syncing';
               
               return (
@@ -361,6 +395,17 @@ export const RegistrosTable: React.FC<RegistrosTableProps> = ({ searchTerm = '',
           )}
         </tbody>
       </table>
+      </div>
+
+      {/* Controles de paginación */}
+      <DataTablePagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalItems={registrosFiltrados.length}
+        itemsPerPage={itemsPerPage}
+        onPageChange={handlePageChange}
+        onItemsPerPageChange={handleItemsPerPageChange}
+      />
     </div>
   );
 };

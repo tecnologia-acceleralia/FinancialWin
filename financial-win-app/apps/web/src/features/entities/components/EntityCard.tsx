@@ -33,8 +33,8 @@ export const EntityCard: React.FC<EntityCardProps> = ({
   return (
     <div className="entity-card">
       <div className="entity-card-header">
-        {/* Avatar a la izquierda */}
-        <div className="entity-avatar">{initials}</div>
+        {/* Avatar a la izquierda con círculo rosa */}
+        <div className="entity-avatar entity-avatar-pink">{initials}</div>
         
         {/* Contenedor con Badge arriba, Nombre y NIF abajo */}
         <div className="entity-info-container">

@@ -1,281 +1,190 @@
-import React from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { PageHeader, type PageHeaderAction } from '../../components/layout';
+import React, { useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { PageHeader } from '../../components/layout';
+import { Proveedor } from '../../features/entities/types';
+import { formatearMoneda } from '../../utils/formatUtils';
 
-interface StatCard {
-  title: string;
-  value: string;
-  subtitle: string;
-  icon: string;
-  trend?: {
-    value: string;
-    isPositive: boolean;
-  };
-}
-
-interface Alert {
-  id: string;
-  title: string;
-  description: string;
-  type: 'warning' | 'error' | 'info';
-}
-
-interface Activity {
-  id: string;
-  type: 'register' | 'invoice' | 'contract';
-  title: string;
-  description: string;
-  date: string;
-  icon: string;
-}
-
-const STATS: StatCard[] = [
-  {
-    title: 'Proveedores Activos',
-    value: '42',
-    subtitle: 'Total registrados',
-    icon: 'groups',
-    trend: {
-      value: '+2 este mes',
-      isPositive: true,
-    },
-  },
-  {
-    title: 'Nuevos (Mes)',
-    value: '3',
-    subtitle: 'Verificación pendiente',
-    icon: 'person_add',
-  },
-  {
-    title: 'Facturas Ptes',
-    value: '15',
-    subtitle: '€12.4k total',
-    icon: 'receipt_long',
-  },
-  {
-    title: 'Incidencias',
-    value: '1',
-    subtitle: 'En resolución',
-    icon: 'warning',
-  },
-];
-
-const ALERTS: Alert[] = [
-  {
-    id: '1',
-    title: 'Certificado Tributario Caducado',
-    description: 'El certificado de 3 proveedores ha caducado. Renovación requerida.',
-    type: 'warning',
-  },
-  {
-    id: '2',
-    title: 'Contrato próximo a vencer',
-    description: '2 contratos vencen en los próximos 30 días.',
-    type: 'info',
-  },
-];
-
-const ACTIVITIES: Activity[] = [
-  {
-    id: '1',
-    type: 'register',
-    title: 'Nuevo proveedor registrado',
-    description: 'Proveedor 1 S.L. ha sido agregado al sistema',
-    date: 'Hace 2 horas',
-    icon: 'person_add',
-  },
-  {
-    id: '2',
-    type: 'invoice',
-    title: 'Factura aprobada',
-    description: 'Factura #1234 de Proveedor 2 García aprobada',
-    date: 'Hace 5 horas',
-    icon: 'check_circle',
-  },
-  {
-    id: '3',
-    type: 'contract',
-    title: 'Contrato vencido',
-    description: 'Contrato con Proveedor 3 Tech ha vencido',
-    date: 'Ayer',
-    icon: 'event_busy',
-  },
-];
+const STORAGE_KEY = 'zaffra_suppliers';
 
 export const ProveedoresDashboardPage: React.FC = () => {
   const navigate = useNavigate();
 
-  const handleBack = () => {
-    navigate('/');
+  // Cargar proveedores del localStorage
+  const proveedores = useMemo(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (!stored) return [];
+      const data: Proveedor[] = JSON.parse(stored);
+      return data.filter((p) => p.is_active !== false);
+    } catch (error) {
+      console.error('Error al cargar proveedores del localStorage:', error);
+      return [];
+    }
+  }, []);
+
+  // Calcular métricas
+  const totalProveedores = proveedores.length;
+
+  // Proveedores activos
+  const proveedoresActivos = useMemo(() => {
+    return proveedores.filter((p) => p.is_active !== false).length;
+  }, [proveedores]);
+
+  // Pagos pendientes: suma de deuda de todos los proveedores
+  const pagosPendientes = useMemo(() => {
+    return proveedores.reduce((total, proveedor) => {
+      // Intentar obtener pagosPendientes o deuda del proveedor
+      // Si el proveedor tiene un campo pagosPendientes o deuda, usarlo; si no, tratar como 0
+      const deuda = (proveedor as any).pagosPendientes ?? (proveedor as any).deuda ?? 0;
+      const valor = typeof deuda === 'number' ? deuda : 0;
+      return total + (isNaN(valor) ? 0 : valor);
+    }, 0);
+  }, [proveedores]);
+
+  // Gasto mensual estimado
+  // TODO: Conectar con datos reales de gastos cuando esté disponible
+  const gastoMensualEstimado = useMemo(() => {
+    // Placeholder hasta que tengamos datos de gastos vinculados
+    return 0;
+  }, [proveedores]);
+
+  // Proveedores nuevos este mes
+  const nuevosEsteMes = useMemo(() => {
+    const ahora = new Date();
+    const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
+    return proveedores.filter((p) => {
+      if (!p.created_at) return false;
+      const fechaCreacion = new Date(p.created_at);
+      return fechaCreacion >= inicioMes;
+    }).length;
+  }, [proveedores]);
+
+  const handleVerLista = () => {
+    navigate('/proveedores/listado');
   };
 
   const handleNuevoProveedor = () => {
     navigate('/proveedores/nuevo');
   };
 
-  const headerActions: PageHeaderAction[] = [
-    {
-      icon: 'add',
-      label: 'Nuevo Proveedor',
-      onClick: handleNuevoProveedor,
-      variant: 'primary',
-    },
-  ];
-
   return (
-    <div className="proveedores-dashboard-container">
+    <div className="layout-page-container">
       <PageHeader
         title="Proveedores"
-        showBackButton={true}
-        onBack={handleBack}
-        actions={headerActions}
+        showBackButton={false}
       />
-
-      {/* Grid de Stats */}
-      <div className="proveedores-stats-grid">
-        {STATS.map((stat) => (
-          <div key={stat.title} className="studio-kpi-card">
-            <div className="proveedores-stat-content">
-              <div className="proveedores-stat-header">
-                <div className="proveedores-stat-icon-wrapper">
-                  <span className="material-symbols-outlined proveedores-stat-icon">
-                    {stat.icon}
-                  </span>
+      <div className="studio-container">
+        <div className="studio-card flex flex-col gap-8">
+          {/* Grid de Estadísticas */}
+          <div className="clients-stats-grid">
+            <div className="studio-kpi-card">
+              <div className="stat-header">
+                <div>
+                  <p className="stat-label">
+                    Total Proveedores
+                  </p>
+                  <h3 className="stat-value">
+                    {totalProveedores}
+                  </h3>
                 </div>
-                <div className="proveedores-stat-info">
-                  <p className="proveedores-stat-label">{stat.title}</p>
-                  <p className="proveedores-stat-value">{stat.value}</p>
+                <div className="stat-icon-container-blue">
+                  <span className="material-symbols-outlined stat-icon-blue">
+                    groups
+                  </span>
                 </div>
               </div>
-              <div className="proveedores-stat-footer">
-                <p className="proveedores-stat-subtitle">{stat.subtitle}</p>
-                {stat.trend && (
-                  <span
-                    className={`proveedores-stat-trend ${
-                      stat.trend.isPositive ? 'proveedores-stat-trend-positive' : 'proveedores-stat-trend-negative'
-                    }`}
-                  >
-                    {stat.trend.value}
+            </div>
+
+            <div className="studio-kpi-card">
+              <div className="stat-header">
+                <div>
+                  <p className="stat-label">
+                    Proveedores Activos
+                  </p>
+                  <h3 className="stat-value">
+                    {proveedoresActivos}
+                  </h3>
+                </div>
+                <div className="stat-icon-container-green">
+                  <span className="material-symbols-outlined stat-icon-green">
+                    check_circle
                   </span>
-                )}
+                </div>
+              </div>
+            </div>
+
+            <div className="studio-kpi-card">
+              <div className="stat-header">
+                <div>
+                  <p className="stat-label">
+                    Pagos Pendientes
+                  </p>
+                  <h3 className={`stat-value ${pagosPendientes > 0 ? 'stat-value-money-highlight' : ''}`}>
+                    {formatearMoneda(pagosPendientes)}
+                  </h3>
+                </div>
+                <div className="stat-icon-container-orange">
+                  <span className="material-symbols-outlined stat-icon-orange">
+                    pending_actions
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="studio-kpi-card">
+              <div className="stat-header">
+                <div>
+                  <p className="stat-label">
+                    Gasto Mensual
+                  </p>
+                  <h3 className={`stat-value ${gastoMensualEstimado > 0 ? 'stat-value-money-highlight' : ''}`}>
+                    {formatearMoneda(gastoMensualEstimado)}
+                  </h3>
+                </div>
+                <div className="stat-icon-container-pink">
+                  <span className="material-symbols-outlined stat-icon-pink">
+                    trending_up
+                  </span>
+                </div>
               </div>
             </div>
           </div>
-        ))}
-      </div>
 
-      {/* Grid Principal: Alertas y Actividad */}
-      <div className="proveedores-main-grid">
-        {/* Sección Alertas Prioritarias */}
-        <div className="proveedores-alerts-section">
-          <div className="studio-card">
-            <div className="proveedores-section-header">
-              <h2 className="proveedores-section-title">Alertas Prioritarias</h2>
-              <span className="material-symbols-outlined proveedores-section-icon">
-                notifications_active
-              </span>
-            </div>
-            <div className="proveedores-alerts-list">
-              {ALERTS.map((alert) => (
-                <div
-                  key={alert.id}
-                  className={`proveedores-alert-item proveedores-alert-item-${alert.type}`}
-                >
-                  <span className="material-symbols-outlined proveedores-alert-icon">
-                    {alert.type === 'warning' ? 'warning' : alert.type === 'error' ? 'error' : 'info'}
-                  </span>
-                  <div className="proveedores-alert-content">
-                    <p className="proveedores-alert-title">{alert.title}</p>
-                    <p className="proveedores-alert-description">{alert.description}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+          {/* Botones de Navegación Hero */}
+          <div className="client-hero-actions-grid">
+            <button
+              onClick={handleVerLista}
+              className="client-hero-action-card"
+            >
+              <div className="client-hero-action-icon">
+                <span className="material-symbols-outlined">list</span>
+              </div>
+              <div>
+                <h3 className="client-hero-action-title">
+                  Ver Lista de Proveedores
+                </h3>
+                <p className="client-hero-action-description">
+                  Explora y gestiona todos tus proveedores
+                </p>
+              </div>
+            </button>
 
-        {/* Sección Actividad Reciente */}
-        <div className="proveedores-activity-section">
-          <div className="studio-card">
-            <div className="proveedores-section-header">
-              <h2 className="proveedores-section-title">Actividad Reciente</h2>
-              <span className="material-symbols-outlined proveedores-section-icon">
-                history
-              </span>
-            </div>
-            <div className="proveedores-activity-timeline">
-              {ACTIVITIES.map((activity, index) => (
-                <div key={activity.id} className="proveedores-activity-item">
-                  <div className="proveedores-activity-line">
-                    {index < ACTIVITIES.length - 1 && (
-                      <div className="proveedores-activity-line-connector" />
-                    )}
-                    <div className="proveedores-activity-icon-wrapper">
-                      <span className="material-symbols-outlined proveedores-activity-icon">
-                        {activity.icon}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="proveedores-activity-content">
-                    <p className="proveedores-activity-title">{activity.title}</p>
-                    <p className="proveedores-activity-description">{activity.description}</p>
-                    <p className="proveedores-activity-date">{activity.date}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Accesos Directos */}
-      <div className="proveedores-shortcuts-section">
-        <div className="proveedores-shortcuts-grid">
-          <Link
-            to="/proveedores/listado"
-            className="proveedores-shortcut-card"
-          >
-            <div className="proveedores-shortcut-icon-wrapper">
-              <span className="material-symbols-outlined proveedores-shortcut-icon">
-                list
-              </span>
-            </div>
-            <h3 className="proveedores-shortcut-title">Ver Lista</h3>
-            <p className="proveedores-shortcut-description">
-              Accede a la lista completa de proveedores
-            </p>
-          </Link>
-          <button
-            type="button"
-            onClick={handleNuevoProveedor}
-            className="proveedores-shortcut-card"
-          >
-            <div className="proveedores-shortcut-icon-wrapper">
-              <span className="material-symbols-outlined proveedores-shortcut-icon">
-                add_circle
-              </span>
-            </div>
-            <h3 className="proveedores-shortcut-title">Nuevo Proveedor</h3>
-            <p className="proveedores-shortcut-description">
-              Registra un nuevo proveedor en el sistema
-            </p>
-          </button>
-        </div>
-      </div>
-
-      {/* Sugerencia IA */}
-      <div className="proveedores-ai-suggestion">
-        <div className="proveedores-ai-suggestion-content">
-          <div className="proveedores-ai-suggestion-icon-wrapper">
-            <span className="material-symbols-outlined proveedores-ai-suggestion-icon">
-              auto_awesome
-            </span>
-          </div>
-          <div className="proveedores-ai-suggestion-text">
-            <h3 className="proveedores-ai-suggestion-title">Sugerencia de IA</h3>
-            <p className="proveedores-ai-suggestion-description">
-              Considera renegociar los términos de pago con tus principales proveedores para mejorar el flujo de caja.
-            </p>
+            <button
+              onClick={handleNuevoProveedor}
+              className="client-hero-action-card"
+            >
+              <div className="client-hero-action-icon">
+                <span className="material-symbols-outlined">person_add</span>
+              </div>
+              <div>
+                <h3 className="client-hero-action-title">
+                  Añadir Nuevo Proveedor
+                </h3>
+                <p className="client-hero-action-description">
+                  Registra un nuevo proveedor en el sistema
+                </p>
+              </div>
+            </button>
           </div>
         </div>
       </div>

@@ -1,18 +1,20 @@
 import React, { useMemo } from 'react';
 import { 
-  AreaChart, 
-  Area, 
+  LineChart, 
+  Line, 
   XAxis, 
   YAxis, 
   CartesianGrid, 
   Tooltip, 
+  Legend,
   ResponsiveContainer
 } from 'recharts';
 import type { FinancialRecord } from '../../contexts/FinancialContext';
 import { ChartTooltip } from './ChartTooltip';
 
 interface ExpensesAccumulatedChartProps {
-  records: FinancialRecord[];
+  income: FinancialRecord[];
+  expenses: FinancialRecord[];
 }
 
 const monthNames = [
@@ -20,12 +22,11 @@ const monthNames = [
   'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'
 ];
 
-export const ExpensesAccumulatedChart: React.FC<ExpensesAccumulatedChartProps> = ({ records }) => {
+export const ExpensesAccumulatedChart: React.FC<ExpensesAccumulatedChartProps> = ({ income, expenses }) => {
   const chartData = useMemo(() => {
-    // Agrupar gastos por mes
-    const monthMap = new Map<string, number>();
-
-    records.forEach((record) => {
+    // Agrupar ingresos por mes
+    const incomeMap = new Map<string, number>();
+    income.forEach((record) => {
       const dateStr = record.data.issueDate || record.createdAt;
       const date = new Date(dateStr);
       
@@ -33,15 +34,34 @@ export const ExpensesAccumulatedChart: React.FC<ExpensesAccumulatedChartProps> =
         const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
         const total = parseFloat(record.data.total?.toString() || '0');
         if (!isNaN(total) && total > 0) {
-          const current = monthMap.get(monthKey) || 0;
-          monthMap.set(monthKey, current + total);
+          const current = incomeMap.get(monthKey) || 0;
+          incomeMap.set(monthKey, current + total);
         }
       }
     });
 
+    // Agrupar gastos por mes
+    const expenseMap = new Map<string, number>();
+    expenses.forEach((record) => {
+      const dateStr = record.data.issueDate || record.createdAt;
+      const date = new Date(dateStr);
+      
+      if (!isNaN(date.getTime())) {
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        const total = parseFloat(record.data.total?.toString() || '0');
+        if (!isNaN(total) && total > 0) {
+          const current = expenseMap.get(monthKey) || 0;
+          expenseMap.set(monthKey, current + total);
+        }
+      }
+    });
+
+    // Combinar todos los meses únicos
+    const allMonths = new Set([...incomeMap.keys(), ...expenseMap.keys()]);
+    
     // Convertir a array y ordenar por fecha
-    const sortedMonths = Array.from(monthMap.entries())
-      .map(([key, value]) => {
+    const sortedMonths = Array.from(allMonths)
+      .map((key) => {
         const [year, month] = key.split('-');
         const monthIndex = parseInt(month) - 1;
         return {
@@ -49,7 +69,8 @@ export const ExpensesAccumulatedChart: React.FC<ExpensesAccumulatedChartProps> =
           name: `${monthNames[monthIndex]} ${year}`,
           year: parseInt(year),
           monthIndex,
-          gasto: Number(value.toFixed(2)),
+          ingresoMensual: Number((incomeMap.get(key) || 0).toFixed(2)),
+          gastoMensual: Number((expenseMap.get(key) || 0).toFixed(2)),
         };
       })
       .sort((a, b) => {
@@ -57,16 +78,19 @@ export const ExpensesAccumulatedChart: React.FC<ExpensesAccumulatedChartProps> =
         return a.monthIndex - b.monthIndex;
       });
 
-    // Calcular gasto acumulado
-    let acumulado = 0;
+    // Calcular acumulados
+    let ingresosAcumulados = 0;
+    let gastosAcumulados = 0;
     return sortedMonths.map((item) => {
-      acumulado += item.gasto;
+      ingresosAcumulados += item.ingresoMensual;
+      gastosAcumulados += item.gastoMensual;
       return {
         ...item,
-        acumulado: Number(acumulado.toFixed(2)),
+        ingresosAcumulados: Number(ingresosAcumulados.toFixed(2)),
+        gastosAcumulados: Number(gastosAcumulados.toFixed(2)),
       };
     });
-  }, [records]);
+  }, [income, expenses]);
 
   if (chartData.length === 0) {
     return (
@@ -81,16 +105,10 @@ export const ExpensesAccumulatedChart: React.FC<ExpensesAccumulatedChartProps> =
   return (
     <div className="studio-card">
       <h3 className="text-lg font-semibold mb-4 text-slate-900 dark:text-white">
-        Evolución de Gasto Acumulado
+        Flujo de Caja Acumulado
       </h3>
-      <ResponsiveContainer width="100%" height={300}>
-        <AreaChart data={chartData}>
-          <defs>
-            <linearGradient id="colorGastoAcumulado" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8} />
-              <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.1} />
-            </linearGradient>
-          </defs>
+      <ResponsiveContainer width="100%" height={350}>
+        <LineChart data={chartData}>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis 
             dataKey="name" 
@@ -108,17 +126,30 @@ export const ExpensesAccumulatedChart: React.FC<ExpensesAccumulatedChartProps> =
             }}
           />
           <Tooltip content={<ChartTooltip />} />
-          <Area
+          <Legend />
+          <Line
             type="monotone"
-            dataKey="acumulado"
-            stroke="#3b82f6"
-            fillOpacity={1}
-            fill="url(#colorGastoAcumulado)"
-            name="Gasto Acumulado"
+            dataKey="ingresosAcumulados"
+            stroke="#10b981"
+            strokeWidth={3}
+            dot={{ fill: '#10b981', r: 4 }}
+            activeDot={{ r: 6 }}
+            name="Ingresos Totales"
             animationBegin={0}
             animationDuration={1500}
           />
-        </AreaChart>
+          <Line
+            type="monotone"
+            dataKey="gastosAcumulados"
+            stroke="#f97316"
+            strokeWidth={3}
+            dot={{ fill: '#f97316', r: 4 }}
+            activeDot={{ r: 6 }}
+            name="Gastos Totales"
+            animationBegin={0}
+            animationDuration={1500}
+          />
+        </LineChart>
       </ResponsiveContainer>
     </div>
   );
