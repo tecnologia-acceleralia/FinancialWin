@@ -4,7 +4,7 @@ import { useFinancial } from '../../contexts/FinancialContext';
 import { IngresosTable } from '../../features/finance/components/IngresosTable';
 import { PageHeader, type PageHeaderAction } from '../../components/layout';
 import { FilterPanel, type FilterValues } from '../../features/finance/components/FilterPanel';
-import { StatCard } from '../../components/common';
+import { StatCard, UniversalSearchBar } from '../../components/common';
 import { exportToCSV } from '../../utils/exportToCSV';
 import { importFromExcel } from '../../utils/importFromExcel';
 import { useToast } from '../../contexts/ToastContext';
@@ -276,16 +276,37 @@ export const IngresosPage: React.FC = () => {
     setFilters(newFilters);
   };
 
+  // Preparar datos para UniversalSearchBar
+  const ingresosForSearch = useMemo(() => {
+    return income
+      .filter((record) => record.data.supplier && record.data.total)
+      .map((record) => ({
+        id: record.id,
+        cliente: record.data.supplier || '',
+        factura: record.data.invoiceNum || `F-${record.id.slice(-6)}`,
+        estado: record.paymentStatus === 'Pagado' ? 'Pagado' : 'Pendiente Pago',
+        total: record.data.total?.toString() || '',
+      }));
+  }, [income]);
+
   return (
     <div className="layout-page-container">
       <PageHeader
         title="Ingresos"
-        showSearch={true}
-        searchValue={busqueda}
-        onSearchChange={setBusqueda}
-        searchPlaceholder="Buscar ingreso (cliente, factura, estado)..."
+        showSearch={false}
         actions={headerActions}
       />
+      <div className="action-toolbar">
+        <UniversalSearchBar
+          items={ingresosForSearch}
+          onFilter={() => {
+            // El filtrado se maneja en IngresosTable usando searchTerm
+          }}
+          onSearchTermChange={setBusqueda}
+          searchFields={['cliente', 'factura', 'estado', 'total']}
+          placeholder="Buscar por cliente, factura, estado, total..."
+        />
+      </div>
       <div className="studio-container">
         {/* Tarjetas de Resumen Compactas */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">

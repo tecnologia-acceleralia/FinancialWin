@@ -228,7 +228,7 @@ export const EntityDetailPage: React.FC = () => {
     : undefined;
 
   // Estado para la pestaña activa
-  const [activeTab, setActiveTab] = useState<'general' | 'facturacion' | 'contactos'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'facturacion' | 'contactos' | 'contabilidad'>('general');
   
   // Estado para el buscador de facturas
   const [invoiceSearch, setInvoiceSearch] = useState('');
@@ -586,7 +586,7 @@ export const EntityDetailPage: React.FC = () => {
                 <div className="flex items-center gap-4 text-sm text-slate-600 dark:text-slate-400">
                   <span className="flex items-center gap-1">
                     <span className="material-symbols-outlined text-base">badge</span>
-                    <span>NIF: {entityData.nif}</span>
+                    <span>NIF: {entityData.nif || 'No disponible'}</span>
                   </span>
                   <span className="flex items-center gap-1">
                     <span className="material-symbols-outlined text-base">
@@ -707,6 +707,20 @@ export const EntityDetailPage: React.FC = () => {
             <span className="material-symbols-outlined tab-main-icon">contacts</span>
             <span className="tab-main-label">Contactos</span>
           </button>
+          {type === 'proveedor' && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('contabilidad')}
+              className={
+                activeTab === 'contabilidad'
+                  ? 'tab-main tab-main-active'
+                  : 'tab-main tab-main-inactive'
+              }
+            >
+              <span className="material-symbols-outlined tab-main-icon">account_balance</span>
+              <span className="tab-main-label">Contabilidad</span>
+            </button>
+          )}
         </div>
 
         {/* Contenido de tabs */}
@@ -758,29 +772,79 @@ export const EntityDetailPage: React.FC = () => {
                   <div>
                     <label className="label-studio">Dirección</label>
                     <div className="input-studio-readonly">
-                      {entityData.direccionFiscal.calle}
+                      {entityData.direccionFiscal.calle || '-'}
                     </div>
                   </div>
                   <div>
                     <label className="label-studio">Ciudad</label>
                     <div className="input-studio-readonly">
-                      {entityData.direccionFiscal.ciudad}
+                      {entityData.direccionFiscal.ciudad || '-'}
                     </div>
                   </div>
                   <div>
                     <label className="label-studio">Código Postal</label>
                     <div className="input-studio-readonly">
-                      {entityData.direccionFiscal.codigoPostal}
+                      {entityData.direccionFiscal.codigoPostal || '-'}
                     </div>
                   </div>
                   <div>
                     <label className="label-studio">País</label>
                     <div className="input-studio-readonly">
-                      {entityData.direccionFiscal.pais}
+                      {entityData.direccionFiscal.pais || '-'}
                     </div>
                   </div>
                 </div>
               </div>
+
+              {/* Información Adicional (solo para proveedores) */}
+              {type === 'proveedor' && rawEntityData && (
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">
+                    Información Adicional
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {(rawEntityData as Proveedor).web && (
+                      <div>
+                        <label className="label-studio">Sitio Web</label>
+                        <div className="input-studio-readonly">
+                          <a
+                            href={(rawEntityData as Proveedor).web}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 dark:text-blue-400 hover:underline"
+                          >
+                            {(rawEntityData as Proveedor).web}
+                          </a>
+                        </div>
+                      </div>
+                    )}
+                    {(rawEntityData as Proveedor).puesto && (
+                      <div>
+                        <label className="label-studio">Puesto</label>
+                        <div className="input-studio-readonly">
+                          {(rawEntityData as Proveedor).puesto}
+                        </div>
+                      </div>
+                    )}
+                    {(rawEntityData as Proveedor).ordersEmail && (
+                      <div>
+                        <label className="label-studio">Email de Pedidos</label>
+                        <div className="input-studio-readonly">
+                          {(rawEntityData as Proveedor).ordersEmail}
+                        </div>
+                      </div>
+                    )}
+                    {(rawEntityData as Proveedor).telefono && (
+                      <div>
+                        <label className="label-studio">Teléfono</label>
+                        <div className="input-studio-readonly">
+                          {(rawEntityData as Proveedor).telefono}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Notas Internas */}
               {entityData.notasInternas && (
@@ -907,6 +971,25 @@ export const EntityDetailPage: React.FC = () => {
                   ))}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Tab: Contabilidad (solo para proveedores) */}
+          {activeTab === 'contabilidad' && type === 'proveedor' && rawEntityData && (
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">
+                  Información Contable
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="label-studio">Cuenta por pagar</label>
+                    <div className="input-studio-readonly">
+                      {(rawEntityData as Proveedor).cuentaContable || 'Sin asignar en Odoo'}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </div>

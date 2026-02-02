@@ -20,6 +20,35 @@
     --brand-500: #b84e9d;
     --brand-600: #a21caf;
     --brand-900: #581c87;
+    /* Colores de acento pastel para Light Mode */
+    --bg-accent-amber: #fef3c7;
+    --bg-accent-cyan: #cffafe;
+    --bg-accent-purple: #f3e8ff;
+    --bg-accent-blue: #dbeafe;
+    --bg-accent-emerald: #d1fae5;
+    --bg-accent-pink: #fce7f3;
+    --bg-accent-red: #fee2e2;
+    --bg-accent-green: #dcfce7;
+    --bg-accent-orange: #fff3e0;
+    /* Variables para Documentación (Light Mode) */
+    --bg-card: #ffffff;
+    --text-primary: #111827;
+  }
+
+  .dark {
+    /* Colores de acento más opacos para Dark Mode */
+    --bg-accent-amber: rgba(251, 191, 36, 0.2);
+    --bg-accent-cyan: rgba(6, 182, 212, 0.2);
+    --bg-accent-purple: rgba(184, 78, 157, 0.2);
+    --bg-accent-blue: rgba(59, 130, 246, 0.2);
+    --bg-accent-emerald: rgba(16, 185, 129, 0.2);
+    --bg-accent-pink: rgba(184, 78, 157, 0.2);
+    --bg-accent-red: rgba(239, 68, 68, 0.2);
+    --bg-accent-green: rgba(34, 197, 94, 0.2);
+    --bg-accent-orange: rgba(251, 146, 60, 0.2);
+    /* Variables para Documentación (Dark Mode) */
+    --bg-card: #131B29;
+    --text-primary: #ffffff;
   }
 
   * {
@@ -70,7 +99,22 @@
   }
 
   .btn-secondary {
-    @apply bg-gray-200 text-gray-900 hover:bg-gray-300;
+    @apply transition-colors;
+    background-color: var(--bg-card) !important; /* Usar variable CSS */
+    color: var(--text-primary) !important; /* Usar variable CSS */
+    border: 1px solid #e2e8f0 !important; /* Borde gris claro en Light Mode */
+  }
+
+  .btn-secondary:hover:not(:disabled) {
+    background-color: #f8fafc !important; /* Hover gris muy ligero en Light Mode */
+  }
+
+  .dark .btn-secondary {
+    border-color: #2A3B5A !important; /* Mantener borde dark */
+  }
+
+  .dark .btn-secondary:hover:not(:disabled) {
+    background-color: #2A3B5A !important; /* Mantener hover dark */
   }
 
   .btn-ghost {
@@ -294,6 +338,11 @@
   /* AI Studio - Contenedores y Layout */
   .studio-container {
     @apply w-full h-full flex flex-col min-h-0;
+    background-color: #f1f5f9; /* Gris humo para Light Mode */
+  }
+
+  .dark .studio-container {
+    background-color: transparent; /* Mantener transparente en Dark Mode */
   }
 
   /* Modo Claro por defecto */
@@ -337,15 +386,30 @@
   }
 
   .studio-kpi-card {
-    @apply bg-white dark:bg-[#131B29] rounded-2xl p-6 border border-[#e5e5e5] dark:border-[#2A3B5A] shadow-card flex flex-col justify-between h-full hover:shadow-lg transition-all cursor-default;
+    @apply rounded-2xl p-6 border border-[#e5e5e5] dark:border-[#2A3B5A] shadow-card flex flex-col justify-between h-full hover:shadow-lg transition-all cursor-default;
+    background-color: #ffffff !important; /* Blanco puro en Light Mode - Forzado */
+  }
+
+  .dark .studio-kpi-card {
+    background-color: #131B29 !important; /* Mantener estilo dark */
   }
 
   .kpi-label {
-    @apply text-sm font-semibold text-[#525252] dark:text-[#a3a3a3] uppercase tracking-wider;
+    @apply text-sm font-semibold uppercase tracking-wider;
+    color: #111827 !important; /* Negro en Light Mode - Forzado */
+  }
+
+  .dark .kpi-label {
+    color: #a3a3a3 !important; /* Mantener estilo dark */
   }
 
   .kpi-value {
-    @apply text-3xl font-bold text-[#171717] dark:text-[#fafafa] mt-2;
+    @apply text-3xl font-bold mt-2;
+    color: #111827 !important; /* Negro en Light Mode - Forzado */
+  }
+
+  .dark .kpi-value {
+    color: #fafafa !important; /* Mantener estilo dark */
   }
 
   .kpi-content {
@@ -380,12 +444,14 @@
 
   /* Pendientes de Tesorería */
   .treasury-pending-item {
-    @apply flex items-center justify-between p-4 rounded-lg border border-gray-200 dark:border-gray-700;
-    @apply bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors;
+    @apply flex items-center justify-between p-0 rounded-lg;
+    background-color: transparent !important; /* Fondo transparente */
+    color: #1e293b !important; /* Texto negro en Light Mode */
+    @apply dark:text-white transition-colors;
   }
 
   .treasury-pending-item-content {
-    @apply flex-1 flex flex-col gap-2;
+    @apply flex-1 flex flex-col gap-2 px-6;
   }
 
   .treasury-pending-item-header {
@@ -417,11 +483,15 @@
   }
 
   .treasury-pending-item-supplier {
-    @apply font-medium text-slate-900 dark:text-white;
+    @apply font-medium;
+    color: #1e293b !important; /* Texto negro en Light Mode */
+    @apply dark:text-white;
   }
 
   .treasury-pending-item-invoice {
-    @apply text-sm text-gray-500 dark:text-gray-400;
+    @apply text-sm;
+    color: #64748b !important; /* Texto gris oscuro en Light Mode */
+    @apply dark:text-gray-400;
   }
 
   .treasury-pending-item-amount {
@@ -532,7 +602,24 @@
 
   /* AI Studio - Inputs y Formularios */
   .input-studio {
-    @apply w-full px-4 py-2.5 bg-white dark:bg-[#1B273B] border border-[#e5e5e5] dark:border-[#2A3B5A] rounded-lg text-sm font-medium text-[#171717] dark:text-[#fafafa] placeholder:text-[#a3a3a3] dark:placeholder:text-[#737373] focus:outline-none focus:ring-2 focus:ring-[#B84E9D] focus:border-[#B84E9D] hover:border-[#a3a3a3] transition-all shadow-sm;
+    @apply w-full px-4 py-2.5 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#B84E9D] focus:border-[#B84E9D] transition-all shadow-sm;
+    background-color: #ffffff !important; /* Fondo blanco en Light Mode */
+    border: 1px solid #e2e8f0 !important; /* Borde gris claro en Light Mode */
+    color: #111827 !important; /* Texto negro/gris oscuro en Light Mode */
+  }
+
+  .input-studio::placeholder {
+    color: #6b7280 !important; /* Placeholder gris en Light Mode */
+  }
+
+  .dark .input-studio {
+    background-color: #1B273B !important;
+    border-color: #2A3B5A !important;
+    color: #fafafa !important;
+  }
+
+  .dark .input-studio::placeholder {
+    color: #737373 !important;
   }
 
   .input-studio-readonly {
@@ -799,7 +886,35 @@
   }
 
   .studio-form-panel {
-    @apply w-full md:flex-1 bg-white dark:bg-[#131B29] flex flex-col min-h-0;
+    @apply w-full md:flex-1 flex flex-col min-h-0;
+    background-color: var(--bg-card) !important;
+    color: var(--text-primary) !important;
+  }
+
+  /* Asegurar que los textos dentro del panel usen el color correcto en Light Mode */
+  .studio-form-panel p,
+  .studio-form-panel span:not(.material-symbols-outlined):not(.record-type-button-active *),
+  .studio-form-panel label,
+  .studio-form-panel div:not(.record-type-button):not(.record-type-button-active),
+  .studio-form-panel h1,
+  .studio-form-panel h2,
+  .studio-form-panel h3,
+  .studio-form-panel h4,
+  .studio-form-panel h5,
+  .studio-form-panel h6 {
+    color: var(--text-primary) !important;
+  }
+
+  /* Excepciones: mantener colores específicos de iconos y elementos especiales */
+  .studio-form-panel .material-symbols-outlined {
+    color: inherit;
+  }
+
+  /* Mantener colores originales de los botones (NO TOCAR) */
+  .studio-form-panel .record-type-button,
+  .studio-form-panel .record-type-button-active,
+  .studio-form-panel .btn-validate-primary {
+    /* No aplicar color aquí - mantener estilos originales */
   }
 
   .studio-form-panel-inner {
@@ -816,11 +931,14 @@
   }
 
   .studio-form-title {
-    @apply text-2xl font-bold text-[#171717] dark:text-[#fafafa];
+    @apply text-2xl font-bold;
+    color: var(--text-primary) !important;
   }
 
   .studio-form-subtitle {
-    @apply mt-1 text-sm font-medium text-[#737373] dark:text-[#a3a3a3];
+    @apply mt-1 text-sm font-medium;
+    color: var(--text-primary) !important;
+    opacity: 0.7; /* Gris más suave para subtítulos */
   }
 
   .studio-form-grid {
@@ -841,19 +959,47 @@
   }
 
   .form-label-studio {
-    @apply block text-xs font-bold text-[#525252] dark:text-[#a3a3a3] mb-1.5 uppercase tracking-wider;
+    @apply block text-xs font-bold mb-1.5 uppercase tracking-wider;
+    color: var(--text-primary) !important; /* Usar variable para Light/Dark Mode */
   }
 
   .form-input-studio {
-    @apply w-full px-4 py-2.5 bg-white dark:bg-[#1B273B] border border-[#e5e5e5] dark:border-[#2A3B5A] rounded-lg text-sm font-medium text-[#171717] dark:text-[#fafafa] placeholder:text-[#a3a3a3] dark:placeholder:text-[#737373] focus:outline-none focus:ring-2 focus:ring-[#B84E9D] focus:border-[#B84E9D] hover:border-[#a3a3a3] transition-all shadow-sm;
+    @apply w-full px-4 py-2.5 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#B84E9D] focus:border-[#B84E9D] transition-all shadow-sm;
+    background-color: #ffffff !important; /* Fondo blanco en Light Mode */
+    border: 1px solid #e2e8f0 !important; /* Borde gris claro en Light Mode */
+    color: #111827 !important; /* Texto negro/gris oscuro en Light Mode */
+  }
+
+  .form-input-studio::placeholder {
+    color: #6b7280 !important; /* Placeholder gris en Light Mode */
+  }
+
+  .dark .form-input-studio {
+    background-color: #1B273B !important;
+    border-color: #2A3B5A !important;
+    color: #fafafa !important;
+  }
+
+  .dark .form-input-studio::placeholder {
+    color: #737373 !important;
   }
 
   .form-input-total {
-    @apply font-bold text-[#171717] dark:text-white;
+    @apply font-bold;
+    color: var(--text-primary) !important;
   }
 
   .form-select-studio {
-    @apply w-full px-4 py-2.5 bg-white dark:bg-[#1B273B] border border-[#e5e5e5] dark:border-[#2A3B5A] rounded-lg text-sm font-medium text-[#171717] dark:text-[#fafafa] focus:outline-none focus:ring-2 focus:ring-[#B84E9D] focus:border-[#B84E9D] hover:border-[#a3a3a3] transition-all shadow-sm;
+    @apply w-full px-4 py-2.5 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#B84E9D] focus:border-[#B84E9D] transition-all shadow-sm;
+    background-color: #ffffff !important; /* Fondo blanco en Light Mode */
+    border: 1px solid #e2e8f0 !important; /* Borde gris claro en Light Mode */
+    color: #111827 !important; /* Texto negro/gris oscuro en Light Mode */
+  }
+
+  .dark .form-select-studio {
+    background-color: #1B273B !important;
+    border-color: #2A3B5A !important;
+    color: #fafafa !important;
   }
 
   .form-field-full {
@@ -1066,11 +1212,18 @@
      Registros Table - Clases Semánticas
      ============================================ */
   .table-wrapper {
-    @apply overflow-x-auto rounded-xl border border-gray-200 dark:border-[#2A3B5A];
+    @apply overflow-x-auto rounded-xl border;
     scrollbar-width: thin;
     scrollbar-color: transparent transparent;
     width: 100%;
     max-width: 100%;
+    background-color: #ffffff !important; /* Fondo blanco en Light Mode */
+    border-color: #e5e7eb !important; /* Borde gris claro en Light Mode */
+  }
+
+  .dark .table-wrapper {
+    background-color: transparent !important; /* Mantener estilo dark */
+    border-color: #2A3B5A !important; /* Mantener borde dark */
   }
 
   /* Scrollbar personalizado - visible solo en hover */
@@ -1107,7 +1260,7 @@
   }
 
   .table-header {
-    @apply bg-gray-50 dark:bg-[#1B273B] uppercase text-xs font-semibold tracking-wider text-gray-600 dark:text-gray-400;
+    @apply uppercase text-xs font-semibold tracking-wider;
     font-size: 0.7rem;
     letter-spacing: 0.05em;
     white-space: nowrap;
@@ -1115,6 +1268,13 @@
     min-width: fit-content;
     position: relative;
     border-right: 1px solid rgba(229, 231, 235, 0.5);
+    background-color: #f8fafc !important; /* Gris muy suave en Light Mode */
+    color: #475569 !important; /* Gris oscuro en Light Mode */
+  }
+
+  .dark .table-header {
+    background-color: #1B273B !important; /* Mantener estilo dark */
+    color: #9ca3af !important; /* Mantener estilo dark */
   }
 
   .table-header:last-child {
@@ -1127,11 +1287,17 @@
   }
 
   .table-row {
-    @apply border-b border-gray-100 dark:border-[#2A3B5A] hover:bg-gray-50 dark:hover:bg-[#1B273B] transition-colors;
+    @apply border-b dark:border-[#2A3B5A] hover:bg-gray-50 dark:hover:bg-[#1B273B] transition-colors;
+    background-color: #ffffff !important; /* Fondo blanco en Light Mode - Forzado */
+    border-bottom-color: #f1f5f9 !important; /* Borde sutil en Light Mode */
+  }
+
+  .dark .table-row {
+    background-color: transparent !important; /* Mantener estilo dark */
+    border-bottom-color: #2A3B5A !important; /* Mantener borde dark */
   }
 
   .table-row td {
-    @apply text-gray-900 dark:text-gray-100;
     font-size: 0.85rem;
     line-height: 1.5;
     padding: 0.875rem 1.25rem;
@@ -1141,6 +1307,13 @@
     border-right: 1px solid rgba(229, 231, 235, 0.3);
     vertical-align: middle;
     min-width: fit-content;
+    background-color: #ffffff !important; /* Fondo blanco puro en Light Mode */
+    color: #1f2937 !important; /* Negro/gris oscuro en Light Mode */
+  }
+
+  .dark .table-row td {
+    background-color: transparent !important; /* Mantener estilo dark */
+    color: #f3f4f6 !important; /* Mantener estilo dark */
   }
 
   /* Espaciado adicional entre celdas para evitar solapamiento */
@@ -1216,15 +1389,36 @@
   }
 
   .pill-success {
-    @apply bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400;
+    @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold;
+    background-color: #f0fdf4 !important; /* Verde muy claro en Light Mode */
+    color: #16a34a !important; /* Verde fuerte en Light Mode */
+  }
+
+  .dark .pill-success {
+    background-color: rgba(34, 197, 94, 0.3) !important; /* Mantener estilo dark */
+    color: #4ade80 !important; /* Mantener color dark */
   }
 
   .pill-warning {
-    @apply bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-400;
+    @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold;
+    background-color: #fffbeb !important; /* Amarillo/naranja muy claro en Light Mode */
+    color: #ca8a04 !important; /* Ocre/naranja fuerte en Light Mode */
+  }
+
+  .dark .pill-warning {
+    background-color: rgba(251, 191, 36, 0.3) !important; /* Mantener estilo dark */
+    color: #fbbf24 !important; /* Mantener color dark */
   }
 
   .pill-danger {
-    @apply bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400;
+    @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold;
+    background-color: #fef2f2 !important; /* Rojo muy claro en Light Mode */
+    color: #dc2626 !important; /* Rojo fuerte en Light Mode */
+  }
+
+  .dark .pill-danger {
+    background-color: rgba(239, 68, 68, 0.3) !important; /* Mantener estilo dark */
+    color: #f87171 !important; /* Mantener color dark */
   }
 
   .table-action-button {
@@ -1333,7 +1527,16 @@
 
   /* Estados de sincronización ERP */
   .erp-status-pending {
-    @apply status-badge-base bg-gray-100 text-gray-900 border border-gray-200 dark:bg-gray-800/50 dark:text-gray-200 dark:border-gray-700;
+    @apply status-badge-base;
+    background-color: #fffbeb !important; /* Amarillo/naranja muy claro en Light Mode (consistente con Pendiente) */
+    color: #ca8a04 !important; /* Ocre/naranja fuerte en Light Mode */
+    border: 1px solid rgba(202, 138, 4, 0.2) !important; /* Borde ocre sutil */
+  }
+
+  .dark .erp-status-pending {
+    background-color: rgba(59, 130, 246, 0.5) !important; /* Mantener estilo dark */
+    color: #93c5fd !important; /* Mantener color dark */
+    border-color: rgba(59, 130, 246, 0.7) !important; /* Mantener borde dark */
   }
 
   .erp-status-syncing {
@@ -1341,15 +1544,42 @@
   }
 
   .erp-status-synced-odoo {
-    @apply status-badge-base bg-blue-100 text-blue-900 border border-blue-200 dark:bg-blue-900/40 dark:text-blue-200 dark:border-blue-800;
+    @apply status-badge-base;
+    background-color: #f0fdf4 !important; /* Verde muy claro en Light Mode (consistente con Validado) */
+    color: #16a34a !important; /* Verde fuerte en Light Mode */
+    border: 1px solid rgba(22, 163, 74, 0.2) !important; /* Borde verde sutil */
+  }
+
+  .dark .erp-status-synced-odoo {
+    background-color: rgba(34, 197, 94, 0.4) !important; /* Mantener estilo dark */
+    color: #4ade80 !important; /* Mantener color dark */
+    border-color: rgba(34, 197, 94, 0.8) !important; /* Mantener borde dark */
   }
 
   .erp-status-synced-a3 {
-    @apply status-badge-base bg-green-100 text-green-900 border border-green-200 dark:bg-green-900/40 dark:text-green-200 dark:border-green-800;
+    @apply status-badge-base;
+    background-color: #f0fdf4 !important; /* Verde muy claro en Light Mode (consistente con Validado) */
+    color: #16a34a !important; /* Verde fuerte en Light Mode */
+    border: 1px solid rgba(22, 163, 74, 0.2) !important; /* Borde verde sutil */
+  }
+
+  .dark .erp-status-synced-a3 {
+    background-color: rgba(34, 197, 94, 0.4) !important; /* Mantener estilo dark */
+    color: #4ade80 !important; /* Mantener color dark */
+    border-color: rgba(34, 197, 94, 0.8) !important; /* Mantener borde dark */
   }
 
   .erp-status-error {
-    @apply status-badge-base bg-red-100 text-red-900 border border-red-200 dark:bg-red-900/40 dark:text-red-200 dark:border-red-800;
+    @apply status-badge-base;
+    background-color: #fef2f2 !important; /* Rojo muy claro en Light Mode (consistente con Rechazado) */
+    color: #dc2626 !important; /* Rojo fuerte en Light Mode */
+    border: 1px solid rgba(220, 38, 38, 0.2) !important; /* Borde rojo sutil */
+  }
+
+  .dark .erp-status-error {
+    background-color: rgba(239, 68, 68, 0.4) !important; /* Mantener estilo dark */
+    color: #f87171 !important; /* Mantener color dark */
+    border-color: rgba(239, 68, 68, 0.8) !important; /* Mantener borde dark */
   }
 
   /* Contenedor del selector de estado de pago */
@@ -2442,6 +2672,11 @@
   /* Contenedor principal de la página */
   .home-container {
     @apply space-y-8 animate-fade-in overflow-x-hidden;
+    background-color: #f8fafc; /* Gris muy suave en Light Mode */
+  }
+
+  .dark .home-container {
+    background-color: transparent; /* Mantener fondo transparente en Dark Mode */
   }
 
   /* Grid principal de hero */
@@ -2545,7 +2780,12 @@
   }
 
   .home-next-due-icon {
-    @apply material-symbols-outlined text-gray-400;
+    @apply material-symbols-outlined;
+    color: #64748b !important; /* Gris oscuro visible en Light Mode */
+  }
+
+  .dark .home-next-due-icon {
+    color: #9ca3af !important; /* Mantener gris claro en Dark Mode */
   }
 
   .home-next-due-title {
@@ -2608,11 +2848,53 @@
   }
 
   .popover-content {
-    @apply absolute top-full right-0 z-50 p-3 rounded-lg shadow-lg border-2;
-    @apply bg-white dark:bg-[#1B273B] border-[#B84E9D];
-    @apply w-64 max-h-[85vh] overflow-y-auto;
-    @apply mt-2 origin-top-right;
-    @apply transition-all duration-200 ease-out;
+    @apply absolute top-full right-0 z-50 p-3 rounded-lg w-64 max-h-[85vh] overflow-y-auto;
+    @apply mt-2 origin-top-right transition-all duration-200 ease-out;
+    /* Light Mode - Fondo blanco, borde gris claro, sombra elegante */
+    background-color: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+  }
+
+  .dark .popover-content {
+    background-color: #1B273B !important;
+    border-color: #2A3B5A !important;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2) !important;
+  }
+
+  /* Flecha del popover (si se agrega en el futuro) */
+  .popover-content::before {
+    content: '';
+    position: absolute;
+    top: -8px;
+    right: 20px;
+    width: 0;
+    height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-bottom: 8px solid #ffffff; /* Blanco en Light Mode */
+  }
+
+  .dark .popover-content::before {
+    border-bottom-color: #1B273B; /* Fondo oscuro en Dark Mode */
+  }
+
+  /* Borde de la flecha para que coincida con el borde del popover */
+  .popover-content::after {
+    content: '';
+    position: absolute;
+    top: -9px;
+    right: 20px;
+    width: 0;
+    height: 0;
+    border-left: 9px solid transparent;
+    border-right: 9px solid transparent;
+    border-bottom: 9px solid #e2e8f0; /* Borde gris claro en Light Mode */
+    z-index: -1;
+  }
+
+  .dark .popover-content::after {
+    border-bottom-color: #2A3B5A; /* Borde oscuro en Dark Mode */
   }
 
   /* Responsive: En móviles, el popover se ajusta al ancho disponible */
@@ -2627,15 +2909,30 @@
 
   /* Contenido del popover de trimestre */
   .quarter-popover-header {
-    @apply mb-2.5 pb-2.5 border-b border-gray-200 dark:border-[#2A3B5A];
+    @apply mb-2.5 pb-2.5 border-b;
+    border-bottom-color: #e2e8f0 !important; /* Gris muy claro en Light Mode */
+  }
+
+  .dark .quarter-popover-header {
+    border-bottom-color: #2A3B5A !important; /* Mantener en Dark Mode */
   }
 
   .quarter-popover-title {
-    @apply text-sm font-semibold text-slate-900 dark:text-white mb-1;
+    @apply text-sm font-semibold mb-1;
+    color: #1e293b !important; /* Color específico para Light Mode */
+  }
+
+  .dark .quarter-popover-title {
+    color: #ffffff !important; /* Mantener blanco en Dark Mode */
   }
 
   .quarter-popover-period {
-    @apply text-xs text-gray-600 dark:text-gray-400;
+    @apply text-xs;
+    color: #64748b !important; /* Color específico para Light Mode */
+  }
+
+  .dark .quarter-popover-period {
+    color: #a3a3a3 !important; /* Mantener gris claro en Dark Mode */
   }
 
   .quarter-popover-item {
@@ -2643,11 +2940,21 @@
   }
 
   .quarter-popover-label {
-    @apply text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5;
+    @apply text-xs font-medium mb-0.5;
+    color: #94a3b8 !important; /* Color específico para Light Mode */
+  }
+
+  .dark .quarter-popover-label {
+    color: #a3a3a3 !important; /* Mantener gris claro en Dark Mode */
   }
 
   .quarter-popover-value {
-    @apply text-sm text-slate-900 dark:text-white leading-relaxed;
+    @apply text-sm leading-relaxed;
+    color: #334155 !important; /* Color específico para Light Mode */
+  }
+
+  .dark .quarter-popover-value {
+    color: #ffffff !important; /* Mantener blanco en Dark Mode */
   }
 
   /* Sección de acceso rápido */
@@ -2689,44 +2996,134 @@
 
   /* Variantes de color para círculos de iconos */
   .icon-circle-amber {
-    @apply icon-circle bg-amber-50 dark:bg-amber-900/20 group-hover:bg-amber-500;
+    @apply icon-circle;
+    background-color: #ffffff; /* Blanco en Light Mode */
+  }
+
+  .dark .icon-circle-amber {
+    background-color: rgba(251, 191, 36, 0.2); /* Mantener estilo dark */
+  }
+
+  .icon-circle-amber:hover {
+    background-color: #f59e0b; /* Color vivo en hover */
   }
 
   .icon-circle-cyan {
-    @apply icon-circle bg-cyan-50 dark:bg-cyan-900/20 group-hover:bg-cyan-500;
+    @apply icon-circle;
+    background-color: #ffffff; /* Blanco en Light Mode */
+  }
+
+  .dark .icon-circle-cyan {
+    background-color: rgba(6, 182, 212, 0.2); /* Mantener estilo dark */
+  }
+
+  .icon-circle-cyan:hover {
+    background-color: #06b6d4; /* Color vivo en hover */
   }
 
   .icon-circle-purple {
-    @apply icon-circle bg-purple-50 dark:bg-purple-900/20 group-hover:bg-[#b84e9d];
+    @apply icon-circle;
+    background-color: #ffffff; /* Blanco en Light Mode */
+  }
+
+  .dark .icon-circle-purple {
+    background-color: rgba(184, 78, 157, 0.2); /* Mantener estilo dark */
+  }
+
+  .icon-circle-purple:hover {
+    background-color: #b84e9d; /* Color vivo en hover */
   }
 
   .icon-circle-blue {
-    @apply icon-circle bg-blue-50 dark:bg-blue-900/20 group-hover:bg-blue-500;
+    @apply icon-circle;
+    background-color: #ffffff; /* Blanco en Light Mode */
+  }
+
+  .dark .icon-circle-blue {
+    background-color: rgba(59, 130, 246, 0.2); /* Mantener estilo dark */
+  }
+
+  .icon-circle-blue:hover {
+    background-color: #3b82f6; /* Color vivo en hover */
   }
 
   .icon-circle-emerald {
-    @apply icon-circle bg-emerald-50 dark:bg-emerald-900/20 group-hover:bg-emerald-500;
+    @apply icon-circle;
+    background-color: #ffffff; /* Blanco en Light Mode */
+  }
+
+  .dark .icon-circle-emerald {
+    background-color: rgba(16, 185, 129, 0.2); /* Mantener estilo dark */
+  }
+
+  .icon-circle-emerald:hover {
+    background-color: #10b981; /* Color vivo en hover */
   }
 
   /* Variantes de color para icon wrapper (mantener compatibilidad) */
   .base-card-icon-wrapper-amber {
-    @apply base-card-icon-wrapper bg-amber-50 dark:bg-amber-900/20 group-hover:bg-amber-500;
+    @apply base-card-icon-wrapper;
+    background-color: #ffffff; /* Blanco en Light Mode */
+  }
+
+  .dark .base-card-icon-wrapper-amber {
+    background-color: rgba(251, 191, 36, 0.2);
+  }
+
+  .base-card-icon-wrapper-amber:hover {
+    background-color: #f59e0b;
   }
 
   .base-card-icon-wrapper-cyan {
-    @apply base-card-icon-wrapper bg-cyan-50 dark:bg-cyan-900/20 group-hover:bg-cyan-500;
+    @apply base-card-icon-wrapper;
+    background-color: #ffffff; /* Blanco en Light Mode */
+  }
+
+  .dark .base-card-icon-wrapper-cyan {
+    background-color: rgba(6, 182, 212, 0.2);
+  }
+
+  .base-card-icon-wrapper-cyan:hover {
+    background-color: #06b6d4;
   }
 
   .base-card-icon-wrapper-purple {
-    @apply base-card-icon-wrapper bg-purple-50 dark:bg-purple-900/20 group-hover:bg-[#b84e9d];
+    @apply base-card-icon-wrapper;
+    background-color: #ffffff; /* Blanco en Light Mode */
+  }
+
+  .dark .base-card-icon-wrapper-purple {
+    background-color: rgba(184, 78, 157, 0.2);
+  }
+
+  .base-card-icon-wrapper-purple:hover {
+    background-color: #b84e9d;
   }
 
   .base-card-icon-wrapper-blue {
-    @apply base-card-icon-wrapper bg-blue-50 dark:bg-blue-900/20 group-hover:bg-blue-500;
+    @apply base-card-icon-wrapper;
+    background-color: #ffffff; /* Blanco en Light Mode */
+  }
+
+  .dark .base-card-icon-wrapper-blue {
+    background-color: rgba(59, 130, 246, 0.2);
+  }
+
+  .base-card-icon-wrapper-blue:hover {
+    background-color: #3b82f6;
   }
 
   .base-card-icon-wrapper-emerald {
-    @apply base-card-icon-wrapper bg-emerald-50 dark:bg-emerald-900/20 group-hover:bg-emerald-500;
+    @apply base-card-icon-wrapper;
+    background-color: #ffffff; /* Blanco en Light Mode */
+  }
+
+  .dark .base-card-icon-wrapper-emerald {
+    background-color: rgba(16, 185, 129, 0.2);
+  }
+
+  .base-card-icon-wrapper-emerald:hover {
+    background-color: #10b981;
   }
 
   /* Icono base */
@@ -2736,23 +3133,68 @@
 
   /* Variantes de color para iconos */
   .base-card-icon-amber {
-    @apply base-card-icon text-amber-600 dark:text-amber-400 group-hover:text-white;
+    @apply base-card-icon;
+    color: #f59e0b; /* Color vivo en Light Mode */
+  }
+
+  .dark .base-card-icon-amber {
+    color: #fbbf24; /* Mantener estilo dark */
+  }
+
+  .icon-circle-amber:hover .base-card-icon-amber {
+    color: #ffffff; /* Blanco en hover */
   }
 
   .base-card-icon-cyan {
-    @apply base-card-icon text-cyan-600 dark:text-cyan-400 group-hover:text-white;
+    @apply base-card-icon;
+    color: #06b6d4; /* Color vivo en Light Mode */
+  }
+
+  .dark .base-card-icon-cyan {
+    color: #22d3ee; /* Mantener estilo dark */
+  }
+
+  .icon-circle-cyan:hover .base-card-icon-cyan {
+    color: #ffffff; /* Blanco en hover */
   }
 
   .base-card-icon-purple {
-    @apply base-card-icon text-[#a21caf] dark:text-[#f472b6] group-hover:text-white;
+    @apply base-card-icon;
+    color: #b84e9d; /* Color vivo en Light Mode */
+  }
+
+  .dark .base-card-icon-purple {
+    color: #f472b6; /* Mantener estilo dark */
+  }
+
+  .icon-circle-purple:hover .base-card-icon-purple {
+    color: #ffffff; /* Blanco en hover */
   }
 
   .base-card-icon-blue {
-    @apply base-card-icon text-blue-600 dark:text-blue-400 group-hover:text-white;
+    @apply base-card-icon;
+    color: #3b82f6; /* Color vivo en Light Mode */
+  }
+
+  .dark .base-card-icon-blue {
+    color: #60a5fa; /* Mantener estilo dark */
+  }
+
+  .icon-circle-blue:hover .base-card-icon-blue {
+    color: #ffffff; /* Blanco en hover */
   }
 
   .base-card-icon-emerald {
-    @apply base-card-icon text-emerald-600 dark:text-emerald-400 group-hover:text-white;
+    @apply base-card-icon;
+    color: #10b981; /* Color vivo en Light Mode */
+  }
+
+  .dark .base-card-icon-emerald {
+    color: #34d399; /* Mantener estilo dark */
+  }
+
+  .icon-circle-emerald:hover .base-card-icon-emerald {
+    color: #ffffff; /* Blanco en hover */
   }
 
   /* Título de la card */
@@ -2777,21 +3219,42 @@
 
   /* Variantes de color para badges */
   .base-card-badge-gray {
-    @apply base-card-badge bg-slate-100/50 dark:bg-gray-700 text-slate-600 dark:text-gray-300;
+    @apply base-card-badge;
+    background-color: var(--bg-accent-blue); /* Azul pastel en Light Mode */
+    color: #1e40af; /* Azul oscuro para contraste */
+  }
+
+  .dark .base-card-badge-gray {
+    background-color: rgba(59, 130, 246, 0.2);
+    color: #93c5fd;
   }
 
   .base-card-badge-red {
-    @apply base-card-badge bg-red-50 dark:bg-red-900/20 text-red-600;
+    @apply base-card-badge;
+    background-color: var(--bg-accent-red); /* Rojo pastel en Light Mode */
+    color: #991b1b; /* Rojo oscuro para contraste */
+  }
+
+  .dark .base-card-badge-red {
+    background-color: rgba(239, 68, 68, 0.2);
+    color: #fca5a5;
   }
 
   .base-card-badge-green {
-    @apply base-card-badge bg-green-50 dark:bg-green-900/20 text-green-600;
+    @apply base-card-badge;
+    background-color: var(--bg-accent-green); /* Verde pastel en Light Mode */
+    color: #166534; /* Verde oscuro para contraste */
+  }
+
+  .dark .base-card-badge-green {
+    background-color: rgba(34, 197, 94, 0.2);
+    color: #86efac;
   }
 
   /* Badge corporativo rosa - Estilo profesional con clases Tailwind específicas */
   .base-card-badge-pink {
     @apply inline-flex items-center justify-center;
-    background-color: rgba(184, 78, 157, 0.1);
+    background-color: var(--bg-accent-pink); /* Rosa pastel en Light Mode */
     color: #B84E9D;
     padding: 0.25rem 0.75rem;
     border-radius: 9999px;
@@ -2799,12 +3262,66 @@
     font-weight: 700;
   }
 
+  .dark .base-card-badge-pink {
+    background-color: rgba(184, 78, 157, 0.2);
+    color: #f472b6;
+  }
+
+  /* Badge con fondo pastel según color del icono */
   .base-card-badge-blue {
-    @apply base-card-badge bg-blue-50 dark:bg-blue-900/20 text-blue-600;
+    @apply base-card-badge;
+    background-color: var(--bg-accent-blue); /* Azul pastel en Light Mode */
+    color: #1e40af; /* Azul oscuro para contraste */
+  }
+
+  .dark .base-card-badge-blue {
+    background-color: rgba(59, 130, 246, 0.2);
+    color: #93c5fd;
   }
 
   .base-card-badge-emerald {
-    @apply base-card-badge bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600;
+    @apply base-card-badge;
+    background-color: var(--bg-accent-emerald); /* Esmeralda pastel en Light Mode */
+    color: #065f46; /* Esmeralda oscuro para contraste */
+  }
+
+  .dark .base-card-badge-emerald {
+    background-color: rgba(16, 185, 129, 0.2);
+    color: #6ee7b7;
+  }
+
+  /* Badges específicos para cada color de icono */
+  .base-card-badge-amber {
+    @apply base-card-badge;
+    background-color: var(--bg-accent-amber); /* Ámbar pastel en Light Mode */
+    color: #92400e; /* Ámbar oscuro para contraste */
+  }
+
+  .dark .base-card-badge-amber {
+    background-color: rgba(251, 191, 36, 0.2);
+    color: #fcd34d;
+  }
+
+  .base-card-badge-cyan {
+    @apply base-card-badge;
+    background-color: var(--bg-accent-cyan); /* Cian pastel en Light Mode */
+    color: #155e75; /* Cian oscuro para contraste */
+  }
+
+  .dark .base-card-badge-cyan {
+    background-color: rgba(6, 182, 212, 0.2);
+    color: #67e8f9;
+  }
+
+  .base-card-badge-purple {
+    @apply base-card-badge;
+    background-color: var(--bg-accent-purple); /* Púrpura pastel en Light Mode */
+    color: #6b21a8; /* Púrpura oscuro para contraste */
+  }
+
+  .dark .base-card-badge-purple {
+    background-color: rgba(184, 78, 157, 0.2);
+    color: #f472b6;
   }
 
   /* Cards de acceso rápido (mantener compatibilidad) */
@@ -2941,18 +3458,48 @@
   /* Card de resumen operacional */
   .home-summary-card {
     @apply lg:col-span-2 studio-card rounded-2xl;
+    background-color: #ffffff !important; /* Blanco puro en Light Mode - Forzado */
+  }
+
+  .dark .home-summary-card {
+    background-color: #131B29 !important; /* Mantener estilo dark */
   }
 
   .home-summary-title {
-    @apply text-xl font-bold font-poppins mb-6 text-slate-900 dark:text-white;
+    @apply text-xl font-bold font-poppins mb-6;
+    color: #111827 !important; /* Forzar texto oscuro en Light Mode */
+  }
+
+  .dark .home-summary-title {
+    color: #ffffff !important; /* Mantener blanco en Dark Mode */
   }
 
   .home-summary-list {
     @apply space-y-4;
+    background-color: transparent !important; /* Asegurar que no tenga fondo gris */
   }
 
   .home-summary-item {
-    @apply flex items-center justify-between p-4 rounded-xl bg-slate-50 dark:bg-secondary-900/50 hover:bg-slate-100 dark:hover:bg-[#1a2333] transition-colors;
+    @apply flex items-center justify-between p-4 rounded-xl transition-colors;
+    background-color: transparent !important; /* Eliminar fondo gris en Light Mode */
+    border-bottom: 1px solid #f1f5f9; /* Separador tenue en Light Mode */
+  }
+
+  .home-summary-item:last-child {
+    border-bottom: none; /* Sin borde en el último item */
+  }
+
+  .home-summary-item:hover {
+    background-color: rgba(248, 250, 252, 0.5) !important; /* Hover muy sutil en Light Mode */
+  }
+
+  .dark .home-summary-item {
+    background-color: rgba(19, 27, 41, 0.5) !important; /* Mantener estilo dark */
+    border-bottom-color: #2A3B5A; /* Borde en Dark Mode */
+  }
+
+  .dark .home-summary-item:hover {
+    background-color: rgba(26, 35, 51, 0.8) !important; /* Hover en Dark Mode */
   }
 
   .home-summary-indicator {
@@ -2973,19 +3520,42 @@
 
   .home-summary-item-content {
     @apply flex items-center gap-4;
+    background-color: transparent !important; /* Asegurar que no tenga fondo */
+  }
+
+  /* Asegurar que el contenedor del resumen no tenga fondos grises */
+  .home-summary-card > div {
+    background-color: transparent !important;
   }
 
   .home-summary-item-text {
-    @apply font-semibold text-base text-slate-900 dark:text-white;
+    @apply font-semibold text-base;
+    color: #111827 !important; /* Forzar texto oscuro en Light Mode */
+  }
+
+  .dark .home-summary-item-text {
+    color: #ffffff !important; /* Mantener blanco en Dark Mode */
   }
 
   .home-summary-item-subtext {
-    @apply text-sm text-slate-500 dark:text-slate-400;
+    @apply text-sm;
+    color: #111827 !important; /* Forzar texto oscuro en Light Mode (opacidad aplicada por Tailwind) */
+    opacity: 0.7; /* Simular text-slate-500 pero forzando base oscura */
+  }
+
+  .dark .home-summary-item-subtext {
+    color: #a3a3a3 !important; /* Mantener gris claro en Dark Mode */
+    opacity: 1;
   }
 
   /* Clase centralizada para cifras monetarias */
   .summary-amount {
-    @apply text-slate-900 dark:text-white font-bold;
+    @apply font-bold;
+    color: #111827 !important; /* Forzar texto oscuro en Light Mode */
+  }
+
+  .dark .summary-amount {
+    color: #ffffff !important; /* Mantener blanco en Dark Mode */
   }
 
   .home-summary-item-amount {
@@ -3007,6 +3577,11 @@
   /* Panel de alertas */
   .home-alerts-card {
     @apply studio-card rounded-2xl;
+    background-color: #ffffff; /* Blanco puro en Light Mode */
+  }
+
+  .dark .home-alerts-card {
+    background-color: #131B29; /* Mantener estilo dark */
   }
 
   .home-alerts-header {
@@ -3818,11 +4393,23 @@
 
   /* Contenedor de paginación */
   .pagination-container {
-    @apply w-full flex items-center justify-between border-t border-[#e5e5e5] dark:border-[#2A3B5A] pt-6 pb-4 bg-white dark:bg-[#131B29] px-4 mt-0 flex-shrink-0;
+    @apply w-full flex items-center justify-between border-t pt-6 pb-4 px-4 mt-0 flex-shrink-0;
+    background-color: #ffffff !important; /* Fondo blanco en Light Mode */
+    border-top-color: #e5e7eb !important; /* Borde gris claro en Light Mode */
+  }
+
+  .dark .pagination-container {
+    background-color: #131B29 !important; /* Mantener estilo dark */
+    border-top-color: #2A3B5A !important; /* Mantener borde dark */
   }
 
   .pagination-info {
-    @apply text-sm text-[#525252] dark:text-[#a3a3a3];
+    @apply text-sm;
+    color: #1f2937 !important; /* Negro/gris oscuro en Light Mode */
+  }
+
+  .dark .pagination-info {
+    color: #a3a3a3 !important; /* Mantener estilo dark */
   }
 
   .pagination-controls {
@@ -3830,7 +4417,24 @@
   }
 
   .pagination-button {
-    @apply w-8 h-8 rounded-lg border border-[#e5e5e5] dark:border-[#2A3B5A] bg-white dark:bg-[#1B273B] text-sm font-medium text-[#525252] dark:text-[#a3a3a3] hover:bg-[#f5f5f5] dark:hover:bg-[#2A3B5A] transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply w-8 h-8 rounded-lg border text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+    background-color: #ffffff !important; /* Fondo blanco en Light Mode */
+    border-color: #e5e7eb !important; /* Borde gris claro en Light Mode */
+    color: #1f2937 !important; /* Negro/gris oscuro en Light Mode */
+  }
+
+  .pagination-button:hover:not(:disabled) {
+    background-color: #f5f5f5 !important; /* Hover gris claro en Light Mode */
+  }
+
+  .dark .pagination-button {
+    background-color: #1B273B !important; /* Mantener estilo dark */
+    border-color: #2A3B5A !important; /* Mantener borde dark */
+    color: #a3a3a3 !important; /* Mantener color dark */
+  }
+
+  .dark .pagination-button:hover:not(:disabled) {
+    background-color: #2A3B5A !important; /* Mantener hover dark */
   }
 
   .pagination-button-active {
@@ -3838,11 +4442,49 @@
   }
 
   .pagination-number-button {
-    @apply w-8 h-8 rounded-full border border-[#e5e5e5] dark:border-[#2A3B5A] bg-white dark:bg-[#1B273B] text-sm font-medium text-[#525252] dark:text-[#a3a3a3] hover:bg-[#f5f5f5] dark:hover:bg-[#2A3B5A] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center;
+    @apply w-8 h-8 rounded-full border text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center;
+    background-color: #ffffff !important; /* Fondo blanco en Light Mode */
+    border-color: #e5e7eb !important; /* Borde gris claro en Light Mode */
+    color: #1f2937 !important; /* Negro/gris oscuro en Light Mode */
+  }
+
+  .pagination-number-button:hover:not(:disabled) {
+    background-color: #f5f5f5 !important; /* Hover gris claro en Light Mode */
+  }
+
+  .dark .pagination-number-button {
+    background-color: #1B273B !important; /* Mantener estilo dark */
+    border-color: #2A3B5A !important; /* Mantener borde dark */
+    color: #e5e7eb !important; /* Gris claro/blanco en Dark Mode para mejor visibilidad */
+  }
+
+  .dark .pagination-number-button:hover:not(:disabled) {
+    background-color: #2A3B5A !important; /* Mantener hover dark */
   }
 
   .pagination-number-button-active {
-    @apply pagination-number-button bg-[#B84E9D] text-white border-[#B84E9D] hover:bg-[#9C3C86];
+    @apply pagination-number-button font-bold;
+    /* Light Mode: Fondo rosa suave con texto rosa fuerte */
+    background-color: #fce7f3 !important; /* Fondo rosa suave */
+    border-color: #B84E9D !important; /* Borde rosa */
+    color: #B84E9D !important; /* Texto rosa fuerte */
+  }
+
+  .pagination-number-button-active:hover:not(:disabled) {
+    background-color: #f9d0e8 !important; /* Hover rosa un poco más intenso */
+  }
+
+  .dark .pagination-number-button-active {
+    /* Dark Mode: Rosa brillante (#B84E9D) con negrita, sin fondo gris */
+    background-color: transparent !important; /* Sin fondo para que resalte el rosa */
+    border-color: #B84E9D !important; /* Borde rosa brillante */
+    color: #B84E9D !important; /* Texto rosa brillante */
+    font-weight: 700 !important; /* Negrita para mayor énfasis */
+  }
+
+  .dark .pagination-number-button-active:hover:not(:disabled) {
+    background-color: rgba(184, 78, 157, 0.1) !important; /* Hover con fondo rosa muy suave */
+    color: #ff0080 !important; /* Rosa más brillante en hover para dark mode */
   }
 
   /* Botones Hero de Acción para Dashboard de Clientes */
@@ -3910,20 +4552,45 @@
   }
 
   .pagination-ellipsis {
-    @apply w-8 h-8 flex items-center justify-center text-sm text-[#525252] dark:text-[#a3a3a3] font-medium;
+    @apply w-8 h-8 flex items-center justify-center text-sm font-medium;
+    color: #1f2937 !important; /* Negro/gris oscuro en Light Mode */
+  }
+
+  .dark .pagination-ellipsis {
+    color: #a3a3a3 !important; /* Mantener estilo dark */
   }
 
   .pagination-button-icon {
     @apply material-symbols-outlined text-lg;
+    color: inherit; /* Hereda el color del botón padre */
   }
 
   .pagination-select {
-    @apply h-8 px-3 rounded-lg border border-[#e5e5e5] dark:border-[#2A3B5A] bg-white dark:bg-[#1B273B] text-sm font-medium text-[#525252] dark:text-[#a3a3a3] hover:bg-[#f5f5f5] dark:hover:bg-[#2A3B5A] focus:outline-none focus:ring-2 focus:ring-[#B84E9D] focus:border-[#B84E9D] transition-colors cursor-pointer;
+    @apply h-8 px-3 rounded-lg border text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#B84E9D] focus:border-[#B84E9D] transition-colors cursor-pointer;
+    background-color: #ffffff !important; /* Fondo blanco en Light Mode */
+    border-color: #e5e7eb !important; /* Borde gris claro en Light Mode */
+    color: #1f2937 !important; /* Negro/gris oscuro en Light Mode */
+  }
+
+  .pagination-select:hover {
+    background-color: #f5f5f5 !important; /* Hover gris claro en Light Mode */
+  }
+
+  .dark .pagination-select {
+    background-color: #1B273B !important; /* Mantener estilo dark */
+    border-color: #2A3B5A !important; /* Mantener borde dark */
+    color: #a3a3a3 !important; /* Mantener color dark */
+  }
+
+  .dark .pagination-select:hover {
+    background-color: #2A3B5A !important; /* Mantener hover dark */
   }
 
   /* Barra de herramientas superior */
   .action-toolbar {
     @apply flex items-center justify-between mb-8;
+    background-color: transparent !important; /* Fondo transparente */
+    color: var(--text-primary) !important; /* Usar variable CSS para el color del texto */
   }
 
   /* Buscador */
@@ -3932,11 +4599,91 @@
   }
 
   .search-input {
-    @apply w-full pl-10 pr-4 py-2.5 bg-white dark:bg-[#1B273B] border border-[#e5e5e5] dark:border-[#2A3B5A] rounded-lg text-sm font-medium text-[#171717] dark:text-[#fafafa] placeholder:text-[#a3a3a3] dark:placeholder:text-[#737373] focus:outline-none focus:ring-2 focus:ring-[#B84E9D] focus:border-[#B84E9D] hover:border-[#a3a3a3] transition-all shadow-sm;
+    @apply w-full pl-10 pr-4 py-2.5 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#B84E9D] focus:border-[#B84E9D] transition-all shadow-sm;
+    background-color: #ffffff !important; /* Blanco puro en Light Mode */
+    border: 1px solid #e2e8f0 !important; /* Borde gris claro en Light Mode */
+    color: #1e293b !important; /* Negro/gris oscuro en Light Mode */
+  }
+
+  .search-input::placeholder {
+    color: #94a3b8 !important; /* Gris suave para placeholder en Light Mode */
+  }
+
+  .dark .search-input {
+    background-color: #1B273B !important; /* Mantener estilo dark */
+    border-color: #2A3B5A !important; /* Mantener borde dark */
+    color: #fafafa !important; /* Mantener color dark */
+  }
+
+  .dark .search-input::placeholder {
+    color: #737373 !important; /* Mantener placeholder dark */
   }
 
   .search-input-icon {
-    @apply absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-[#a3a3a3] dark:text-[#737373] text-lg pointer-events-none;
+    @apply absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-lg pointer-events-none;
+    color: #1e293b !important; /* Negro/gris oscuro en Light Mode */
+  }
+
+  .dark .search-input-icon {
+    color: #737373 !important; /* Mantener estilo dark */
+  }
+
+  /* Universal Search Bar */
+  .universal-search-bar {
+    @apply relative flex items-center w-full max-w-md;
+  }
+
+  .universal-search-icon {
+    @apply absolute left-3 top-1/2 -translate-y-1/2 text-lg pointer-events-none;
+    color: #1e293b !important; /* Negro/gris oscuro en Light Mode */
+  }
+
+  .dark .universal-search-icon {
+    color: #737373 !important; /* Mantener estilo dark */
+  }
+
+  .universal-search-input {
+    @apply w-full pl-10 pr-10 py-2.5 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#B84E9D] focus:border-[#B84E9D] transition-all shadow-sm;
+    background-color: #ffffff !important; /* Blanco puro en Light Mode */
+    border: 1px solid #e2e8f0 !important; /* Borde gris claro en Light Mode */
+    color: #1e293b !important; /* Negro/gris oscuro en Light Mode */
+  }
+
+  .universal-search-input::placeholder {
+    color: #94a3b8 !important; /* Gris suave para placeholder en Light Mode */
+  }
+
+  .dark .universal-search-input {
+    background-color: #1B273B !important; /* Mantener estilo dark */
+    border-color: #2A3B5A !important; /* Mantener borde dark */
+    color: #fafafa !important; /* Mantener color dark */
+  }
+
+  .dark .universal-search-input::placeholder {
+    color: #737373 !important; /* Mantener placeholder dark */
+  }
+
+  .universal-search-clear {
+    @apply absolute right-3 top-1/2 -translate-y-1/2 flex items-center justify-center w-6 h-6 rounded-full transition-colors cursor-pointer;
+    color: #1e293b !important; /* Negro/gris oscuro en Light Mode */
+  }
+
+  .universal-search-clear:hover {
+    background-color: #f8fafc !important; /* Hover gris muy ligero en Light Mode */
+    color: #1e293b !important; /* Mantener color en hover */
+  }
+
+  .dark .universal-search-clear {
+    color: #737373 !important; /* Mantener estilo dark */
+  }
+
+  .dark .universal-search-clear:hover {
+    background-color: #2A3B5A !important; /* Mantener hover dark */
+    color: #fafafa !important; /* Mantener color dark en hover */
+  }
+
+  .universal-search-clear .material-symbols-outlined {
+    @apply text-lg;
   }
 
   /* Grupo de botones de la barra de herramientas */
@@ -3945,17 +4692,35 @@
   }
 
   .toolbar-button {
-    @apply rounded-lg border border-[#e5e5e5] dark:border-[#2A3B5A] bg-white dark:bg-[#1B273B] text-[#525252] dark:text-[#a3a3a3] hover:bg-[#f5f5f5] dark:hover:bg-[#2A3B5A] transition-colors flex items-center justify-center;
+    @apply rounded-lg transition-colors flex items-center justify-center;
     min-width: 2.75rem; /* 44px - tamaño táctil óptimo */
     min-height: 2.75rem; /* 44px */
     padding: 0.625rem 1rem; /* py-2.5 px-4 */
     font-size: 0.9375rem; /* text-[15px] */
     font-weight: 500;
+    background-color: #ffffff !important; /* Fondo blanco en Light Mode */
+    border: 1px solid #e2e8f0 !important; /* Borde gris en Light Mode */
+    color: #1e293b !important; /* Texto/icono negro en Light Mode */
+  }
+
+  .toolbar-button:hover:not(:disabled) {
+    background-color: #f8fafc !important; /* Hover gris muy ligero en Light Mode */
+  }
+
+  .dark .toolbar-button {
+    background-color: #1B273B !important; /* Mantener estilo dark */
+    border-color: #2A3B5A !important; /* Mantener borde dark */
+    color: #a3a3a3 !important; /* Mantener color dark */
+  }
+
+  .dark .toolbar-button:hover:not(:disabled) {
+    background-color: #2A3B5A !important; /* Mantener hover dark */
   }
 
   .toolbar-button-icon {
     @apply material-symbols-outlined;
     font-size: 1.25rem; /* text-xl - 20px */
+    color: inherit; /* Hereda el color del botón padre */
   }
 
   .toolbar-button-primary {
@@ -4290,7 +5055,12 @@
   }
 
   .page-header-title {
-    @apply text-3xl font-bold font-poppins text-slate-900 dark:text-white;
+    @apply text-3xl font-bold font-poppins;
+    color: #0f172a !important; /* Negro puro en Light Mode - Forzado */
+  }
+
+  .dark .page-header-title {
+    color: #ffffff !important; /* Mantener blanco en Dark Mode */
   }
 
   /* ============================================
@@ -4819,11 +5589,27 @@
 
   /* Chart Tooltip - Soporte para dark/light mode */
   .chart-tooltip {
-    @apply bg-white dark:bg-[#1f2937] border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3;
+    background-color: #ffffff !important; /* Fondo blanco puro en Light Mode */
+    border: 1px solid #e2e8f0 !important; /* Borde gris claro en Light Mode */
+    border-radius: 0.5rem;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    padding: 0.75rem;
+  }
+
+  .dark .chart-tooltip {
+    background-color: #1f2937 !important; /* Mantener estilo dark */
+    border-color: #374151 !important;
   }
 
   .chart-tooltip-label {
-    @apply text-sm font-semibold text-gray-900 dark:text-white mb-2 pb-2 border-b border-gray-200 dark:border-gray-700;
+    @apply text-sm font-semibold mb-2 pb-2 border-b;
+    color: #1e293b !important; /* Texto negro en Light Mode */
+    border-bottom-color: #e2e8f0 !important; /* Borde gris claro */
+  }
+
+  .dark .chart-tooltip-label {
+    color: #ffffff !important; /* Mantener blanco en Dark Mode */
+    border-bottom-color: #374151 !important;
   }
 
   .chart-tooltip-item {
@@ -4831,11 +5617,52 @@
   }
 
   .chart-tooltip-name {
-    @apply text-gray-600 dark:text-gray-400;
+    color: #1e293b !important; /* Texto negro en Light Mode */
+  }
+
+  .dark .chart-tooltip-name {
+    color: #9ca3af !important; /* Mantener gris en Dark Mode */
   }
 
   .chart-tooltip-value {
-    @apply font-semibold text-gray-900 dark:text-white;
+    @apply font-semibold;
+    color: #1e293b !important; /* Texto negro en Light Mode */
+  }
+
+  .dark .chart-tooltip-value {
+    color: #ffffff !important; /* Mantener blanco en Dark Mode */
+  }
+
+  /* Estilos para ejes y leyendas de Recharts en modo Light */
+  /* Ejes (XAxis, YAxis) - Color gris oscuro en Light Mode */
+  :not(.dark) .recharts-cartesian-axis-tick text,
+  :not(.dark) .recharts-cartesian-axis-tick-value,
+  :not(.dark) .recharts-cartesian-axis-tick tspan {
+    fill: #64748b !important; /* Gris oscuro en Light Mode */
+  }
+
+  .dark .recharts-cartesian-axis-tick text,
+  .dark .recharts-cartesian-axis-tick-value,
+  .dark .recharts-cartesian-axis-tick tspan {
+    fill: #e2e8f0 !important; /* Mantener claro en Dark Mode */
+  }
+
+  /* Leyendas (Legend) - Color gris oscuro en Light Mode */
+  :not(.dark) .recharts-legend-item-text {
+    color: #64748b !important; /* Gris oscuro en Light Mode */
+  }
+
+  .dark .recharts-legend-item-text {
+    color: #e2e8f0 !important; /* Mantener claro en Dark Mode */
+  }
+
+  /* Líneas de la cuadrícula (CartesianGrid) */
+  :not(.dark) .recharts-cartesian-grid line {
+    stroke: #e2e8f0 !important; /* Gris claro en Light Mode */
+  }
+
+  .dark .recharts-cartesian-grid line {
+    stroke: #2A3B5A !important; /* Mantener estilo dark */
   }
 
   /* ============================================

@@ -26,7 +26,19 @@ const BADGE_COLORS = {
   pink: 'base-card-badge-pink',
   blue: 'base-card-badge-blue',
   emerald: 'base-card-badge-emerald',
+  amber: 'base-card-badge-amber',
+  cyan: 'base-card-badge-cyan',
+  purple: 'base-card-badge-purple',
 } as const;
+
+// Mapeo de color de badge según color de icono (para usar automáticamente)
+const ICON_TO_BADGE_COLOR: Record<keyof typeof ICON_CIRCLE_COLORS, keyof typeof BADGE_COLORS> = {
+  amber: 'amber',
+  cyan: 'cyan',
+  purple: 'purple',
+  blue: 'blue',
+  emerald: 'emerald',
+};
 
 export interface CardProps {
   title?: string;
@@ -34,7 +46,7 @@ export interface CardProps {
   icon?: string;
   iconColor?: 'amber' | 'cyan' | 'purple' | 'blue' | 'emerald';
   badge?: string;
-  badgeColor?: 'gray' | 'red' | 'green' | 'pink' | 'blue' | 'emerald';
+  badgeColor?: 'gray' | 'red' | 'green' | 'pink' | 'blue' | 'emerald' | 'amber' | 'cyan' | 'purple' | undefined;
   onClick?: ((e: React.MouseEvent<HTMLDivElement>) => void) | (() => void);
   children?: React.ReactNode;
   className?: string;
@@ -46,7 +58,7 @@ export const Card: React.FC<CardProps> = ({
   icon,
   iconColor = 'amber',
   badge,
-  badgeColor = 'gray',
+  badgeColor,
   onClick,
   children,
   className = '',
@@ -67,7 +79,10 @@ export const Card: React.FC<CardProps> = ({
   // Obtener clases usando el mapeo (Tailwind puede detectarlas)
   const iconCircleClass = iconColor ? ICON_CIRCLE_COLORS[iconColor] : '';
   const iconClass = iconColor ? ICON_COLORS[iconColor] : '';
-  const badgeClass = badgeColor ? BADGE_COLORS[badgeColor] : '';
+  
+  // Si no se especifica badgeColor, usar el color del icono automáticamente
+  const resolvedBadgeColor = badgeColor || (iconColor ? ICON_TO_BADGE_COLOR[iconColor] : 'gray');
+  const badgeClass = resolvedBadgeColor ? BADGE_COLORS[resolvedBadgeColor] : '';
 
   return (
     <div

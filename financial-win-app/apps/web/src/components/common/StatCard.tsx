@@ -10,28 +10,28 @@ interface StatCardProps {
 
 const colorClasses = {
   blue: {
-    bg: 'bg-blue-100 dark:bg-blue-900/20',
-    icon: 'text-blue-600 dark:text-blue-400',
+    bg: 'bg-white border border-slate-100 dark:bg-blue-500/15',
+    icon: 'text-blue-600 dark:text-blue-300',
   },
   green: {
-    bg: 'bg-green-100 dark:bg-green-900/20',
-    icon: 'text-green-600 dark:text-green-400',
+    bg: 'bg-white border border-slate-100 dark:bg-green-500/15',
+    icon: 'text-green-600 dark:text-green-300',
   },
   purple: {
-    bg: 'bg-purple-100 dark:bg-purple-900/20',
+    bg: 'bg-white border border-slate-100 dark:bg-purple-500/15',
     icon: 'text-purple-600 dark:text-purple-400',
   },
   red: {
-    bg: 'bg-red-100 dark:bg-red-900/20',
-    icon: 'text-red-600 dark:text-red-400',
+    bg: 'bg-white border border-slate-100 dark:bg-red-500/15',
+    icon: 'text-red-600 dark:text-red-300',
   },
   orange: {
-    bg: 'bg-orange-100 dark:bg-orange-900/20',
-    icon: 'text-orange-600 dark:text-orange-400',
+    bg: 'bg-white border border-slate-100 dark:bg-orange-500/15',
+    icon: 'text-orange-600 dark:text-orange-300',
   },
   yellow: {
-    bg: 'bg-yellow-100 dark:bg-yellow-900/20',
-    icon: 'text-yellow-600 dark:text-yellow-400',
+    bg: 'bg-white border border-slate-100 dark:bg-yellow-500/15',
+    icon: 'text-yellow-600 dark:text-yellow-300',
   },
 };
 

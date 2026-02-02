@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CategoriaProveedor, Proveedor } from '../../features/entities/types';
+import { CategoriaProveedor } from '../../features/entities/types';
 import { EntityFilterPanel, type EntityFilterValues } from '@/features/entities/components/EntityFilterPanel';
 import { DataTablePagination } from '../../components/common/DataTablePagination';
 import { EmptyState } from '../../components/common/EmptyState';
@@ -11,14 +11,17 @@ import {
   EntityCardsView,
   type EntityTableItem,
   type EntityCardItem,
+  UniversalSearchBar,
 } from '../../components/common';
 import { exportToExcel, type ExportColumn } from '../../utils/exportToExcel';
+import { useToast } from '../../contexts/ToastContext';
+import { odooService, type OdooPartner } from '../../services/odooService';
 
-const STORAGE_KEY = 'zaffra_suppliers';
 const VIEW_TYPE_STORAGE_KEY = 'proveedores_view_type';
 
 export const ProveedoresListPage: React.FC = () => {
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [busqueda, setBusqueda] = useState('');
@@ -33,40 +36,59 @@ export const ProveedoresListPage: React.FC = () => {
     balanceRange: { min: null, max: null },
     paymentsRange: { min: null, max: null },
   });
+  const [isImporting, setIsImporting] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [partners, setPartners] = useState<OdooPartner[]>([]);
 
   // Persistir el tipo de vista en localStorage
   useEffect(() => {
     localStorage.setItem(VIEW_TYPE_STORAGE_KEY, viewType);
   }, [viewType]);
 
-  // Cargar proveedores del localStorage
-  const proveedores = useMemo(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (!stored) return [];
-      const data: Proveedor[] = JSON.parse(stored);
-      return data.filter((p) => p.is_active !== false);
-    } catch (error) {
-      console.error('Error al cargar proveedores del localStorage:', error);
-      return [];
-    }
-  }, []);
+  // Cargar proveedores directamente desde Odoo
+  useEffect(() => {
+    const loadPartners = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const result = await odooService.getPartners('supplier');
+        setPartners(result);
+      } catch (err) {
+        console.error('Error al cargar proveedores desde Odoo:', err);
+        setError(
+          err instanceof Error
+            ? err.message
+            : 'Error desconocido al cargar proveedores desde Odoo.'
+        );
+        showToast(
+          'No se pudieron cargar los proveedores desde Odoo. Revisa la configuración de Odoo.',
+          'error'
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    void loadPartners();
+  }, [refreshKey, showToast]);
 
   // Convertir proveedores al formato de lista
   const proveedoresLista = useMemo(() => {
-    return proveedores.map((p): EntityTableItem & EntityCardItem => ({
-      id: p.id || '',
-      nombre: p.nombreComercial || p.razonSocial || '',
-      nif: p.cif || '',
-      tipo: p.categoria || 'Proveedor Externo',
-      estado: p.is_active === false ? 'inactivo' : 'activo',
+    return partners.map((p): EntityTableItem & EntityCardItem => ({
+      id: String(p.id),
+      nombre: p.name,
+      nif: p.vat || '',
+      tipo: 'Proveedor Externo',
+      estado: 'activo',
       saldoBancario: 0,
       pagosPendientes: 0,
-      email: p.ordersEmail,
-      phone: p.telefono,
-      ciudad: p.ciudad,
+      email: p.email,
+      phone: '',
+      ciudad: p.city,
     }));
-  }, [proveedores]);
+  }, [partners]);
 
   // Filtrar proveedores por búsqueda y filtros avanzados
   const proveedoresFiltrados = useMemo(() => {
@@ -204,25 +226,80 @@ export const ProveedoresListPage: React.FC = () => {
     exportToExcel(dataToExport, filename, columns);
   };
 
+  const handleImportarOdoo = async () => {
+    setIsImporting(true);
+    try {
+      // Forzar recarga desde Odoo
+      setRefreshKey((prev) => prev + 1);
+      showToast('Proveedores sincronizados desde Odoo', 'success');
+    } catch (error) {
+      console.error('Error al sincronizar proveedores desde Odoo:', error);
+      showToast(
+        `Error al sincronizar proveedores desde Odoo: ${
+          error instanceof Error ? error.message : 'Error desconocido'
+        }`,
+        'error'
+      );
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   return (
     <div className="clients-list-container flex flex-col h-full">
       <ListViewHeader
         title="Lista de Proveedores"
         showBackButton
         onBack={handleVolver}
-        showSearch
-        searchValue={busqueda}
-        onSearchChange={setBusqueda}
-        searchPlaceholder="Buscar proveedor (Nombre, CIF)..."
+        showSearch={false}
         viewType={viewType}
         onViewTypeChange={setViewType}
         onFilterClick={handleFiltro}
         onDownloadClick={handleDescarga}
         onAddClick={handleNuevoProveedor}
       />
+      <div className="action-toolbar mb-6">
+        <div className="flex gap-4 items-center">
+          <div className="flex-1">
+            <UniversalSearchBar
+              items={proveedoresLista}
+              onFilter={() => {
+                // El filtrado se maneja en proveedoresFiltrados usando busqueda
+              }}
+              onSearchTermChange={setBusqueda}
+              searchFields={['nombre', 'nif', 'email', 'ciudad']}
+              placeholder="Buscar por nombre, nif, email, ciudad..."
+            />
+          </div>
+          <button
+            type="button"
+            onClick={handleImportarOdoo}
+            disabled={isImporting}
+            className="btn btn-secondary"
+          >
+            <span className="material-symbols-outlined mr-2">
+              {isImporting ? 'sync' : 'download'}
+            </span>
+            {isImporting ? 'Importando...' : 'Importar de Odoo'}
+          </button>
+        </div>
+      </div>
 
       <div className="flex flex-col flex-grow gap-8 py-6 min-h-0">
-        {proveedoresPaginados.length > 0 ? (
+        {isLoading ? (
+          <div className="flex justify-center items-center h-full">
+            <span className="material-symbols-outlined mr-2 animate-spin">
+              progress_activity
+            </span>
+            <span>Cargando proveedores desde Odoo...</span>
+          </div>
+        ) : error ? (
+          <EmptyState
+            title="Error al cargar proveedores"
+            description={error}
+            icon="warning"
+          />
+        ) : proveedoresPaginados.length > 0 ? (
           <>
             <div className="flex-grow overflow-y-auto pb-4">
               {viewType === 'table' ? (

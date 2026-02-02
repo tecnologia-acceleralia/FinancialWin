@@ -4,7 +4,7 @@ import { useFinancial } from '../../contexts/FinancialContext';
 import { GastosTable } from '../../features/finance/components/GastosTable';
 import { PageHeader, type PageHeaderAction } from '../../components/layout';
 import { FilterPanel, type FilterValues } from '../../features/finance/components/FilterPanel';
-import { StatCard } from '../../components/common';
+import { StatCard, UniversalSearchBar } from '../../components/common';
 import { exportToCSV } from '../../utils/exportToCSV';
 import { importFromExcel } from '../../utils/importFromExcel';
 import { useToast } from '../../contexts/ToastContext';
@@ -271,16 +271,37 @@ export const GastosPage: React.FC = () => {
     setFilters(newFilters);
   };
 
+  // Preparar datos para UniversalSearchBar
+  const gastosForSearch = useMemo(() => {
+    return expenses
+      .filter((expense) => expense.data.supplier && expense.data.total)
+      .map((expense) => ({
+        id: expense.id,
+        proveedor: expense.data.supplier || '',
+        departamento: expense.data.department || '',
+        via: 'Transferencia',
+        total: expense.data.total?.toString() || '',
+      }));
+  }, [expenses]);
+
   return (
     <div className="layout-page-container">
       <PageHeader
         title="Gastos"
-        showSearch={true}
-        searchValue={busqueda}
-        onSearchChange={setBusqueda}
-        searchPlaceholder="Buscar gasto (proveedor, departamento, tipo)..."
+        showSearch={false}
         actions={headerActions}
       />
+      <div className="action-toolbar">
+        <UniversalSearchBar
+          items={gastosForSearch}
+          onFilter={() => {
+            // El filtrado se maneja en GastosTable usando searchTerm
+          }}
+          onSearchTermChange={setBusqueda}
+          searchFields={['proveedor', 'departamento', 'via', 'total']}
+          placeholder="Buscar por proveedor, departamento, via, total..."
+        />
+      </div>
       <div className="studio-container">
         {/* Tarjetas de Resumen Compactas */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">

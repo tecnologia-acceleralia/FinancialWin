@@ -19,3 +19,5 @@ export { EntityTableView } from './EntityTableView';
 export type { EntityTableViewProps, EntityTableItem } from './EntityTableView';
 export { EntityCardsView } from './EntityCardsView';
 export type { EntityCardsViewProps, EntityCardItem } from './EntityCardsView';
+export { UniversalSearchBar } from './UniversalSearchBar';
+export type { UniversalSearchBarProps } from './UniversalSearchBar';

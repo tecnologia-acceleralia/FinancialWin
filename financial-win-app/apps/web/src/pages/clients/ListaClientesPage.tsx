@@ -11,6 +11,7 @@ import {
   EntityCardsView,
   type EntityTableItem,
   type EntityCardItem,
+  UniversalSearchBar,
 } from '../../components/common';
 import { exportToExcel, type ExportColumn } from '../../utils/exportToExcel';
 
@@ -205,16 +206,24 @@ export const ListaClientesPage: React.FC = () => {
       <ListViewHeader
         title="Lista de Clientes"
         showBackButton={false}
-        showSearch={true}
-        searchValue={busqueda}
-        onSearchChange={setBusqueda}
-        searchPlaceholder="Buscar cliente (Nombre, CIF)..."
+        showSearch={false}
         viewType={viewType}
         onViewTypeChange={setViewType}
         onFilterClick={handleFiltro}
         onDownloadClick={handleDescarga}
         onAddClick={handleNuevoCliente}
       />
+      <div className="action-toolbar mb-6">
+        <UniversalSearchBar<EntityTableItem & EntityCardItem>
+          items={clientesLista}
+          onFilter={(_filteredItems: (EntityTableItem & EntityCardItem)[]) => {
+            // El filtrado se maneja en clientesFiltrados usando busqueda
+          }}
+          onSearchTermChange={setBusqueda}
+          searchFields={['nombre', 'nif', 'ciudad']}
+          placeholder="Buscar por nombre, nif, ciudad..."
+        />
+      </div>
 
       <div className="flex flex-col flex-grow gap-8 py-6 min-h-0">
         {clientesPaginados.length > 0 ? (

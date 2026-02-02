@@ -4,8 +4,7 @@ import { ProveedorForm } from '../../features/entities/components/ProveedorForm'
 import { Proveedor } from '../../features/entities/types';
 import { PageHeader } from '../../components/layout';
 import { useToast } from '../../contexts/ToastContext';
-
-const STORAGE_KEY = 'zaffra_suppliers';
+import { odooService } from '../../services/odooService';
 
 interface SeccionInfo {
   id: string;
@@ -86,25 +85,10 @@ export const NuevoProveedorPage: React.FC = () => {
         return;
       }
 
-      // Obtener proveedores existentes del localStorage
-      const existingData = localStorage.getItem(STORAGE_KEY);
-      const proveedores: Proveedor[] = existingData ? JSON.parse(existingData) : [];
+      // Crear partner en Odoo como proveedor
+      await odooService.createPartner('supplier', data);
 
-      // Generar ID único si no existe
-      const nuevoProveedor: Proveedor = {
-        ...data,
-        id: data.id || `proveedor-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        created_at: data.created_at || new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-
-      // Agregar el nuevo proveedor
-      proveedores.push(nuevoProveedor);
-
-      // Guardar en localStorage
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(proveedores));
-
-      showToast('Proveedor guardado correctamente', 'success');
+      showToast('Proveedor creado correctamente en Odoo', 'success');
 
       // Navegar según la acción seleccionada
       if (shouldNavigateAfterSave === 'nuevo') {
@@ -115,8 +99,13 @@ export const NuevoProveedorPage: React.FC = () => {
       }
       setShouldNavigateAfterSave(null);
     } catch (error) {
-      console.error('Error al guardar proveedor:', error);
-      showToast('Error al guardar el proveedor', 'error');
+      console.error('Error al crear proveedor en Odoo:', error);
+      showToast(
+        error instanceof Error
+          ? `Error al crear el proveedor en Odoo: ${error.message}`
+          : 'Error desconocido al crear el proveedor en Odoo',
+        'error'
+      );
     }
   };
 

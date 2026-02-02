@@ -29,6 +29,8 @@ export interface Proveedor {
   ordersEmail?: string;
   telefono?: string;
   web?: string;
+  puesto?: string;
+  cuentaContable?: string;
   // Dirección y Facturación
   direccion?: string;
   ciudad?: string;
@@ -62,6 +64,8 @@ export interface CreateProveedorDto {
   ordersEmail?: string;
   telefono?: string;
   web?: string;
+  puesto?: string;
+  cuentaContable?: string;
   direccion?: string;
   ciudad?: string;
   zip?: string;

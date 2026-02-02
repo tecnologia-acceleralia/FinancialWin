@@ -5,6 +5,7 @@ import { PageHeader, type PageHeaderAction } from '../../components/layout';
 import { FilterPanel, type FilterValues } from '../../features/finance/components/FilterPanel';
 import { exportToCSV } from '../../utils/exportToCSV';
 import { useToast } from '../../contexts/ToastContext';
+import { UniversalSearchBar } from '../../components/common';
 
 // Subcomponente: Resumen de registros (KPI)
 interface RecordsSummaryProps {
@@ -312,12 +313,20 @@ export const RecordsPage: React.FC = () => {
     <div className="layout-page-container">
       <PageHeader
         title="Registros"
-        showSearch
-        searchValue={busqueda}
-        onSearchChange={setBusqueda}
-        searchPlaceholder="Buscar registro..."
+        showSearch={false}
         actions={headerActions}
       />
+      <div className="action-toolbar">
+        <UniversalSearchBar
+          items={registrosFormateados}
+          onFilter={() => {
+            // El filtrado se maneja en RegistrosTable usando searchTerm
+          }}
+          onSearchTermChange={setBusqueda}
+          searchFields={['nombreDocumento', 'departamento', 'usuario', 'importe']}
+          placeholder="Buscar por nombreDocumento, departamento, usuario, importe..."
+        />
+      </div>
 
       <div className="studio-card">
         <div className="mt-8">
@@ -325,7 +334,7 @@ export const RecordsPage: React.FC = () => {
         </div>
 
         <div className="mt-4 px-2">
-          <p className="text-sm text-[#525252] dark:text-[#a3a3a3]">
+          <p className="text-sm" style={{ color: 'var(--text-primary)' }}>
             {totalRegistros === 0 
               ? 'No hay registros cargados desde la base de datos local'
               : `${totalRegistros} ${totalRegistros === 1 ? 'registro cargado' : 'registros cargados'} desde la base de datos local`}

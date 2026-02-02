@@ -77,7 +77,7 @@ export const FinancialDashboardPage: React.FC = () => {
                       key={movement.id}
                       className="treasury-pending-item"
                     >
-                      <div className="treasury-pending-item-content">
+                      <div className="treasury-pending-item-content border-r border-slate-200 dark:border-slate-800">
                         <div className="treasury-pending-item-header">
                           <span className={`treasury-pending-item-type ${isIncome ? 'treasury-pending-item-type-income' : 'treasury-pending-item-type-expense'}`}>
                             <span className="material-symbols-outlined treasury-pending-item-icon">
@@ -96,7 +96,7 @@ export const FinancialDashboardPage: React.FC = () => {
                           )}
                         </div>
                       </div>
-                      <div className={`treasury-pending-item-amount ${isIncome ? 'treasury-pending-item-amount-income' : 'treasury-pending-item-amount-expense'}`}>
+                      <div className={`treasury-pending-item-amount px-6 ${isIncome ? 'treasury-pending-item-amount-income' : 'treasury-pending-item-amount-expense'}`}>
                         {isIncome ? '+' : '-'}{formatCurrency(amount)}
                       </div>
                     </div>
