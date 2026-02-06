@@ -23,7 +23,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const { records } = useFinancial();
-  const { kpis } = useFinancialStats();
+  const { kpis, incomeInvoices } = useFinancialStats();
 
   // Obtener información del trimestre actual
   const quarterInfo = useMemo(() => getCurrentQuarterInfo(), []);
@@ -63,14 +63,6 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
     }, 0);
   }, [clientes]);
 
-  // Contar facturas sin PDF
-  const facturasSinPDF = useMemo(() => {
-    return records.filter((record) => {
-      // Considerar que una factura sin PDF es un registro que no tiene fileUrl
-      return !record.fileUrl || record.fileUrl === '';
-    }).length;
-  }, [records]);
-
   // Contar documentos pendientes de procesar (facturas sin PDF asociado)
   const documentosPendientes = useMemo(() => {
     return records.filter((record) => {
@@ -78,6 +70,56 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
       return !record.fileUrl || record.fileUrl === '';
     }).length;
   }, [records]);
+
+  // Calcular facturas próximas a vencer (ingresos no pagados que vencen en los próximos 5 días)
+  const facturasProximasAVencer = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Filtrar facturas de ingresos que no estén pagadas
+    const unpaidIncomes = incomeInvoices.filter(
+      (invoice) => invoice.payment_state !== 'paid'
+    );
+    
+    // Filtrar facturas que vencen en los próximos 5 días
+    const upcomingInvoices = unpaidIncomes.filter((invoice) => {
+      // Usar invoice_date_due si está disponible, sino usar invoice_date + 30 días como fallback
+      const dueDateStr = invoice.invoice_date_due || invoice.invoice_date;
+      if (!dueDateStr) return false;
+      
+      try {
+        const dueDate = new Date(dueDateStr);
+        dueDate.setHours(0, 0, 0, 0);
+        
+        if (isNaN(dueDate.getTime())) {
+          // Fallback: si no hay fecha de vencimiento, usar invoice_date + 30 días
+          if (!invoice.invoice_date) return false;
+          const invoiceDate = new Date(invoice.invoice_date);
+          invoiceDate.setHours(0, 0, 0, 0);
+          invoiceDate.setDate(invoiceDate.getDate() + 30);
+          const diffTime = invoiceDate.getTime() - today.getTime();
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          return diffDays >= 0 && diffDays <= 5;
+        }
+        
+        const diffTime = dueDate.getTime() - today.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        // Incluir facturas que vencen entre hoy y los próximos 5 días
+        return diffDays >= 0 && diffDays <= 5;
+      } catch {
+        return false;
+      }
+    });
+    
+    const count = upcomingInvoices.length;
+    const totalAmount = upcomingInvoices.reduce(
+      (sum, invoice) => sum + (invoice.amount_total || 0),
+      0
+    );
+    
+    return { count, totalAmount };
+  }, [incomeInvoices]);
 
   // Verificar si hay datos para mostrar
   const hasData = records.length > 0 || clientes.length > 0 || proveedores.length > 0;
@@ -315,13 +357,13 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
               <h3 className="home-alerts-title">{t('home.alerts.title')}</h3>
             </div>
             <div className="home-alerts-list">
-              {facturasSinPDF > 0 && (
-                <div className="home-alert-item-error">
-                  <span className="material-symbols-outlined home-alert-icon-error">error</span>
+              {facturasProximasAVencer.count > 0 && (
+                <div className="home-alert-item-danger">
+                  <span className="material-symbols-outlined home-alert-icon-warning">event_upcoming</span>
                   <div>
-                    <p className="home-alert-title-error">Acción requerida</p>
-                    <p className="home-alert-desc-error">
-                      {facturasSinPDF} {facturasSinPDF === 1 ? 'factura' : 'facturas'} sin archivo PDF asociado
+                    <p className="home-alert-title-warning">Vencimientos próximos</p>
+                    <p className="home-alert-desc-warning">
+                      {facturasProximasAVencer.count} {facturasProximasAVencer.count === 1 ? 'factura' : 'facturas'} de clientes vencen esta semana (Total: {formatearMoneda(facturasProximasAVencer.totalAmount)})
                     </p>
                   </div>
                 </div>
@@ -337,7 +379,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                   </div>
                 </div>
               )}
-              {facturasSinPDF === 0 && totalDeudaClientes === 0 && (
+              {facturasProximasAVencer.count === 0 && totalDeudaClientes === 0 && (
                 <div className="home-alert-item-info">
                   <span className="material-symbols-outlined home-alert-icon-info">check_circle</span>
                   <div>

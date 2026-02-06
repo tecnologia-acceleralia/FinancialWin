@@ -7,7 +7,7 @@ export interface DocumentFormProps {
   data: ExtractedData;
   onChange: (field: string, value: string) => void;
   type: DocumentType;
-  onSave?: () => void;
+  onSave?: (target: 'in_invoice' | 'out_invoice') => void;
   isSaving?: boolean;
   isFormValid?: boolean;
 }
@@ -324,13 +324,26 @@ export const DocumentForm: React.FC<DocumentFormProps> = ({
 
               {/* Proveedor */}
               <div className="form-field-full">
-                <label className="form-label-studio">Proveedor</label>
+                <label className="form-label-studio">
+                  Proveedor
+                  {!data.supplier && (
+                    <span className="text-red-500 ml-1">*</span>
+                  )}
+                </label>
                 <input
                   type="text"
-                  className="form-input-studio"
+                  className={`form-input-studio ${
+                    !data.supplier ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
+                  }`}
                   value={data.supplier || ''}
                   onChange={(e) => updateField('supplier', e.target.value)}
+                  placeholder="Nombre del proveedor o cliente"
                 />
+                {!data.supplier && (
+                  <p className="text-red-500 text-sm mt-1">
+                    Este campo es obligatorio para enviar a Odoo
+                  </p>
+                )}
               </div>
 
               {/* CIF/NIF or VAT based on origin y Número Factura - Agrupados */}
@@ -445,17 +458,44 @@ export const DocumentForm: React.FC<DocumentFormProps> = ({
       {onSave && (
         <div className="studio-actions">
           <div className="studio-actions-spacer"></div>
-          <button
-            type="button"
-            onClick={onSave}
-            disabled={isSaving || !isFormValid}
-            className="btn-validate-primary disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <span className="material-symbols-outlined">
-              {isSaving ? 'hourglass_empty' : 'check_circle'}
-            </span>
-            {isSaving ? 'Guardando...' : isFormValid ? 'Validar y Archivar' : 'Completa los campos obligatorios'}
-          </button>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => onSave('in_invoice')}
+              disabled={isSaving || !isFormValid}
+              className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSaving ? (
+                <>
+                  <span className="material-symbols-outlined mr-2 animate-spin">sync</span>
+                  <span>Enviando...</span>
+                </>
+              ) : (
+                <>
+                  <span className="material-symbols-outlined mr-2">local_shipping</span>
+                  <span>Enviar a Proveedores</span>
+                </>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => onSave('out_invoice')}
+              disabled={isSaving || !isFormValid}
+              className="btn btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSaving ? (
+                <>
+                  <span className="material-symbols-outlined mr-2 animate-spin">sync</span>
+                  <span>Enviando...</span>
+                </>
+              ) : (
+                <>
+                  <span className="material-symbols-outlined mr-2">person_add</span>
+                  <span>Enviar a Clientes</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
       )}
     </form>

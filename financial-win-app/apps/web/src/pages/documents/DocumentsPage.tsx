@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Dropzone, DocumentForm, FilePreview } from '../../components/forms';
+import { Dropzone, DocumentForm } from '../../components/forms';
 import { DocumentViewer } from '../../components/common/DocumentViewer';
 import { CategoryTabs, type Category, SubCategoryTabs } from '../../components/ui';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { useFinancial } from '../../contexts/FinancialContext';
+import { useToast } from '../../contexts/ToastContext';
 import { useGeminiExtraction } from '../../hooks/useGeminiExtraction';
 import { PageHeader } from '../../components/layout';
+import { odooService } from '../../services/odooService';
 import type { ExtractedData, DocumentType } from '../../types';
 
 // Estructura de datos para las categorías de documentos
@@ -38,14 +39,11 @@ const DOCUMENT_CATEGORIES: Category[] = [
 
 export const DocumentsPage: React.FC = () => {
   const { t } = useLanguage();
-  const { addRecord } = useFinancial();
+  const { showToast } = useToast();
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [currentFileIndex, setCurrentFileIndex] = useState<number>(0);
   const [formData, setFormData] = useState<ExtractedData | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [extractionError, setExtractionError] = useState<string | null>(null);
-  const [recordType, setRecordType] = useState<'expense' | 'income'>('expense');
   const fileUrlRef = useRef<string | null>(null);
   
   // Estados de navegación por pestañas
@@ -142,29 +140,22 @@ export const DocumentsPage: React.FC = () => {
       if (readyItem && readyItem.data) {
         // Actualizar formData con los datos extraídos
         setFormData(readyItem.data);
-        setExtractionError(null);
       } else {
         // Verificar si hay errores en la cola
         const errorItem = batchQueue.find((item) => item.status === 'error');
         if (errorItem && errorItem.error) {
-          setExtractionError(errorItem.error);
+          showToast(errorItem.error, 'error');
         }
       }
     }
-  }, [isLoading, batchQueue]);
+  }, [isLoading, batchQueue, showToast]);
 
   // Manejar errores del hook
   useEffect(() => {
     if (error) {
-      setExtractionError(error);
-    } else if (!isLoading) {
-      // Limpiar error cuando termine la carga exitosamente
-      const hasErrors = batchQueue.some((item) => item.status === 'error');
-      if (!hasErrors) {
-        setExtractionError(null);
-      }
+      showToast(error, 'error');
     }
-  }, [error, isLoading, batchQueue]);
+  }, [error, showToast]);
 
   // Validar si el formulario tiene los campos obligatorios rellenos
   const isFormValid = useMemo(() => {
@@ -209,9 +200,7 @@ export const DocumentsPage: React.FC = () => {
   const handleFilesSelected = async (files: File[]) => {
     setSelectedFiles(files);
     setCurrentFileIndex(0);
-    setSuccessMessage(null);
     setFormData(null);
-    setExtractionError(null);
     
     // Iniciar extracción real con el primer archivo usando processFiles
     // Esto actualiza correctamente el estado isLoading del hook
@@ -222,7 +211,7 @@ export const DocumentsPage: React.FC = () => {
       } catch (err) {
         const errorMessage =
           err instanceof Error ? err.message : 'Error desconocido al procesar el documento';
-        setExtractionError(errorMessage);
+        showToast(errorMessage, 'error');
         console.error('Error al procesar documento:', err);
       }
     }
@@ -237,86 +226,76 @@ export const DocumentsPage: React.FC = () => {
     }
   };
 
-  const handleSave = async () => {
+  const handleSave = async (target: 'in_invoice' | 'out_invoice') => {
     if (!formData || !currentFile) return;
 
     setIsSaving(true);
-    setSuccessMessage(null);
 
     try {
-      // Preparar datos según el tipo de registro
-      let dataToSave: ExtractedData = formData;
+      // Normalizar datos: unificar campos equivalentes
+      const normalizedData = {
+        ...formData,
+        total: formData.total || formData.amount || '',
+        supplier: formData.supplier || 
+                 (formData as Record<string, unknown>).vendor as string || 
+                 (formData as Record<string, unknown>).establishmentName as string ||
+                 formData.establishment ||
+                 '',
+        amount: formData.amount || formData.total || '',
+      };
 
-      // Si es un ingreso, mapear supplier como cliente
-      if (recordType === 'income' && formData.supplier) {
-        dataToSave = {
-          ...formData,
-          // Para ingresos, el supplier se trata como el nombre del cliente
-          // Mantenemos supplier en los datos pero conceptualmente es el cliente
-        };
+      // Validar que tenemos los datos mínimos requeridos para crear la factura
+      if (!normalizedData.supplier || normalizedData.supplier.trim() === '') {
+        throw new Error('El nombre del proveedor/cliente es requerido para crear la factura.');
       }
 
-      // Convertir el archivo a Base64 o mantener la URL local
-      let fileUrl: string | undefined;
-      if (fileUrlRef.current) {
-        // Si ya tenemos una URL local (object URL), convertirla a Base64 para persistencia
-        try {
-          const response = await fetch(fileUrlRef.current);
-          const blob = await response.blob();
-          const reader = new FileReader();
-          fileUrl = await new Promise<string>((resolve, reject) => {
-            reader.onloadend = () => {
-              if (typeof reader.result === 'string') {
-                resolve(reader.result);
-              } else {
-                reject(new Error('Error al convertir archivo a Base64'));
-              }
-            };
-            reader.onerror = reject;
-            reader.readAsDataURL(blob);
-          });
-        } catch (error) {
-          console.error('Error al convertir archivo a Base64:', error);
-          // Si falla, usar la URL local como fallback
-          fileUrl = fileUrlRef.current;
-        }
+      if (!normalizedData.total || normalizedData.total.trim() === '') {
+        throw new Error('El total de la factura es requerido.');
       }
 
-      // Guardar en el contexto financiero
-      addRecord({
-        type: recordType,
-        data: dataToSave,
-        documentType,
-        fileName: currentFile.name,
-        fileUrl: fileUrl,
-      });
+      // Llamar a Odoo para crear la factura con datos normalizados
+      const invoiceId = await odooService.createInvoice(normalizedData, target);
 
-      // Mostrar mensaje de éxito
-      setSuccessMessage('Documento guardado exitosamente');
+      console.log(`✅ Factura creada en Odoo con ID: ${invoiceId}`);
+
+      // Mostrar mensaje de éxito diferenciado por tipo
+      const tipoFactura = target === 'in_invoice' ? 'Proveedores' : 'Clientes';
+      showToast(`Factura de ${tipoFactura} creada correctamente en Odoo`, 'success');
       
       // Resetear estado
       reset();
       setFormData(null);
       setSelectedFiles([]);
       setCurrentFileIndex(0);
-      setExtractionError(null);
-      setRecordType('expense'); // Resetear a 'expense' para el siguiente documento
 
       // Limpiar URL del objeto
       if (fileUrlRef.current) {
         URL.revokeObjectURL(fileUrlRef.current);
         fileUrlRef.current = null;
       }
-
-      // Limpiar mensaje de éxito después de 5 segundos
-      setTimeout(() => {
-        setSuccessMessage(null);
-      }, 5000);
     } catch (err) {
-      console.error('Error al guardar documento:', err);
-      setSuccessMessage(
-        err instanceof Error ? err.message : 'Error desconocido al guardar'
-      );
+      console.error('Error al enviar factura a Odoo:', err);
+      
+      // Manejo específico para error 503 (sobrecarga de IA/Odoo)
+      // Verificar si el error contiene información sobre 503 (puede venir de diferentes formas)
+      const is503Error = 
+        (err instanceof Error && (
+          err.message.includes('503') || 
+          err.message.includes('Service Unavailable') ||
+          err.message.includes('temporalmente saturado')
+        )) ||
+        (err && typeof err === 'object' && 'status' in err && (err as { status: number }).status === 503) ||
+        (err && typeof err === 'object' && 'response' in err && 
+          (err as { response?: { status?: number } }).response?.status === 503);
+      
+      if (is503Error) {
+        showToast('Servidor temporalmente saturado. Reintenta en unos segundos.', 'error');
+      } else {
+        const errorMessage = err instanceof Error 
+          ? err.message 
+          : 'Error desconocido al enviar la factura a Odoo';
+        showToast(errorMessage, 'error');
+      }
     } finally {
       setIsSaving(false);
     }
@@ -348,20 +327,6 @@ export const DocumentsPage: React.FC = () => {
                 activeSubCategory={activeSubCategory || ''}
                 onSubCategoryChange={setActiveSubCategory}
               />
-            </div>
-          )}
-
-          {/* Mensaje de éxito */}
-          {successMessage && (
-            <div className="mt-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded-lg animate-fade-in">
-              {successMessage}
-            </div>
-          )}
-
-          {/* Mensaje de error */}
-          {(error || extractionError) && (
-            <div className="mt-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg animate-fade-in">
-              Error: {error || extractionError}
             </div>
           )}
 
@@ -405,40 +370,14 @@ export const DocumentsPage: React.FC = () => {
                       </p>
                     </div>
                   ) : formData ? (
-                    <>
-                      {/* Selector de tipo de registro */}
-                      <div className="record-type-selector">
-                        <button
-                          type="button"
-                          className={`record-type-button ${recordType === 'expense' ? 'record-type-button-active' : ''}`}
-                          onClick={() => setRecordType('expense')}
-                        >
-                          <span className="material-symbols-outlined record-type-button-icon">
-                            shopping_cart
-                          </span>
-                          Gasto (Compra)
-                        </button>
-                        <button
-                          type="button"
-                          className={`record-type-button ${recordType === 'income' ? 'record-type-button-active' : ''}`}
-                          onClick={() => setRecordType('income')}
-                        >
-                          <span className="material-symbols-outlined record-type-button-icon">
-                            payments
-                          </span>
-                          Ingreso (Venta)
-                        </button>
-                      </div>
-
-                      <DocumentForm
-                        data={formData}
-                        onChange={handleFieldChange}
-                        type={documentType}
-                        onSave={handleSave}
-                        isSaving={isSaving}
-                        isFormValid={isFormValid}
-                      />
-                    </>
+                    <DocumentForm
+                      data={formData}
+                      onChange={handleFieldChange}
+                      type={documentType}
+                      onSave={handleSave}
+                      isSaving={isSaving}
+                      isFormValid={isFormValid}
+                    />
                   ) : null}
                 </div>
               </div>

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { useFinancial, type FinancialRecord, type ErpStatus } from '../../contexts/FinancialContext';
+import { useFinancial, type FinancialRecord } from '../../contexts/FinancialContext';
 import { RegistrosTable } from '../../features/finance/components/RegistrosTable';
 import { PageHeader, type PageHeaderAction } from '../../components/layout';
 import { FilterPanel, type FilterValues } from '../../features/finance/components/FilterPanel';
@@ -45,7 +45,6 @@ export const RecordsPage: React.FC = () => {
     dateRange: { from: '', to: '' },
     categories: [],
     status: [],
-    erpStatus: [],
     documentType: [],
     amountRange: { min: null, max: null },
   });
@@ -69,19 +68,6 @@ export const RecordsPage: React.FC = () => {
     }
   };
 
-  /**
-   * Mapea el estado ERP del filtro al valor interno
-   */
-  const mapErpStatusFilterToInternal = (filterStatus: string): ErpStatus | null => {
-    const mapping: Record<string, ErpStatus> = {
-      'Pendiente': 'pending',
-      'Sincronizando': 'syncing',
-      'Sincronizado Odoo': 'synced_odoo',
-      'Sincronizado A3': 'synced_a3',
-      'Error': 'error',
-    };
-    return mapping[filterStatus] || null;
-  };
 
   /**
    * Extrae el valor numérico del importe para búsqueda
@@ -117,7 +103,6 @@ export const RecordsPage: React.FC = () => {
         fechaRegistroOriginal: record.createdAt,
         usuario: record.data.supplier || 'N/A',
         importe,
-        erpStatus: record.erpStatus || 'pending',
       };
     });
   }, [records]);
@@ -210,17 +195,6 @@ export const RecordsPage: React.FC = () => {
         });
       }
 
-      // Filtro por Estado ERP
-      if (filters.erpStatus.length > 0) {
-        const erpStatusInternal = filters.erpStatus
-          .map(mapErpStatusFilterToInternal)
-          .filter((status): status is ErpStatus => status !== null);
-        
-        resultado = resultado.filter((registro) => {
-          const registroErpStatus = registro.erpStatus as ErpStatus;
-          return erpStatusInternal.includes(registroErpStatus);
-        });
-      }
 
       // Filtro por rango de importe
       if (filters.amountRange.min !== null) {

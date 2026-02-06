@@ -23,7 +23,7 @@ export function normalizeName(name: string): string {
 export function findSupplierByName(
   supplierName: string,
   storageKey: 'zaffra_suppliers' | 'zaffra_clients'
-): { id?: string; nombreComercial?: string; razonSocial?: string; idContableA3?: string } | undefined {
+): { id?: string; nombreComercial?: string; razonSocial?: string } | undefined {
   try {
     const stored = localStorage.getItem(storageKey);
     if (!stored) return undefined;
@@ -32,7 +32,6 @@ export function findSupplierByName(
       id?: string;
       nombreComercial?: string;
       razonSocial?: string;
-      idContableA3?: string;
     }>;
 
     const normalizedSearch = normalizeName(supplierName);

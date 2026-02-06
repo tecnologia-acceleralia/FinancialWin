@@ -1,56 +1,123 @@
-import React, { useMemo, useState, useRef } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { useFinancial } from '../../contexts/FinancialContext';
 import { GastosTable } from '../../features/finance/components/GastosTable';
 import { PageHeader, type PageHeaderAction } from '../../components/layout';
 import { FilterPanel, type FilterValues } from '../../features/finance/components/FilterPanel';
 import { StatCard, UniversalSearchBar } from '../../components/common';
 import { exportToCSV } from '../../utils/exportToCSV';
-import { importFromExcel } from '../../utils/importFromExcel';
 import { useToast } from '../../contexts/ToastContext';
+import { odooService, type OdooInvoice, mapOdooStatus } from '../../services/odooService';
+
+// Interfaz para mapear datos de Odoo al formato de la tabla
+interface MappedGasto {
+  id: string;
+  fecha: string;
+  proveedor: string;
+  monto: number;
+  estado: 'Borrador' | 'Publicado' | 'En proceso de pago' | 'Pagada' | 'Revertido';
+  numero: string;
+  invoiceDate: string | null;
+  currency: string;
+}
 
 export const GastosPage: React.FC = () => {
   const { t } = useLanguage();
-  const { expenses, addRecord } = useFinancial();
   const { showToast } = useToast();
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [busqueda, setBusqueda] = useState('');
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
   const [filters, setFilters] = useState<FilterValues>({
     dateRange: { from: '', to: '' },
     categories: [],
     status: [],
-    erpStatus: [],
     documentType: [],
     amountRange: { min: null, max: null },
   });
+  const [invoices, setInvoices] = useState<OdooInvoice[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Calcular KPIs (solo para tarjetas pequeñas)
+  // Cargar facturas de Odoo al montar el componente
+  useEffect(() => {
+    const loadInvoices = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const data = await odooService.getInvoices('in_invoice');
+        setInvoices(data);
+      } catch (err) {
+        console.error('Error al cargar facturas de Odoo:', err);
+        setError(err instanceof Error ? err.message : 'Error al cargar facturas');
+        showToast('Error al cargar facturas de Odoo', 'error');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadInvoices();
+  }, [showToast]);
+
+  // Mapear facturas de Odoo al formato esperado
+  const mappedGastos = useMemo<MappedGasto[]>(() => {
+    return invoices.map((invoice) => {
+      // Mapear estado usando la función auxiliar
+      const estado = mapOdooStatus(invoice.state, invoice.payment_state);
+
+      // Formatear fecha
+      const fecha = invoice.invoice_date
+        ? new Date(invoice.invoice_date).toLocaleDateString('es-ES')
+        : '-';
+
+      // Obtener nombre del proveedor
+      const proveedor = invoice.partner_id?.[1] || 'Sin proveedor';
+
+      // Obtener moneda
+      const currency = invoice.currency_id?.[1] || 'EUR';
+
+      return {
+        id: invoice.id.toString(),
+        fecha,
+        proveedor,
+        monto: invoice.amount_total || 0,
+        estado,
+        numero: invoice.name,
+        invoiceDate: invoice.invoice_date || null,
+        currency,
+      };
+    });
+  }, [invoices]);
+
+  // Calcular KPIs desde datos de Odoo
   const kpis = useMemo(() => {
-    const validExpenses = expenses.filter(
-      (expense) => expense.data.supplier && expense.data.total
-    );
-
-    const totalAcumulado = validExpenses.reduce((sum, expense) => {
-      const total = parseFloat(expense.data.total?.toString() || '0');
-      return sum + (isNaN(total) ? 0 : total);
-    }, 0);
-
-    const pendiente = validExpenses
-      .filter((expense) => expense.paymentStatus === 'Pendiente')
-      .reduce((sum, expense) => {
-        const total = parseFloat(expense.data.total?.toString() || '0');
-        return sum + (isNaN(total) ? 0 : total);
+    // Total Acumulado: Suma solo las facturas que NO sean 'Borrador' o 'Revertido'
+    // Incluye: Publicado, En proceso de pago, Pagada
+    const totalAcumulado = mappedGastos
+      .filter((gasto) => 
+        gasto.estado !== 'Borrador' && 
+        gasto.estado !== 'Revertido'
+      )
+      .reduce((sum, gasto) => {
+        return sum + (gasto.monto || 0);
       }, 0);
 
-    const numeroOperaciones = validExpenses.length;
+    // Pendiente: Suma las facturas 'Publicado' y 'En proceso de pago'
+    // Excluye: Borrador, Pagada, Revertido
+    const pendiente = mappedGastos
+      .filter((gasto) => 
+        gasto.estado === 'Publicado' || 
+        gasto.estado === 'En proceso de pago'
+      )
+      .reduce((sum, gasto) => {
+        return sum + (gasto.monto || 0);
+      }, 0);
+
+    const numeroOperaciones = mappedGastos.length;
 
     return {
       totalAcumulado,
       pendiente,
       numeroOperaciones,
     };
-  }, [expenses]);
+  }, [mappedGastos]);
 
   const formatCurrency = (amount: number): string => {
     return new Intl.NumberFormat('es-ES', {
@@ -61,20 +128,17 @@ export const GastosPage: React.FC = () => {
     }).format(amount);
   };
 
-  // Obtener datos filtrados para exportar (replicando lógica de la tabla)
-  const getFilteredExpenses = useMemo(() => {
-    let resultado = expenses.filter(
-      (expense) => expense.data.supplier && expense.data.total
-    );
+  // Obtener datos filtrados para exportar
+  const getFilteredGastos = useMemo(() => {
+    let resultado = mappedGastos;
 
     // Filtro por búsqueda de texto
     if (busqueda.trim()) {
       const busquedaLower = busqueda.toLowerCase().trim();
       resultado = resultado.filter(
-        (expense) =>
-          expense.data.supplier?.toLowerCase().includes(busquedaLower) ||
-          expense.data.department?.toLowerCase().includes(busquedaLower) ||
-          expense.data.expenseType?.toLowerCase().includes(busquedaLower)
+        (gasto) =>
+          gasto.proveedor.toLowerCase().includes(busquedaLower) ||
+          gasto.numero.toLowerCase().includes(busquedaLower)
       );
     }
 
@@ -82,100 +146,66 @@ export const GastosPage: React.FC = () => {
     if (filters) {
       // Filtro por rango de fechas
       if (filters.dateRange.from) {
-        resultado = resultado.filter((expense) => {
-          const fechaFactura = expense.data.issueDate
-            ? new Date(expense.data.issueDate)
-            : new Date(expense.createdAt);
+        resultado = resultado.filter((gasto) => {
+          if (!gasto.invoiceDate) return false;
+          const fechaFactura = new Date(gasto.invoiceDate);
           const fechaDesde = new Date(filters.dateRange.from);
           fechaDesde.setHours(0, 0, 0, 0);
           return fechaFactura >= fechaDesde;
         });
       }
       if (filters.dateRange.to) {
-        resultado = resultado.filter((expense) => {
-          const fechaFactura = expense.data.issueDate
-            ? new Date(expense.data.issueDate)
-            : new Date(expense.createdAt);
+        resultado = resultado.filter((gasto) => {
+          if (!gasto.invoiceDate) return false;
+          const fechaFactura = new Date(gasto.invoiceDate);
           const fechaHasta = new Date(filters.dateRange.to);
           fechaHasta.setHours(23, 59, 59, 999);
           return fechaFactura <= fechaHasta;
         });
       }
 
-      // Filtro por categorías (tipo)
-      if (filters.categories.length > 0) {
-        resultado = resultado.filter((expense) =>
-          filters.categories.includes(expense.data.expenseType || '')
-        );
-      }
-
       // Filtro por estados
       if (filters.status.length > 0) {
-        resultado = resultado.filter((expense) => {
-          const estado =
-            expense.paymentStatus === 'Pagado' ? 'Pagado' : 'Registrada';
-          return filters.status.includes(estado);
-        });
+        resultado = resultado.filter((gasto) =>
+          filters.status.includes(gasto.estado)
+        );
       }
 
       // Filtro por rango de importe
       if (filters.amountRange.min !== null) {
-        resultado = resultado.filter((expense) => {
-          const total = parseFloat(expense.data.total?.toString() || '0');
-          return total >= filters.amountRange.min!;
+        resultado = resultado.filter((gasto) => {
+          return gasto.monto >= filters.amountRange.min!;
         });
       }
       if (filters.amountRange.max !== null) {
-        resultado = resultado.filter((expense) => {
-          const total = parseFloat(expense.data.total?.toString() || '0');
-          return total <= filters.amountRange.max!;
+        resultado = resultado.filter((gasto) => {
+          return gasto.monto <= filters.amountRange.max!;
         });
       }
     }
 
     return resultado;
-  }, [expenses, busqueda, filters]);
+  }, [mappedGastos, busqueda, filters]);
 
   // Función para exportar a CSV
   const handleExport = () => {
-    const dataToExport = getFilteredExpenses.map((expense) => {
-      const total = parseFloat(expense.data.total?.toString() || '0');
-      const base = parseFloat(expense.data.base?.toString() || '0');
-      const vat = parseFloat(expense.data.vat?.toString() || '0');
-
+    const dataToExport = getFilteredGastos.map((gasto) => {
       return {
-        Estado: expense.paymentStatus === 'Pagado' ? 'Pagado' : 'Pendiente',
-        Proveedor: expense.data.supplier || '',
-        Departamento: expense.data.department || 'N/A',
-        Tipo: expense.data.expenseType || 'Otros',
-        'Fecha Factura': expense.data.issueDate
-          ? new Date(expense.data.issueDate).toLocaleDateString('es-ES')
-          : new Date(expense.createdAt).toLocaleDateString('es-ES'),
-        'Fecha Pago':
-          expense.paymentStatus === 'Pagado'
-            ? new Date(expense.updatedAt).toLocaleDateString('es-ES')
-            : '-',
-        Moneda: expense.data.currency || 'EUR',
-        Vía: 'Transferencia',
-        Importe: base.toFixed(2),
-        Variable: '0.00',
-        IVA: vat.toFixed(2),
-        'Total Banco': total.toFixed(2),
+        Estado: gasto.estado,
+        Proveedor: gasto.proveedor,
+        'Fecha Factura': gasto.fecha,
+        Moneda: gasto.currency,
+        'Número Factura': gasto.numero,
+        'Total Banco': gasto.monto.toFixed(2),
       };
     });
 
     const headers = [
       { key: 'Estado' as const, label: 'Estado' },
       { key: 'Proveedor' as const, label: 'Proveedor' },
-      { key: 'Departamento' as const, label: 'Departamento' },
-      { key: 'Tipo' as const, label: 'Tipo' },
       { key: 'Fecha Factura' as const, label: 'Fecha Factura' },
-      { key: 'Fecha Pago' as const, label: 'Fecha Pago' },
       { key: 'Moneda' as const, label: 'Moneda' },
-      { key: 'Vía' as const, label: 'Vía' },
-      { key: 'Importe' as const, label: 'Importe' },
-      { key: 'Variable' as const, label: 'Variable' },
-      { key: 'IVA' as const, label: 'IVA' },
+      { key: 'Número Factura' as const, label: 'Número Factura' },
       { key: 'Total Banco' as const, label: 'Total Banco' },
     ];
 
@@ -183,80 +213,11 @@ export const GastosPage: React.FC = () => {
     showToast('Exportación completada correctamente', 'success');
   };
 
-  // Función para importar desde Excel/CSV
-  const handleImport = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const result = await importFromExcel(file, 'expense');
-
-      if (result.success && result.records.length > 0) {
-        // Agregar cada registro al contexto
-        result.records.forEach((record) => {
-          addRecord({
-            type: record.type,
-            data: record.data,
-            documentType: record.documentType,
-            fileName: record.fileName,
-            fileUrl: record.fileUrl,
-            erpStatus: record.erpStatus,
-            paymentStatus: record.paymentStatus,
-          });
-        });
-
-        // Mostrar mensaje de éxito
-        const message =
-          result.records.length === 1
-            ? `Se importó 1 registro correctamente`
-            : `Se importaron ${result.records.length} registros correctamente`;
-
-        if (result.warnings.length > 0) {
-          showToast(
-            `${message}. Advertencias: ${result.warnings.join('; ')}`,
-            'success'
-          );
-        } else {
-          showToast(message, 'success');
-        }
-      } else {
-        // Mostrar errores
-        const errorMessage =
-          result.errors.length > 0
-            ? result.errors.join('; ')
-            : 'No se pudieron importar registros del archivo';
-        showToast(errorMessage, 'error');
-      }
-    } catch (error) {
-      showToast(
-        error instanceof Error
-          ? error.message
-          : 'Error al importar el archivo',
-        'error'
-      );
-    } finally {
-      // Limpiar el input para permitir seleccionar el mismo archivo de nuevo
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    }
-  };
-
   const headerActions: PageHeaderAction[] = [
     {
       icon: 'filter_list',
       label: 'Filtros',
       onClick: () => setIsFilterPanelOpen(true),
-      variant: 'default',
-    },
-    {
-      icon: 'upload_file',
-      label: 'Importar Excel',
-      onClick: handleImport,
       variant: 'default',
     },
     {
@@ -273,16 +234,14 @@ export const GastosPage: React.FC = () => {
 
   // Preparar datos para UniversalSearchBar
   const gastosForSearch = useMemo(() => {
-    return expenses
-      .filter((expense) => expense.data.supplier && expense.data.total)
-      .map((expense) => ({
-        id: expense.id,
-        proveedor: expense.data.supplier || '',
-        departamento: expense.data.department || '',
-        via: 'Transferencia',
-        total: expense.data.total?.toString() || '',
-      }));
-  }, [expenses]);
+    return mappedGastos.map((gasto) => ({
+      id: gasto.id,
+      proveedor: gasto.proveedor,
+      numero: gasto.numero,
+      estado: gasto.estado,
+      total: gasto.monto.toString(),
+    }));
+  }, [mappedGastos]);
 
   return (
     <div className="layout-page-container">
@@ -298,8 +257,8 @@ export const GastosPage: React.FC = () => {
             // El filtrado se maneja en GastosTable usando searchTerm
           }}
           onSearchTermChange={setBusqueda}
-          searchFields={['proveedor', 'departamento', 'via', 'total']}
-          placeholder="Buscar por proveedor, departamento, via, total..."
+          searchFields={['proveedor', 'numero', 'estado', 'total']}
+          placeholder="Buscar por proveedor, número de factura, estado, total..."
         />
       </div>
       <div className="studio-container">
@@ -331,7 +290,18 @@ export const GastosPage: React.FC = () => {
         {/* Tabla - Protagonista absoluta */}
         <div className="studio-card">
           <div className="mt-8">
-            <GastosTable searchTerm={busqueda} filters={filters} />
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <span className="ml-3 text-gray-600">Cargando facturas de Odoo...</span>
+              </div>
+            ) : error ? (
+              <div className="flex items-center justify-center py-12">
+                <span className="text-red-600">Error: {error}</span>
+              </div>
+            ) : (
+              <GastosTable searchTerm={busqueda} filters={filters} invoices={invoices} />
+            )}
           </div>
         </div>
       </div>
@@ -342,16 +312,6 @@ export const GastosPage: React.FC = () => {
         onFilterChange={handleFilterChange}
         initialFilters={filters}
         type="gastos"
-      />
-
-      {/* Input oculto para importar archivos */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".xlsx,.xls,.csv"
-        onChange={handleFileChange}
-        style={{ display: 'none' }}
-        aria-label="Importar archivo Excel o CSV"
       />
     </div>
   );

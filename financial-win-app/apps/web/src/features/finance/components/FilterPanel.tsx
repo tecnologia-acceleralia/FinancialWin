@@ -7,7 +7,6 @@ export interface FilterValues {
   };
   categories: string[];
   status: string[];
-  erpStatus: string[];
   documentType: string[];
   amountRange: {
     min: number | null;
@@ -38,19 +37,24 @@ const AVAILABLE_CATEGORIES = [
 // Tipos de documento disponibles para filtros
 const AVAILABLE_DOCUMENT_TYPES = ['Factura', 'Ticket', 'Staff'];
 
-// Estados disponibles
-const AVAILABLE_STATUS_GASTOS = ['Pagado', 'Registrada', 'Por Recibir'];
-const AVAILABLE_STATUS_INGRESOS = ['Pagado', 'Anulada', 'Pendiente Pago'];
+// Estados disponibles - Unificados con los estados de Odoo
+// Estos estados coinciden con los retornados por mapOdooStatus en odooService.ts
+const AVAILABLE_STATUS_GASTOS = [
+  'Borrador',
+  'Publicado',
+  'En proceso de pago',
+  'Pagada',
+  'Revertido',
+];
+const AVAILABLE_STATUS_INGRESOS = [
+  'Borrador',
+  'Publicado',
+  'En proceso de pago',
+  'Pagada',
+  'Revertido',
+];
 const AVAILABLE_STATUS_REGISTROS = ['VALIDADO', 'PENDIENTE', 'RECHAZADO'];
 
-// Estados ERP disponibles
-const AVAILABLE_ERP_STATUS = [
-  'Pendiente',
-  'Sincronizando',
-  'Sincronizado Odoo',
-  'Sincronizado A3',
-  'Error',
-];
 
 export const FilterPanel: React.FC<FilterPanelProps> = ({
   isOpen,
@@ -66,7 +70,6 @@ export const FilterPanel: React.FC<FilterPanelProps> = ({
     },
     categories: initialFilters?.categories || [],
     status: initialFilters?.status || [],
-    erpStatus: initialFilters?.erpStatus || [],
     documentType: initialFilters?.documentType || [],
     amountRange: {
       min: initialFilters?.amountRange?.min || null,
@@ -91,7 +94,6 @@ export const FilterPanel: React.FC<FilterPanelProps> = ({
         },
         categories: initialFilters.categories || [],
         status: initialFilters.status || [],
-        erpStatus: initialFilters.erpStatus || [],
         documentType: initialFilters.documentType || [],
         amountRange: {
           min: initialFilters.amountRange?.min || null,
@@ -119,14 +121,6 @@ export const FilterPanel: React.FC<FilterPanelProps> = ({
     }));
   };
 
-  const handleErpStatusToggle = (erpStatus: string) => {
-    setFilters((prev) => ({
-      ...prev,
-      erpStatus: prev.erpStatus.includes(erpStatus)
-        ? prev.erpStatus.filter((s) => s !== erpStatus)
-        : [...prev.erpStatus, erpStatus],
-    }));
-  };
 
   const handleDocumentTypeToggle = (documentType: string) => {
     setFilters((prev) => ({
@@ -147,7 +141,6 @@ export const FilterPanel: React.FC<FilterPanelProps> = ({
       dateRange: { from: '', to: '' },
       categories: [],
       status: [],
-      erpStatus: [],
       documentType: [],
       amountRange: { min: null, max: null },
     };
@@ -308,32 +301,6 @@ export const FilterPanel: React.FC<FilterPanelProps> = ({
             </div>
           )}
 
-          {/* Estado ERP - Solo para registros */}
-          {type === 'registros' && (
-            <div className="filter-section">
-              <div className="filter-section-header">
-                <span className="material-symbols-outlined filter-section-icon">
-                  sync
-                </span>
-                <h3 className="filter-section-title">Estado ERP</h3>
-              </div>
-              <div className="filter-section-content">
-                <div className="filter-checkbox-group">
-                  {AVAILABLE_ERP_STATUS.map((erpStatus) => (
-                    <label key={erpStatus} className="filter-checkbox-label">
-                      <input
-                        type="checkbox"
-                        checked={filters.erpStatus.includes(erpStatus)}
-                        onChange={() => handleErpStatusToggle(erpStatus)}
-                        className="filter-checkbox"
-                      />
-                      <span className="filter-checkbox-text">{erpStatus}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* Rango de Importe */}
           <div className="filter-section">

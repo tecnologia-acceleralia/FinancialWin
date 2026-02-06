@@ -7,6 +7,7 @@ export { ExpensesPieChart } from './ExpensesPieChart';
 export { IncomeBarChart } from './IncomeBarChart';
 export { IncomeExpenseComparisonChart } from './IncomeExpenseComparisonChart';
 export { ExpensesAccumulatedChart } from './ExpensesAccumulatedChart';
+export { TopVendorsChart } from './TopVendorsChart';
 export { StatCard } from './StatCard';
 export { ChartTooltip, formatCurrencyTooltip } from './ChartTooltip';
 export { QuickNavCards } from './QuickNavCards';

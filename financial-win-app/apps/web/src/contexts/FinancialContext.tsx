@@ -9,7 +9,7 @@ export type FinancialRecordType = 'expense' | 'income';
 /**
  * Estado de sincronización ERP
  */
-export type ErpStatus = 'pending' | 'syncing' | 'synced_odoo' | 'synced_a3' | 'error';
+export type ErpStatus = 'pending' | 'syncing' | 'synced_odoo' | 'error';
 
 /**
  * Estado de pago

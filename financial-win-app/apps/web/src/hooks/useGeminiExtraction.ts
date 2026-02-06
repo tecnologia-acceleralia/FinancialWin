@@ -186,10 +186,60 @@ const validateExtractedData = (
 };
 
 /**
+ * Normaliza campos de proveedor/cliente desde diferentes variantes
+ */
+const normalizeSupplierField = (data: ExtractedData): ExtractedData => {
+  const result = { ...data };
+  const obj = data as Record<string, unknown>;
+  
+  // Normalizar supplier desde diferentes campos posibles
+  if (!result.supplier) {
+    // Intentar obtener desde diferentes campos
+    const supplierName = 
+      (typeof obj.supplier === 'string' && obj.supplier.trim()) ||
+      (typeof obj.proveedor === 'string' && obj.proveedor.trim()) ||
+      (typeof obj.vendor === 'string' && obj.vendor.trim()) ||
+      (typeof obj.establishmentName === 'string' && obj.establishmentName.trim()) ||
+      (typeof obj.establishment === 'string' && obj.establishment.trim()) ||
+      null;
+    
+    if (supplierName) {
+      result.supplier = supplierName;
+    }
+  }
+  
+  return result;
+};
+
+/**
+ * Normaliza campos de total/amount para asegurar que ambos estén presentes
+ */
+const normalizeAmountFields = (data: ExtractedData): ExtractedData => {
+  const result = { ...data };
+  const obj = data as Record<string, unknown>;
+  
+  // Normalizar total y amount: si uno existe, el otro debe tener el mismo valor
+  const totalValue = 
+    (typeof obj.total === 'string' && obj.total.trim()) ||
+    (typeof obj.amount === 'string' && obj.amount.trim()) ||
+    null;
+  
+  if (totalValue) {
+    // Asegurar que ambos campos tengan el mismo valor
+    result.total = totalValue;
+    result.amount = totalValue;
+  }
+  
+  return result;
+};
+
+/**
  * Aplica valores por defecto según el tipo de documento
  */
 const applyDefaults = (data: ExtractedData, documentType: DocumentType): ExtractedData => {
-  const result = { ...data };
+  // Primero normalizar campos de proveedor y amount/total
+  let result = normalizeSupplierField(data);
+  result = normalizeAmountFields(result);
 
   switch (documentType) {
     case 'tickets':

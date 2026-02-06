@@ -37,7 +37,9 @@ export const Toast: React.FC<ToastProps> = ({
       <span className="material-symbols-outlined text-xl flex-shrink-0">
         {getIcon()}
       </span>
-      <p className="flex-1 text-sm font-medium">{message}</p>
+      <p className={`flex-1 text-sm ${type === 'success' ? 'font-semibold text-slate-900' : 'font-medium'}`}>
+        {message}
+      </p>
       <button
         onClick={onClose}
         className="flex-shrink-0 text-gray-400 hover:text-gray-600 transition-colors"

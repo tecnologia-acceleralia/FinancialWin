@@ -25,6 +25,7 @@ export const NuevoProveedorPage: React.FC = () => {
   const [seccionActiva, setSeccionActiva] = useState<string>(SECCIONES[0].id);
   const seccionesRefs = useRef<Record<string, HTMLElement | null>>({});
   const formRef = useRef<HTMLFormElement>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Scroll to top cuando se monta el componente
   useEffect(() => {
@@ -73,11 +74,12 @@ export const NuevoProveedorPage: React.FC = () => {
     navigate('/proveedores/listado');
   };
 
-  const [shouldNavigateAfterSave, setShouldNavigateAfterSave] = useState<
-    'nuevo' | 'salir' | null
-  >(null);
-
   const handleSubmit = async (data: Proveedor) => {
+    // Prevenir múltiples envíos
+    if (isSubmitting) {
+      return;
+    }
+
     try {
       // Validar campos requeridos
       if (!data.nombreComercial || !data.razonSocial || !data.cif) {
@@ -85,39 +87,38 @@ export const NuevoProveedorPage: React.FC = () => {
         return;
       }
 
+      setIsSubmitting(true);
+
       // Crear partner en Odoo como proveedor
-      await odooService.createPartner('supplier', data);
+      // Odoo devuelve un número (ID del nuevo registro)
+      const partnerId = await odooService.createPartner('supplier', data);
 
-      showToast('Proveedor creado correctamente en Odoo', 'success');
-
-      // Navegar según la acción seleccionada
-      if (shouldNavigateAfterSave === 'nuevo') {
-        // Limpiar el formulario recargando la página
-        window.location.href = '/proveedores/nuevo';
-      } else if (shouldNavigateAfterSave === 'salir') {
+      // Verificar que el ID sea válido (mayor a 0)
+      if (partnerId && partnerId > 0) {
+        showToast('Proveedor creado en Odoo correctamente', 'success');
+        // Redirigir a la lista de proveedores (recargará automáticamente desde Odoo)
         navigate('/proveedores/listado');
+      } else {
+        throw new Error('Odoo devolvió un ID inválido.');
       }
-      setShouldNavigateAfterSave(null);
     } catch (error) {
       console.error('Error al crear proveedor en Odoo:', error);
-      showToast(
+      
+      // Detallar el error si falla la conexión
+      const errorMessage =
         error instanceof Error
-          ? `Error al crear el proveedor en Odoo: ${error.message}`
-          : 'Error desconocido al crear el proveedor en Odoo',
-        'error'
-      );
-    }
-  };
-
-  const handleGuardarYNuevo = () => {
-    setShouldNavigateAfterSave('nuevo');
-    if (formRef.current) {
-      formRef.current.requestSubmit();
+          ? error.message.includes('conexión') || error.message.includes('conexion') || error.message.includes('network') || error.message.includes('fetch')
+            ? `Error de conexión con Odoo: ${error.message}`
+            : `Error al crear el proveedor en Odoo: ${error.message}`
+          : 'Error desconocido al crear el proveedor en Odoo';
+      
+      showToast(errorMessage, 'error');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleGuardarYSalir = () => {
-    setShouldNavigateAfterSave('salir');
     if (formRef.current) {
       formRef.current.requestSubmit();
     }
@@ -177,22 +178,17 @@ export const NuevoProveedorPage: React.FC = () => {
               type="button"
               onClick={handleCancelar}
               className="btn btn-outline btn-md"
+              disabled={isSubmitting}
             >
               Cancelar
             </button>
             <button
               type="button"
-              onClick={handleGuardarYNuevo}
-              className="btn btn-secondary btn-md"
-            >
-              Guardar y Nuevo
-            </button>
-            <button
-              type="button"
               onClick={handleGuardarYSalir}
               className="btn btn-primary btn-md"
+              disabled={isSubmitting}
             >
-              Guardar y Salir
+              {isSubmitting ? 'Enviando a Odoo...' : 'Guardar y Salir'}
             </button>
           </div>
         </main>

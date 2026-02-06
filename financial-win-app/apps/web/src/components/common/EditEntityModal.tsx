@@ -82,50 +82,6 @@ export const EditEntityModal: React.FC<EditEntityModalProps> = ({
               />
             </div>
 
-            {/* Campos A3 */}
-            <div>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">
-                Información Contable A3
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="label-studio">ID Contable A3</label>
-                  <input
-                    type="text"
-                    value={clienteFormData.idContableA3 || ''}
-                    onChange={(e) =>
-                      setClienteFormData({ ...clienteFormData, idContableA3: e.target.value })
-                    }
-                    className="input-studio"
-                    placeholder="Ej: 43000001"
-                  />
-                </div>
-                <div>
-                  <label className="label-studio">Actividad A3</label>
-                  <input
-                    type="text"
-                    value={clienteFormData.actividadA3 || ''}
-                    onChange={(e) =>
-                      setClienteFormData({ ...clienteFormData, actividadA3: e.target.value })
-                    }
-                    className="input-studio"
-                    placeholder="Ej: VENTAS"
-                  />
-                </div>
-                <div>
-                  <label className="label-studio">Serie A3</label>
-                  <input
-                    type="text"
-                    value={clienteFormData.serieA3 || ''}
-                    onChange={(e) =>
-                      setClienteFormData({ ...clienteFormData, serieA3: e.target.value })
-                    }
-                    className="input-studio"
-                    placeholder="Ej: A"
-                  />
-                </div>
-              </div>
-            </div>
 
             {/* Botones */}
             <div className="flex justify-end gap-3 pt-4 border-t border-[#e5e5e5] dark:border-[#2A3B5A]">

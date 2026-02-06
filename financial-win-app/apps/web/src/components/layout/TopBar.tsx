@@ -1,7 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { ViewState } from '../../types';
+import { useFinancialStats } from '../../hooks/useFinancialStats';
+import { formatearMoneda } from '../../utils/formatUtils';
+import { Cliente } from '../../features/entities/types';
 
 interface TopBarProps {
   currentView: ViewState;
@@ -23,9 +27,11 @@ interface NotificationMenuProps {
   onToggle: () => void;
   onClose: () => void;
   t: (key: string) => string;
+  badgeCount: number;
+  onNavigate: (path: string) => void;
 }
 
-const NotificationMenu: React.FC<NotificationMenuProps> = ({ notifications, isOpen, onToggle, onClose, t }) => {
+const NotificationMenu: React.FC<NotificationMenuProps> = ({ notifications, isOpen, onToggle, onClose, t, badgeCount, onNavigate }) => {
   const getIconClass = (type: string) => {
     switch (type) {
       case 'error':
@@ -37,8 +43,17 @@ const NotificationMenu: React.FC<NotificationMenuProps> = ({ notifications, isOp
     }
   };
 
-  const getIconName = (type: string) => {
-    switch (type) {
+  const getIconName = (notif: Notification) => {
+    // Si el título contiene "facturas vencen pronto", usar event_upcoming
+    if (notif.title.includes('factura') && notif.title.includes('vencen')) {
+      return 'event_upcoming';
+    }
+    // Si el título contiene "Cobros pendientes", usar payments
+    if (notif.title.includes('Cobros pendientes')) {
+      return 'payments';
+    }
+    // Fallback por tipo
+    switch (notif.type) {
       case 'error':
         return 'error';
       case 'warning':
@@ -48,6 +63,15 @@ const NotificationMenu: React.FC<NotificationMenuProps> = ({ notifications, isOp
     }
   };
 
+  const handleNotificationClick = (notif: Notification) => {
+    if (notif.type === 'warning' && notif.title.includes('facturas')) {
+      onNavigate('/ingresos');
+    } else if (notif.type === 'warning' && notif.title.includes('Cobros')) {
+      onNavigate('/control-financiero');
+    }
+    onClose();
+  };
+
   return (
     <>
       <button
@@ -55,7 +79,11 @@ const NotificationMenu: React.FC<NotificationMenuProps> = ({ notifications, isOp
         className={`topbar-notif-btn ${isOpen ? 'topbar-action-btn-active' : ''}`}
       >
         <span className="material-symbols-outlined topbar-action-icon">notifications</span>
-        <span className="topbar-notif-badge"></span>
+        {badgeCount > 0 && (
+          <span className="topbar-notif-badge-number">
+            {badgeCount > 99 ? '99+' : badgeCount}
+          </span>
+        )}
       </button>
 
       {isOpen && (
@@ -66,24 +94,35 @@ const NotificationMenu: React.FC<NotificationMenuProps> = ({ notifications, isOp
           </div>
 
           <div className="topbar-dropdown-list">
-            {notifications.map((notif) => (
-              <div
-                key={notif.id}
-                className={notif.read ? 'topbar-notif-item' : 'topbar-notif-item-unread'}
-              >
+            {notifications.length === 0 ? (
+              <div className="topbar-notif-item">
                 <div className="topbar-notif-content">
-                  <div className={getIconClass(notif.type)}>
-                    <span className="material-symbols-outlined topbar-notif-icon">{getIconName(notif.type)}</span>
-                  </div>
                   <div className="topbar-notif-details">
-                    <p className="topbar-notif-title">{notif.title}</p>
-                    <p className="topbar-notif-desc">{notif.desc}</p>
-                    <p className="topbar-notif-time">{notif.time}</p>
+                    <p className="topbar-notif-title">No hay notificaciones</p>
                   </div>
-                  {!notif.read && <div className="topbar-notif-unread-dot"></div>}
                 </div>
               </div>
-            ))}
+            ) : (
+              notifications.map((notif) => (
+                <div
+                  key={notif.id}
+                  onClick={() => handleNotificationClick(notif)}
+                  className={notif.read ? 'topbar-notif-item' : 'topbar-notif-item-unread'}
+                >
+                  <div className="topbar-notif-content">
+                    <div className={getIconClass(notif.type)}>
+                      <span className="material-symbols-outlined topbar-notif-icon">{getIconName(notif)}</span>
+                    </div>
+                    <div className="topbar-notif-details">
+                      <p className="topbar-notif-title">{notif.title}</p>
+                      <p className="topbar-notif-desc">{notif.desc}</p>
+                      {notif.time && <p className="topbar-notif-time">{notif.time}</p>}
+                    </div>
+                    {!notif.read && <div className="topbar-notif-unread-dot"></div>}
+                  </div>
+                </div>
+              ))
+            )}
           </div>
 
           <div className="topbar-dropdown-footer">
@@ -156,18 +195,120 @@ const UserDropdown: React.FC<UserDropdownProps> = ({ isOpen, onToggle, onClose, 
   );
 };
 
+const STORAGE_KEY_CLIENTS = 'zaffra_clients';
+
 export const TopBar: React.FC<TopBarProps> = ({ currentView, onToggleSidebar }) => {
   const { theme, toggleTheme } = useTheme();
   const { t } = useLanguage();
+  const navigate = useNavigate();
+  const { incomeInvoices } = useFinancialStats();
 
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isNotifMenuOpen, setIsNotifMenuOpen] = useState(false);
 
-  const NOTIFICATIONS: Notification[] = [
-    { id: 1, type: 'error', title: t('home.alerts.syncError'), desc: t('home.alerts.syncErrorDesc'), time: t('home.alerts.time.h2'), read: false },
-    { id: 2, type: 'warning', title: t('home.alerts.pendingSign'), desc: t('home.alerts.pendingSignDesc'), time: t('home.alerts.time.h4'), read: false },
-    { id: 3, type: 'info', title: t('home.alerts.update'), desc: t('home.alerts.updateDesc'), time: t('home.alerts.time.d1'), read: true },
-  ];
+  // Calcular facturas próximas a vencer (ingresos no pagados que vencen en los próximos 5 días)
+  const facturasProximasAVencer = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Filtrar facturas de ingresos que no estén pagadas
+    const unpaidIncomes = incomeInvoices.filter(
+      (invoice) => invoice.payment_state !== 'paid'
+    );
+    
+    // Filtrar facturas que vencen en los próximos 5 días
+    const upcomingInvoices = unpaidIncomes.filter((invoice) => {
+      // Usar invoice_date_due si está disponible, sino usar invoice_date + 30 días como fallback
+      const dueDateStr = invoice.invoice_date_due || invoice.invoice_date;
+      if (!dueDateStr) return false;
+      
+      try {
+        const dueDate = new Date(dueDateStr);
+        dueDate.setHours(0, 0, 0, 0);
+        
+        if (isNaN(dueDate.getTime())) {
+          // Fallback: si no hay fecha de vencimiento, usar invoice_date + 30 días
+          if (!invoice.invoice_date) return false;
+          const invoiceDate = new Date(invoice.invoice_date);
+          invoiceDate.setHours(0, 0, 0, 0);
+          invoiceDate.setDate(invoiceDate.getDate() + 30);
+          const diffTime = invoiceDate.getTime() - today.getTime();
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          return diffDays >= 0 && diffDays <= 5;
+        }
+        
+        const diffTime = dueDate.getTime() - today.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        // Incluir facturas que vencen entre hoy y los próximos 5 días
+        return diffDays >= 0 && diffDays <= 5;
+      } catch {
+        return false;
+      }
+    });
+    
+    const count = upcomingInvoices.length;
+    
+    return { count };
+  }, [incomeInvoices]);
+
+  // Calcular total de deuda de clientes
+  const totalDeudaClientes = useMemo(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY_CLIENTS);
+      if (!stored) return 0;
+      const clientes: Cliente[] = JSON.parse(stored);
+      const activeClientes = clientes.filter((c) => c.is_active !== false);
+      return activeClientes.reduce((total, cliente) => {
+        const pagosPendientes = (cliente as any).pagosPendientes ?? 0;
+        const valor = typeof pagosPendientes === 'number' ? pagosPendientes : 0;
+        return total + (isNaN(valor) ? 0 : valor);
+      }, 0);
+    } catch (error) {
+      console.error('Error al cargar clientes del localStorage:', error);
+      return 0;
+    }
+  }, []);
+
+  // Calcular total de alertas
+  const totalAlertas = useMemo(() => {
+    return facturasProximasAVencer.count + (totalDeudaClientes > 0 ? 1 : 0);
+  }, [facturasProximasAVencer.count, totalDeudaClientes]);
+
+  // Construir notificaciones reales
+  const NOTIFICATIONS: Notification[] = useMemo(() => {
+    const notifications: Notification[] = [];
+    
+    // Item 1: Facturas próximas a vencer
+    if (facturasProximasAVencer.count > 0) {
+      notifications.push({
+        id: 1,
+        type: 'warning',
+        title: `${facturasProximasAVencer.count} factura${facturasProximasAVencer.count === 1 ? '' : 's'} vencen pronto`,
+        desc: 'Revisa las facturas de clientes que vencen en los próximos 5 días',
+        time: '',
+        read: false,
+      });
+    }
+    
+    // Item 2: Deuda de clientes
+    if (totalDeudaClientes > 0) {
+      notifications.push({
+        id: 2,
+        type: 'warning',
+        title: `Cobros pendientes: ${formatearMoneda(totalDeudaClientes)}`,
+        desc: 'Hay pagos pendientes de clientes que requieren atención',
+        time: '',
+        read: false,
+      });
+    }
+    
+    return notifications;
+  }, [facturasProximasAVencer.count, totalDeudaClientes]);
+
+  const handleNavigate = (path: string) => {
+    navigate(path);
+  };
 
   const closeMenus = () => {
     setIsUserMenuOpen(false);
@@ -220,6 +361,8 @@ export const TopBar: React.FC<TopBarProps> = ({ currentView, onToggleSidebar }) 
               onToggle={handleNotifToggle}
               onClose={closeMenus}
               t={t}
+              badgeCount={totalAlertas}
+              onNavigate={handleNavigate}
             />
           </div>
 

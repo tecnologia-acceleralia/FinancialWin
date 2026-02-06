@@ -63,7 +63,7 @@ export type DocumentType = 'tickets' | 'invoices' | 'staff';
  */
 export interface ExtractedData {
   // Campos comunes
-  department?: 'Marketing' | 'IT' | 'RRHH' | 'Finanzas' | 'Operaciones' | 'Ventas';
+  department?: 'Marketing' | 'Ventas' | 'Operaciones' | 'IT' | 'Administración' | 'RRHH' | 'Dirección';
   base?: string;
   vat?: string;
 
@@ -80,7 +80,20 @@ export interface ExtractedData {
 
   // Campos para invoices
   origin?: 'national' | 'foreign';
-  expenseType?: 'Licencias Software' | 'Consultoría' | 'Material Oficina' | 'Servicios Profesionales' | 'Viajes y Dietas' | 'Otros';
+  expenseType?: 
+    | 'Licencias Software' 
+    | 'Consultoría' 
+    | 'Material Oficina' 
+    | 'Servicios Profesionales' 
+    | 'Viajes y Dietas' 
+    | 'Otros'
+    | 'Licencias'
+    | 'Proveedor externo'
+    | 'Comidas/Dietas'
+    | 'Viajes'
+    | 'Staff'
+    | 'Impuestos/Financieros'
+    | 'Sin Categorizar';
   supplier?: string;
   cif?: string;
   vatId?: string;

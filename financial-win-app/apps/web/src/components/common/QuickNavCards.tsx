@@ -28,11 +28,11 @@ export const QuickNavCards: React.FC = () => {
       {QUICK_NAV_ITEMS.map((item) => (
         <button
           key={item.path}
-          className="btn-quick-nav"
+          className="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors rounded-xl p-6 flex items-center justify-center gap-3 w-full"
           onClick={() => navigate(item.path)}
         >
-          <span className="material-symbols-outlined">{item.icon}</span>
-          {item.label}
+          <span className="material-symbols-outlined text-[#B84E9D]">{item.icon}</span>
+          <span className="text-slate-900 dark:text-slate-100 font-semibold">{item.label}</span>
         </button>
       ))}
     </div>

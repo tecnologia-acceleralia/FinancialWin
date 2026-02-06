@@ -1,5 +1,8 @@
 import { useMemo } from 'react';
-import { useFinancial } from '../contexts/FinancialContext';
+import { useQuery } from '@tanstack/react-query';
+import { odooService, type OdooInvoice } from '../services/odooService';
+import type { FinancialRecord } from '../contexts/FinancialContext';
+import type { ExtractedData } from '../types';
 
 export interface FinancialKPIs {
   totalIngresos: number;
@@ -59,17 +62,186 @@ function isInCurrentQuarter(dateString: string | undefined | null): boolean {
 }
 
 /**
- * Hook para calcular estadísticas financieras basadas en datos reales del FinancialContext
- * Todos los cálculos se actualizan automáticamente cuando cambian los arrays de expenses o income
+ * Transforma una factura de Odoo a FinancialRecord
+ */
+function transformOdooInvoiceToFinancialRecord(
+  invoice: OdooInvoice,
+  type: 'income' | 'expense'
+): FinancialRecord {
+  const invoiceDate = invoice.invoice_date || new Date().toISOString().split('T')[0];
+  const createdAt = invoiceDate;
+  
+  // Mapear payment_state de Odoo a PaymentStatus
+  const paymentStatus: 'Pendiente' | 'Pagado' = 
+    invoice.payment_state === 'paid' ? 'Pagado' : 'Pendiente';
+  
+  // CRÍTICO: Forzar conversión a número para evitar strings
+  const amountTotal = Number(invoice.amount_total) || 0;
+  const vatEstimated = amountTotal * 0.21 / 1.21; // IVA incluido
+  
+  // Mapear categoria_zaffra a expenseType si existe (solo para gastos)
+  // IMPORTANTE: Asegurar que expenseType siempre tenga un valor para gastos
+  // Si categoria_zaffra existe, usarla directamente (incluyendo 'Licencias' para Canva)
+  // Si no existe, usar 'Sin Categorizar' como fallback
+  // CRÍTICO: Si Canva viene con categoria_zaffra === 'Licencias', se mapea directamente a expenseType
+  const expenseType: ExtractedData['expenseType'] | undefined = type === 'expense' 
+    ? (invoice.categoria_zaffra ? invoice.categoria_zaffra as ExtractedData['expenseType'] : 'Sin Categorizar')
+    : undefined;
+  
+  // CRÍTICO: Mapear departamento_zaffra a department para AMBOS tipos (gastos e ingresos)
+  // IMPORTANTE: Eliminar cualquier lógica que mantenga "N/A" - siempre usar departamento_zaffra
+  const department: ExtractedData['department'] | undefined = invoice.departamento_zaffra || undefined;
+  
+  // Log de depuración para verificar el mapeo (especialmente importante para Canva y 'Licencias')
+  console.log(`📊 [FinancialStats] Factura ${type}: ${invoice.name}, Partner: ${invoice.partner_id[1]}, categoria_zaffra: ${invoice.categoria_zaffra || 'N/A'}, departamento_zaffra: ${invoice.departamento_zaffra || 'N/A'}, expenseType mapeado: ${expenseType || 'N/A'}, department asignado: ${department || 'N/A'}, amount_total (num): ${amountTotal}, payment_state: ${invoice.payment_state || 'N/A'}, state: ${invoice.state || 'N/A'}`);
+  
+  const extractedData: ExtractedData = {
+    total: amountTotal.toString(),
+    vat: vatEstimated.toString(),
+    issueDate: invoiceDate,
+    invoiceNum: invoice.name,
+    // Para gastos: supplier, para ingresos: también guardamos el partner como supplier para compatibilidad
+    supplier: invoice.partner_id[1] || 'Sin proveedor/cliente',
+    // Mapear categoria_zaffra a expenseType si existe (solo para gastos)
+    // Asegurar que expenseType tenga prioridad absoluta para el gráfico
+    expenseType: type === 'expense' ? expenseType : undefined,
+    // CRÍTICO: Asignar department desde departamento_zaffra para AMBOS tipos
+    // NUNCA usar "N/A" - siempre usar el valor de departamento_zaffra
+    department: department,
+  };
+  
+  return {
+    id: `odoo-${invoice.id}`,
+    type,
+    data: extractedData,
+    documentType: 'invoices',
+    paymentStatus,
+    createdAt,
+    updatedAt: createdAt,
+  };
+}
+
+/**
+ * Hook para calcular estadísticas financieras basadas en datos de Odoo
+ * Todos los cálculos se actualizan automáticamente cuando cambian los datos de Odoo
  */
 export const useFinancialStats = () => {
-  const { expenses, income } = useFinancial();
+  // Cargar facturas de ingresos (out_invoice)
+  // IMPORTANTE: refetchOnWindowFocus para evitar datos en caché obsoletos
+  const { data: incomeInvoices = [], isLoading: isLoadingIncome } = useQuery({
+    queryKey: ['odoo-invoices', 'out_invoice'],
+    queryFn: () => odooService.getInvoices('out_invoice'),
+    staleTime: 5 * 60 * 1000, // 5 minutos
+    refetchOnWindowFocus: true, // Forzar refetch al enfocar la ventana
+  });
+
+  // Cargar facturas de gastos (in_invoice)
+  // IMPORTANTE: refetchOnWindowFocus para evitar datos en caché obsoletos
+  const { data: expenseInvoices = [], isLoading: isLoadingExpenses } = useQuery({
+    queryKey: ['odoo-invoices', 'in_invoice'],
+    queryFn: () => odooService.getInvoices('in_invoice'),
+    staleTime: 5 * 60 * 1000, // 5 minutos
+    refetchOnWindowFocus: true, // Forzar refetch al enfocar la ventana
+  });
+
+  // Transformar facturas a FinancialRecord
+  // IMPORTANTE: Transformar TODAS las facturas sin filtrar por estado
+  // Esto asegura que facturas con estado 'posted' O payment_state 'paid' se incluyan
+  // El filtro se aplica después en validExpensesForChart solo por supplier y total
+  const income = useMemo(() => {
+    return incomeInvoices.map((invoice) => 
+      transformOdooInvoiceToFinancialRecord(invoice, 'income')
+    );
+  }, [incomeInvoices]);
+
+  const expenses = useMemo(() => {
+    // CRÍTICO: Incluir TODAS las facturas de gastos, independientemente de:
+    // - state (posted, draft, etc.)
+    // - payment_state (paid, not_paid, in_payment)
+    // Esto asegura que facturas pagadas (payment_state === 'paid') se incluyan
+    // IMPORTANTE: NO filtrar aquí por state o payment_state - incluir todas
+    // El filtro se aplica después en validExpensesForChart solo por supplier y total
+    // Esto garantiza que facturas con state === 'posted' O payment_state === 'paid' O payment_state === 'in_payment' se incluyan
+    return expenseInvoices.map((invoice) => 
+      transformOdooInvoiceToFinancialRecord(invoice, 'expense')
+    );
+  }, [expenseInvoices]);
+
+  const isLoading = isLoadingIncome || isLoadingExpenses;
 
   // Filtrar gastos válidos para gráficos (con supplier y total)
+  // CRÍTICO: Incluir TODAS las facturas independientemente del estado de pago
+  // - Facturas con estado 'paid' (Pagada) SÍ deben incluirse en los cálculos de gráficas
+  // - Facturas con estado 'not_paid' o 'in_payment' también se incluyen
+  // - Facturas con state === 'posted' se incluyen automáticamente (ya transformadas)
+  // SIN FILTROS DE FECHA: Incluir todas las facturas sin importar la fecha (trimestre/mes actual o anteriores)
+  // SIN FILTROS DE CATEGORÍAS: NO hay whitelist de categorías - TODAS las categorías se incluyen (incluyendo 'Licencias')
   const validExpensesForChart = useMemo(() => {
-    return expenses.filter(
-      (expense) => expense.data.supplier && expense.data.total
+    const filtered = expenses.filter(
+      (expense) => {
+        // Verificar que tenga supplier y total
+        const hasSupplier = !!expense.data.supplier;
+        const hasTotal = !!expense.data.total;
+        const totalValue = Number(expense.data.total?.toString() || '0');
+        
+        // Obtener fecha de la factura para verificación
+        const invoiceDate = expense.data.issueDate || expense.createdAt;
+        const isInQuarter = invoiceDate ? isInCurrentQuarter(invoiceDate) : false;
+        
+        // Log de cada gasto evaluado (incluyendo estado de pago y fecha)
+        console.log(`🔍 [FinancialStats] Evaluando gasto: ID=${expense.id}, Proveedor="${expense.data.supplier}", Total="${expense.data.total}", Total(num)=${totalValue}, expenseType="${expense.data.expenseType || 'undefined'}", Estado="${expense.paymentStatus}", Fecha="${invoiceDate}", EnTrimestreActual=${isInQuarter}, Válido=${hasSupplier && hasTotal && totalValue > 0}`);
+        
+        // CRÍTICO: NO filtrar por paymentStatus - incluir todas las facturas (paid, not_paid, in_payment)
+        // CRÍTICO: NO filtrar por fecha - incluir todas las facturas (trimestre actual y anteriores)
+        // CRÍTICO: NO filtrar por categorías - TODAS las categorías se incluyen (incluyendo 'Licencias')
+        // Solo filtrar por: supplier existe, total existe, y total > 0
+        return hasSupplier && hasTotal && totalValue > 0;
+      }
     );
+    
+    // Log detallado para depuración
+    console.log(`📊 [FinancialStats] Total gastos transformados: ${expenses.length}`);
+    console.log(`📊 [FinancialStats] Gastos válidos para gráfico: ${filtered.length}`);
+    
+    // Contar facturas por estado de pago para verificación
+    const paidCount = filtered.filter(e => e.paymentStatus === 'Pagado').length;
+    const pendingCount = filtered.filter(e => e.paymentStatus === 'Pendiente').length;
+    console.log(`📊 [FinancialStats] Desglose por estado: Pagadas=${paidCount}, Pendientes=${pendingCount}`);
+    
+    // Verificar que la categoría 'Licencias' esté presente
+    const licenciasCount = filtered.filter(e => e.data.expenseType === 'Licencias').length;
+    console.log(`📊 [FinancialStats] Facturas con categoría 'Licencias': ${licenciasCount}`);
+    
+    // Verificar facturas de Canva específicamente
+    const canvaExpenses = filtered.filter(e => 
+      e.data.supplier?.toLowerCase().includes('canva')
+    );
+    if (canvaExpenses.length > 0) {
+      console.log(`📊 [FinancialStats] ⭐ Facturas de Canva encontradas: ${canvaExpenses.length}`);
+      canvaExpenses.forEach(canva => {
+        const invoiceDate = canva.data.issueDate || canva.createdAt;
+        const isInQuarter = invoiceDate ? isInCurrentQuarter(invoiceDate) : false;
+        console.log(`📊 [FinancialStats] ⭐ Canva: Total=${Number(canva.data.total?.toString() || '0')}, Categoría="${canva.data.expenseType || 'undefined'}", Estado="${canva.paymentStatus}", Fecha="${invoiceDate}", EnTrimestreActual=${isInQuarter}`);
+      });
+    } else {
+      console.log(`📊 [FinancialStats] ⚠️ No se encontraron facturas de Canva en los gastos válidos`);
+    }
+    
+    // Verificar facturas del trimestre actual
+    const currentQuarterExpenses = filtered.filter(e => {
+      const invoiceDate = e.data.issueDate || e.createdAt;
+      return invoiceDate ? isInCurrentQuarter(invoiceDate) : false;
+    });
+    console.log(`📊 [FinancialStats] Facturas del trimestre actual: ${currentQuarterExpenses.length} de ${filtered.length}`);
+    
+    filtered.forEach((expense) => {
+      const total = Number(expense.data.total?.toString() || '0');
+      const invoiceDate = expense.data.issueDate || expense.createdAt;
+      const isInQuarter = invoiceDate ? isInCurrentQuarter(invoiceDate) : false;
+      console.log(`📊 [FinancialStats] ✅ Procesando para gráfico: Proveedor="${expense.data.supplier}", Total=${total}, Categoría asignada="${expense.data.expenseType || 'undefined'}", Estado="${expense.paymentStatus}", Fecha="${invoiceDate}", EnTrimestreActual=${isInQuarter}`);
+    });
+    
+    return filtered;
   }, [expenses]);
 
   /**
@@ -81,83 +253,90 @@ export const useFinancialStats = () => {
     return isNaN(parsed) ? 0 : parsed;
   };
 
-  // Calcular KPIs dinámicos basados en datos reales
+  // Calcular KPIs dinámicos basados en datos de Odoo
   const kpis = useMemo((): FinancialKPIs => {
-    // Filtrar registros válidos (con total)
-    const validExpenses = expenses.filter(
-      (expense) => expense.data.total
+    // Filtrar solo facturas con estado 'posted' para cálculos reales
+    const postedIncomeInvoices = incomeInvoices.filter(
+      (invoice) => invoice.state === 'posted'
     );
-    const validIncome = income.filter(
-      (incomeRecord) => incomeRecord.data.total
+    const postedExpenseInvoices = expenseInvoices.filter(
+      (invoice) => invoice.state === 'posted'
     );
 
-    // Total Ingresos: Suma de todos los total de income
-    const totalIngresos = validIncome.reduce((sum, record) => {
-      return sum + safeParseFloat(record.data.total);
+    // Total Ingresos: Suma de facturas de ingresos con estado 'posted'
+    const totalIngresos = postedIncomeInvoices.reduce((sum, invoice) => {
+      return sum + (invoice.amount_total || 0);
     }, 0);
 
-    // Total Gastos: Suma de todos los total de expenses
-    const totalGastos = validExpenses.reduce((sum, record) => {
-      return sum + safeParseFloat(record.data.total);
+    // Total Gastos: Suma de facturas de gastos con estado 'posted'
+    const totalGastos = postedExpenseInvoices.reduce((sum, invoice) => {
+      return sum + (invoice.amount_total || 0);
     }, 0);
 
-    // Beneficio Neto: Suma de todos los total de income menos la suma de todos los total de expenses
+    // Beneficio Neto: Ingresos - Gastos (solo facturas posted)
     const beneficioNeto = totalIngresos - totalGastos;
 
-    // Caja Pendiente: Suma el total de todos los registros (tanto de ingresos como de gastos)
-    // cuyo paymentStatus sea 'Pendiente'
-    const ingresosPendientes = validIncome
-      .filter((record) => record.paymentStatus === 'Pendiente')
-      .reduce((sum, record) => {
-        return sum + safeParseFloat(record.data.total);
+    // Caja Pendiente: Suma de facturas donde payment_state no sea 'paid'
+    const ingresosPendientes = incomeInvoices
+      .filter((invoice) => invoice.payment_state !== 'paid')
+      .reduce((sum, invoice) => {
+        return sum + (invoice.amount_total || 0);
       }, 0);
 
-    const gastosPendientes = validExpenses
-      .filter((record) => record.paymentStatus === 'Pendiente')
-      .reduce((sum, record) => {
-        return sum + safeParseFloat(record.data.total);
+    const gastosPendientes = expenseInvoices
+      .filter((invoice) => invoice.payment_state !== 'paid')
+      .reduce((sum, invoice) => {
+        return sum + (invoice.amount_total || 0);
       }, 0);
 
     const cajaPendiente = ingresosPendientes + gastosPendientes;
 
     // Ratio de Cobro: Porcentaje de ingresos pagados respecto al total de ingresos
-    // (Suma Ingresos Pagados / Suma Ingresos Totales) * 100
-    const ingresosPagados = validIncome
-      .filter((record) => record.paymentStatus === 'Pagado')
-      .reduce((sum, record) => {
-        return sum + safeParseFloat(record.data.total);
+    const ingresosPagados = incomeInvoices
+      .filter((invoice) => invoice.payment_state === 'paid')
+      .reduce((sum, invoice) => {
+        return sum + (invoice.amount_total || 0);
       }, 0);
 
     const ratioCobro = totalIngresos > 0 ? (ingresosPagados / totalIngresos) * 100 : 0;
 
-    // IVA Neto: Suma el campo vat (tax) de los ingresos y réstale el vat (tax) de los gastos
-    const ivaIngresos = validIncome.reduce((sum, record) => {
-      return sum + safeParseFloat(record.data.vat);
+    // IVA Neto: Estimación basada en amount_total (21% IVA incluido)
+    // En el futuro se puede actualizar odooService para pedir amount_tax_signed
+    const ivaIngresos = postedIncomeInvoices.reduce((sum, invoice) => {
+      const amount = invoice.amount_total || 0;
+      const vat = amount * 0.21 / 1.21; // IVA incluido
+      return sum + vat;
     }, 0);
 
-    const ivaGastos = validExpenses.reduce((sum, record) => {
-      return sum + safeParseFloat(record.data.vat);
+    const ivaGastos = postedExpenseInvoices.reduce((sum, invoice) => {
+      const amount = invoice.amount_total || 0;
+      const vat = amount * 0.21 / 1.21; // IVA incluido
+      return sum + vat;
     }, 0);
 
     const ivaNeto = ivaIngresos - ivaGastos;
 
     // IVA Trimestral: Calcula el IVA neto solo de los registros del trimestre actual
-    const ingresosTrimestre = validIncome.filter((record) => {
-      const fecha = record.data.issueDate || record.createdAt;
-      return isInCurrentQuarter(fecha);
+    const ingresosTrimestre = postedIncomeInvoices.filter((invoice) => {
+      const fecha = invoice.invoice_date;
+      return fecha && isInCurrentQuarter(fecha);
     });
 
-    const gastosTrimestre = validExpenses.filter((record) => {
-      const fecha = record.data.issueDate || record.createdAt;
-      return isInCurrentQuarter(fecha);
+    const gastosTrimestre = postedExpenseInvoices.filter((invoice) => {
+      const fecha = invoice.invoice_date;
+      return fecha && isInCurrentQuarter(fecha);
     });
 
-    const ivaIngresosTrimestre = ingresosTrimestre.reduce((sum, record) => {
-      return sum + safeParseFloat(record.data.vat);
+    const ivaIngresosTrimestre = ingresosTrimestre.reduce((sum, invoice) => {
+      const amount = invoice.amount_total || 0;
+      const vat = amount * 0.21 / 1.21;
+      return sum + vat;
     }, 0);
 
-    const ivaGastosTrimestre = gastosTrimestre.reduce((sum, record) => {
-      return sum + safeParseFloat(record.data.vat);
+    const ivaGastosTrimestre = gastosTrimestre.reduce((sum, invoice) => {
+      const amount = invoice.amount_total || 0;
+      const vat = amount * 0.21 / 1.21;
+      return sum + vat;
     }, 0);
 
     const ivaTrimestral = ivaIngresosTrimestre - ivaGastosTrimestre;
@@ -171,7 +350,7 @@ export const useFinancialStats = () => {
       ivaNeto,
       ivaTrimestral,
     };
-  }, [expenses, income]);
+  }, [incomeInvoices, expenseInvoices]);
 
   // Formatear moneda
   const formatCurrency = (amount: number): string => {
@@ -183,26 +362,39 @@ export const useFinancialStats = () => {
     }).format(amount);
   };
 
-  // Obtener los 5 movimientos pendientes más recientes (solo datos reales)
+  // Obtener los 5 movimientos pendientes más recientes de Odoo
+  // Facturas con payment_state 'not_paid' o 'in_payment'
   const pendingMovements = useMemo(() => {
-    const allRecords = [...income, ...expenses];
+    const allInvoices: OdooInvoice[] = [...incomeInvoices, ...expenseInvoices];
     
-    // Filtrar solo los pendientes y ordenar por fecha (más recientes primero)
-    return allRecords
-      .filter((record) => record.paymentStatus === 'Pendiente')
+    // Filtrar facturas pendientes (not_paid o in_payment)
+    const pendingInvoices = allInvoices.filter(
+      (invoice) => invoice.payment_state === 'not_paid' || invoice.payment_state === 'in_payment'
+    );
+    
+    // Ordenar por fecha (más recientes primero)
+    // Usar invoice_date_due si está disponible, sino invoice_date
+    return pendingInvoices
       .sort((a, b) => {
-        const dateA = new Date(a.data.issueDate || a.createdAt);
-        const dateB = new Date(b.data.issueDate || b.createdAt);
+        const dateA = a.invoice_date ? new Date(a.invoice_date) : new Date(0);
+        const dateB = b.invoice_date ? new Date(b.invoice_date) : new Date(0);
         return dateB.getTime() - dateA.getTime(); // Más reciente primero
       })
-      .slice(0, 5); // Solo los 5 más recientes
-  }, [income, expenses]);
+      .slice(0, 5) // Solo los 5 más recientes
+      .map((invoice) => {
+        const type: 'income' | 'expense' = 
+          incomeInvoices.some((inv) => inv.id === invoice.id) ? 'income' : 'expense';
+        return transformOdooInvoiceToFinancialRecord(invoice, type);
+      });
+  }, [incomeInvoices, expenseInvoices]);
 
   return {
     kpis,
-    allIncome: income, // Retornar solo los ingresos reales
+    allIncome: income, // Retornar ingresos transformados
+    incomeInvoices, // Retornar facturas originales de Odoo para cálculos adicionales
     validExpensesForChart,
     formatCurrency,
     pendingMovements,
+    isLoading,
   };
 };

@@ -36,8 +36,6 @@ export const ProveedoresListPage: React.FC = () => {
     balanceRange: { min: null, max: null },
     paymentsRange: { min: null, max: null },
   });
-  const [isImporting, setIsImporting] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [partners, setPartners] = useState<OdooPartner[]>([]);
@@ -47,7 +45,7 @@ export const ProveedoresListPage: React.FC = () => {
     localStorage.setItem(VIEW_TYPE_STORAGE_KEY, viewType);
   }, [viewType]);
 
-  // Cargar proveedores directamente desde Odoo
+  // Cargar proveedores automáticamente desde Odoo al montar el componente
   useEffect(() => {
     const loadPartners = async () => {
       setIsLoading(true);
@@ -72,7 +70,7 @@ export const ProveedoresListPage: React.FC = () => {
     };
 
     void loadPartners();
-  }, [refreshKey, showToast]);
+  }, [showToast]);
 
   // Convertir proveedores al formato de lista
   const proveedoresLista = useMemo(() => {
@@ -226,25 +224,6 @@ export const ProveedoresListPage: React.FC = () => {
     exportToExcel(dataToExport, filename, columns);
   };
 
-  const handleImportarOdoo = async () => {
-    setIsImporting(true);
-    try {
-      // Forzar recarga desde Odoo
-      setRefreshKey((prev) => prev + 1);
-      showToast('Proveedores sincronizados desde Odoo', 'success');
-    } catch (error) {
-      console.error('Error al sincronizar proveedores desde Odoo:', error);
-      showToast(
-        `Error al sincronizar proveedores desde Odoo: ${
-          error instanceof Error ? error.message : 'Error desconocido'
-        }`,
-        'error'
-      );
-    } finally {
-      setIsImporting(false);
-    }
-  };
-
   return (
     <div className="clients-list-container flex flex-col h-full">
       <ListViewHeader
@@ -259,30 +238,15 @@ export const ProveedoresListPage: React.FC = () => {
         onAddClick={handleNuevoProveedor}
       />
       <div className="action-toolbar mb-6">
-        <div className="flex gap-4 items-center">
-          <div className="flex-1">
-            <UniversalSearchBar
-              items={proveedoresLista}
-              onFilter={() => {
-                // El filtrado se maneja en proveedoresFiltrados usando busqueda
-              }}
-              onSearchTermChange={setBusqueda}
-              searchFields={['nombre', 'nif', 'email', 'ciudad']}
-              placeholder="Buscar por nombre, nif, email, ciudad..."
-            />
-          </div>
-          <button
-            type="button"
-            onClick={handleImportarOdoo}
-            disabled={isImporting}
-            className="btn btn-secondary"
-          >
-            <span className="material-symbols-outlined mr-2">
-              {isImporting ? 'sync' : 'download'}
-            </span>
-            {isImporting ? 'Importando...' : 'Importar de Odoo'}
-          </button>
-        </div>
+        <UniversalSearchBar
+          items={proveedoresLista}
+          onFilter={() => {
+            // El filtrado se maneja en proveedoresFiltrados usando busqueda
+          }}
+          onSearchTermChange={setBusqueda}
+          searchFields={['nombre', 'nif', 'email', 'ciudad']}
+          placeholder="Buscar por nombre, nif, email, ciudad..."
+        />
       </div>
 
       <div className="flex flex-col flex-grow gap-8 py-6 min-h-0">
@@ -326,11 +290,19 @@ export const ProveedoresListPage: React.FC = () => {
               onItemsPerPageChange={handleItemsPerPageChange}
             />
           </>
-        ) : (
+        ) : busqueda.trim() || filters.status.length > 0 || filters.types.length > 0 || 
+            filters.balanceRange.min !== null || filters.balanceRange.max !== null ||
+            filters.paymentsRange.min !== null || filters.paymentsRange.max !== null ? (
           <EmptyState
             title="No se encontraron proveedores"
-            description="Intenta ajustar los términos de búsqueda"
+            description="Intenta ajustar los términos de búsqueda o filtros"
             icon="search_off"
+          />
+        ) : (
+          <EmptyState
+            title="No hay datos en Odoo"
+            description="No hay proveedores disponibles en Odoo en este momento"
+            icon="inbox"
           />
         )}
       </div>

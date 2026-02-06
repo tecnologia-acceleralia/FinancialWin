@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { useFinancial, type FinancialRecord, type ErpStatus } from '../../../contexts/FinancialContext';
+import { useFinancial, type FinancialRecord } from '../../../contexts/FinancialContext';
 import type { FilterValues } from './FilterPanel';
 import { DataTablePagination } from '../../../components/common/DataTablePagination';
 
@@ -23,45 +23,6 @@ export const RegistrosTable: React.FC<RegistrosTableProps> = ({ searchTerm = '',
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
-  /**
-   * Obtiene la clase CSS para el estado ERP
-   */
-  const getErpStatusClass = (status: ErpStatus | undefined): string => {
-    switch (status) {
-      case 'pending':
-        return 'erp-status-pending';
-      case 'syncing':
-        return 'erp-status-syncing';
-      case 'synced_odoo':
-        return 'erp-status-synced-odoo';
-      case 'synced_a3':
-        return 'erp-status-synced-a3';
-      case 'error':
-        return 'erp-status-error';
-      default:
-        return 'erp-status-pending';
-    }
-  };
-
-  /**
-   * Obtiene el texto para el estado ERP
-   */
-  const getErpStatusText = (status: ErpStatus | undefined): string => {
-    switch (status) {
-      case 'pending':
-        return 'Pendiente';
-      case 'syncing':
-        return 'Sincronizando...';
-      case 'synced_odoo':
-        return 'Sincronizado Odoo';
-      case 'synced_a3':
-        return 'Sincronizado A3';
-      case 'error':
-        return 'Error';
-      default:
-        return 'Pendiente';
-    }
-  };
 
   /**
    * Mapea el documentType interno a un nombre legible para el usuario
@@ -143,25 +104,11 @@ export const RegistrosTable: React.FC<RegistrosTableProps> = ({ searchTerm = '',
         fechaRegistroOriginal: record.createdAt, // Guardar fecha original para filtrado
         usuario: record.data.supplier || 'N/A',
         importe,
-        erpStatus: record.erpStatus || 'pending',
         isProcessed: isProcessedByGemini(record),
       };
     });
   }, [records]);
 
-  /**
-   * Mapea el estado ERP del filtro al valor interno
-   */
-  const mapErpStatusFilterToInternal = (filterStatus: string): ErpStatus | null => {
-    const mapping: Record<string, ErpStatus> = {
-      'Pendiente': 'pending',
-      'Sincronizando': 'syncing',
-      'Sincronizado Odoo': 'synced_odoo',
-      'Sincronizado A3': 'synced_a3',
-      'Error': 'error',
-    };
-    return mapping[filterStatus] || null;
-  };
 
   /**
    * Filtra registros según el término de búsqueda y filtros avanzados
@@ -258,17 +205,6 @@ export const RegistrosTable: React.FC<RegistrosTableProps> = ({ searchTerm = '',
         });
       }
 
-      // Filtro por Estado ERP
-      if (filters.erpStatus.length > 0) {
-        const erpStatusInternal = filters.erpStatus
-          .map(mapErpStatusFilterToInternal)
-          .filter((status): status is ErpStatus => status !== null);
-        
-        resultado = resultado.filter((registro) => {
-          const registroErpStatus = registro.erpStatus as ErpStatus;
-          return erpStatusInternal.includes(registroErpStatus);
-        });
-      }
 
       // Filtro por rango de importe
       if (filters.amountRange.min !== null) {
@@ -335,14 +271,12 @@ export const RegistrosTable: React.FC<RegistrosTableProps> = ({ searchTerm = '',
             <th className="table-header table-col-small">Fecha Registro</th>
             <th className="table-header table-col-text">Usuario</th>
             <th className="table-header table-col-small">Importe</th>
-            <th className="table-header table-col-medium">Estado ERP</th>
-            <th className="table-header table-col-compact">Acción</th>
           </tr>
         </thead>
         <tbody>
           {registrosFiltrados.length === 0 ? (
             <tr>
-              <td colSpan={9} className="table-empty-state">
+              <td colSpan={7} className="table-empty-state">
                 <div className="contactos-empty-state">
                   <span className="material-symbols-outlined contactos-empty-icon">
                     search_off
@@ -354,44 +288,25 @@ export const RegistrosTable: React.FC<RegistrosTableProps> = ({ searchTerm = '',
               </td>
             </tr>
           ) : (
-            registrosPaginados.map((registro) => {
-              const isSyncing = registro.erpStatus === 'syncing';
-              
-              return (
-                <tr key={registro.id} className="table-row">
-                  <td className="table-col-small">
-                    <span className={getEstadoClass(registro.estado)}>
-                      {registro.estado}
-                    </span>
-                  </td>
-                  <td className="table-col-medium">{registro.tipoDocumento}</td>
-                  <td className="table-col-medium">{registro.departamento}</td>
-                  <td className="table-col-text" title={registro.nombreDocumento}>
-                    {registro.nombreDocumento}
-                  </td>
-                  <td className="table-col-small">{registro.fechaRegistro}</td>
-                  <td className="table-col-text" title={registro.usuario}>
-                    {registro.usuario}
-                  </td>
-                  <td className="table-col-small">{registro.importe}</td>
-                  <td className="table-col-medium">
-                    <span className={getErpStatusClass(registro.erpStatus as ErpStatus)}>
-                      {isSyncing && (
-                        <span className="material-symbols-outlined animate-spin text-xs mr-1">
-                          sync
-                        </span>
-                      )}
-                      {getErpStatusText(registro.erpStatus as ErpStatus)}
-                    </span>
-                  </td>
-                  <td className="table-col-compact">
-                    <button className="table-action-button">
-                      <span className="material-symbols-outlined">visibility</span>
-                    </button>
-                  </td>
-                </tr>
-              );
-            })
+            registrosPaginados.map((registro) => (
+              <tr key={registro.id} className="table-row">
+                <td className="table-col-small">
+                  <span className={getEstadoClass(registro.estado)}>
+                    {registro.estado}
+                  </span>
+                </td>
+                <td className="table-col-medium">{registro.tipoDocumento}</td>
+                <td className="table-col-medium">{registro.departamento}</td>
+                <td className="table-col-text" title={registro.nombreDocumento}>
+                  {registro.nombreDocumento}
+                </td>
+                <td className="table-col-small">{registro.fechaRegistro}</td>
+                <td className="table-col-text" title={registro.usuario}>
+                  {registro.usuario}
+                </td>
+                <td className="table-col-small">{registro.importe}</td>
+              </tr>
+            ))
           )}
         </tbody>
       </table>

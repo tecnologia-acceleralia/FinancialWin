@@ -40,10 +40,6 @@ export interface Proveedor {
   iban?: string;
   formaPago?: FormaPago;
   plazoPago?: PlazoPago;
-  // Campos A3
-  idContableA3?: string;
-  actividadA3?: string;
-  serieA3?: string;
   // Contactos
   contactos: ContactoProveedor[];
   // Notas
@@ -73,9 +69,6 @@ export interface CreateProveedorDto {
   iban?: string;
   formaPago?: FormaPago;
   plazoPago?: PlazoPago;
-  idContableA3?: string;
-  actividadA3?: string;
-  serieA3?: string;
   contactos: ContactoProveedor[];
   notasInternas?: string;
 }
@@ -101,10 +94,6 @@ export interface Cliente {
   cuentaContable?: string;
   contrapartida?: string;
   claveOperacion347?: string;
-  // Campos A3
-  idContableA3?: string;
-  actividadA3?: string;
-  serieA3?: string;
   // Datos de Contacto
   contactoNombre?: string;
   contactoApellidos?: string;

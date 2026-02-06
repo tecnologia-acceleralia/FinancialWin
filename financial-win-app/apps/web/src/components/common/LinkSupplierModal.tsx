@@ -7,7 +7,6 @@ interface SupplierOption {
   id?: string;
   nombreComercial?: string;
   razonSocial?: string;
-  idContableA3?: string;
 }
 
 interface LinkSupplierModalProps {
@@ -32,7 +31,6 @@ export const LinkSupplierModal: React.FC<LinkSupplierModalProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>('');
   const [newSupplierName, setNewSupplierName] = useState(supplierName);
-  const [newSupplierA3Id, setNewSupplierA3Id] = useState('');
 
   const storageKey = type === 'supplier' ? 'zaffra_suppliers' : 'zaffra_clients';
   const entityLabel = type === 'supplier' ? 'proveedor' : 'cliente';
@@ -70,7 +68,6 @@ export const LinkSupplierModal: React.FC<LinkSupplierModalProps> = ({
   useEffect(() => {
     if (activeTab === 'new') {
       setNewSupplierName(supplierName);
-      setNewSupplierA3Id('');
     } else {
       setSelectedSupplierId('');
       setSearchTerm('');
@@ -84,7 +81,6 @@ export const LinkSupplierModal: React.FC<LinkSupplierModalProps> = ({
       setSearchTerm('');
       setSelectedSupplierId('');
       setNewSupplierName(supplierName);
-      setNewSupplierA3Id('');
     }
   }, [isOpen, supplierName]);
 
@@ -100,13 +96,8 @@ export const LinkSupplierModal: React.FC<LinkSupplierModalProps> = ({
       return;
     }
 
-    if (!supplier.idContableA3) {
-      showToast(`El ${entityLabel} seleccionado no tiene ID Contable A3. Por favor, edítalo primero.`, 'error');
-      return;
-    }
-
     // Vincular primero
-    onLink(selectedSupplierId, supplier.idContableA3, invoiceId);
+    onLink(selectedSupplierId, '', invoiceId);
     
     // Mostrar toast de éxito después de vincular (timing: cuando se cierra el modal)
     const entityName = supplier.nombreComercial || supplier.razonSocial || entityLabel;
@@ -121,10 +112,6 @@ export const LinkSupplierModal: React.FC<LinkSupplierModalProps> = ({
       return;
     }
 
-    if (!newSupplierA3Id.trim()) {
-      showToast('Por favor, ingresa el ID Contable A3', 'error');
-      return;
-    }
 
     try {
       // Crear nuevo proveedor/cliente
@@ -132,7 +119,6 @@ export const LinkSupplierModal: React.FC<LinkSupplierModalProps> = ({
         id: `${type}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         nombreComercial: newSupplierName.trim(),
         razonSocial: newSupplierName.trim(),
-        idContableA3: newSupplierA3Id.trim(),
       };
 
       // Guardar en localStorage
@@ -142,7 +128,7 @@ export const LinkSupplierModal: React.FC<LinkSupplierModalProps> = ({
       showToast(`${entityLabel.charAt(0).toUpperCase() + entityLabel.slice(1)} creado y vinculado correctamente`, 'success');
 
       // Vincular
-      onLink(newSupplier.id!, newSupplier.idContableA3!, invoiceId);
+      onLink(newSupplier.id!, '', invoiceId);
       onClose();
     } catch (error) {
       console.error(`Error al crear ${entityLabel}:`, error);
@@ -209,36 +195,22 @@ export const LinkSupplierModal: React.FC<LinkSupplierModalProps> = ({
                 <div className="link-supplier-list">
                   {filteredSuppliers.map((supplier) => {
                     const displayName = getDisplayName(supplier);
-                    const hasA3Id = !!supplier.idContableA3;
                     const isSelected = selectedSupplierId === supplier.id;
 
                     return (
                       <button
                         key={supplier.id}
                         type="button"
-                        className={`link-supplier-item ${isSelected ? 'selected' : ''} ${!hasA3Id ? 'no-a3-id' : ''}`}
+                        className={`link-supplier-item ${isSelected ? 'selected' : ''}`}
                         onClick={() => {
-                          if (hasA3Id) {
-                            setSelectedSupplierId(supplier.id || '');
-                          } else {
-                            showToast(`Este ${entityLabel} no tiene ID Contable A3. Por favor, edítalo primero.`, 'warning');
-                          }
+                          setSelectedSupplierId(supplier.id || '');
                         }}
-                        disabled={!hasA3Id}
                       >
                         <div className="link-supplier-item-content">
                           <span className="link-supplier-item-name">{displayName}</span>
-                          {supplier.idContableA3 && (
-                            <span className="link-supplier-item-a3">ID A3: {supplier.idContableA3}</span>
-                          )}
                         </div>
                         {isSelected && (
                           <span className="material-symbols-outlined link-supplier-item-check">check_circle</span>
-                        )}
-                        {!hasA3Id && (
-                          <span className="material-symbols-outlined link-supplier-item-warning" title="Sin ID A3">
-                            warning
-                          </span>
                         )}
                       </button>
                     );
@@ -280,21 +252,6 @@ export const LinkSupplierModal: React.FC<LinkSupplierModalProps> = ({
                   />
                 </div>
 
-                <div className="link-supplier-form-group">
-                  <label className="link-supplier-label">
-                    ID Contable A3 <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    className="input"
-                    value={newSupplierA3Id}
-                    onChange={(e) => setNewSupplierA3Id(e.target.value)}
-                    placeholder="Ej: PROV001"
-                  />
-                  <p className="link-supplier-hint">
-                    Este ID se usa para sincronizar con A3factura
-                  </p>
-                </div>
               </div>
 
               <div className="link-supplier-actions">
@@ -305,7 +262,7 @@ export const LinkSupplierModal: React.FC<LinkSupplierModalProps> = ({
                   type="button"
                   className="btn btn-primary"
                   onClick={handleCreateAndLink}
-                  disabled={!newSupplierName.trim() || !newSupplierA3Id.trim()}
+                  disabled={!newSupplierName.trim()}
                 >
                   Guardar y Vincular
                 </button>

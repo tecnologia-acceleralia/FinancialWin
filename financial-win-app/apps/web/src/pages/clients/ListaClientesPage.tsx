@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Cliente } from '../../features/entities/types';
 import { EntityFilterPanel, type EntityFilterValues } from '@/features/entities/components/EntityFilterPanel';
 import { DataTablePagination } from '../../components/common/DataTablePagination';
 import { EmptyState } from '../../components/common/EmptyState';
@@ -14,12 +13,14 @@ import {
   UniversalSearchBar,
 } from '../../components/common';
 import { exportToExcel, type ExportColumn } from '../../utils/exportToExcel';
+import { useToast } from '../../contexts/ToastContext';
+import { odooService, type OdooPartner } from '../../services/odooService';
 
-const STORAGE_KEY = 'zaffra_clients';
 const VIEW_TYPE_STORAGE_KEY = 'clientes_view_type';
 
 export const ListaClientesPage: React.FC = () => {
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [busqueda, setBusqueda] = useState('');
@@ -34,40 +35,57 @@ export const ListaClientesPage: React.FC = () => {
     balanceRange: { min: null, max: null },
     paymentsRange: { min: null, max: null },
   });
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [partners, setPartners] = useState<OdooPartner[]>([]);
 
   // Persistir el tipo de vista en localStorage
   useEffect(() => {
     localStorage.setItem(VIEW_TYPE_STORAGE_KEY, viewType);
   }, [viewType]);
 
-  // Cargar clientes del localStorage
-  const clientes = useMemo(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (!stored) return [];
-      const data: Cliente[] = JSON.parse(stored);
-      return data.filter((c) => c.is_active !== false);
-    } catch (error) {
-      console.error('Error al cargar clientes del localStorage:', error);
-      return [];
-    }
-  }, []);
+  // Cargar clientes automáticamente desde Odoo al montar el componente
+  useEffect(() => {
+    const loadOdooCustomers = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const result = await odooService.getPartners('customer');
+        setPartners(result);
+      } catch (err) {
+        console.error('Error al cargar clientes desde Odoo:', err);
+        setError(
+          err instanceof Error
+            ? err.message
+            : 'Error desconocido al cargar clientes desde Odoo.'
+        );
+        showToast(
+          'No se pudieron cargar los clientes desde Odoo. Revisa la configuración de Odoo.',
+          'error'
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    void loadOdooCustomers();
+  }, [showToast]);
 
   // Convertir clientes al formato de lista
   const clientesLista = useMemo(() => {
-    return clientes.map((c): EntityTableItem & EntityCardItem => ({
-      id: c.id || '',
-      nombre: c.razonSocial || '',
-      nif: c.nif || '',
-      tipo: (c.pais && c.pais !== 'España') ? 'Extranjero' : 'Nacional',
-      estado: c.is_active === false ? 'inactivo' : 'activo',
+    return partners.map((p): EntityTableItem & EntityCardItem => ({
+      id: String(p.id),
+      nombre: p.name,
+      nif: p.vat || '',
+      tipo: 'Nacional', // Por defecto, se puede calcular basado en país si está disponible
+      estado: 'activo',
       saldoBancario: 0,
       pagosPendientes: 0,
-      email: c.email,
-      phone: c.telefono,
-      ciudad: c.ciudad,
+      email: p.email,
+      phone: '',
+      ciudad: p.city || '',
     }));
-  }, [clientes]);
+  }, [partners]);
 
   // Filtrar clientes por búsqueda y filtros avanzados
   const clientesFiltrados = useMemo(() => {
@@ -214,19 +232,32 @@ export const ListaClientesPage: React.FC = () => {
         onAddClick={handleNuevoCliente}
       />
       <div className="action-toolbar mb-6">
-        <UniversalSearchBar<EntityTableItem & EntityCardItem>
+        <UniversalSearchBar
           items={clientesLista}
-          onFilter={(_filteredItems: (EntityTableItem & EntityCardItem)[]) => {
+          onFilter={() => {
             // El filtrado se maneja en clientesFiltrados usando busqueda
           }}
           onSearchTermChange={setBusqueda}
-          searchFields={['nombre', 'nif', 'ciudad']}
-          placeholder="Buscar por nombre, nif, ciudad..."
+          searchFields={['nombre', 'nif', 'email', 'ciudad']}
+          placeholder="Buscar por nombre, nif, email, ciudad..."
         />
       </div>
 
       <div className="flex flex-col flex-grow gap-8 py-6 min-h-0">
-        {clientesPaginados.length > 0 ? (
+        {isLoading ? (
+          <div className="flex justify-center items-center h-full">
+            <span className="material-symbols-outlined mr-2 animate-spin">
+              progress_activity
+            </span>
+            <span>Cargando clientes desde Odoo...</span>
+          </div>
+        ) : error ? (
+          <EmptyState
+            title="Error al cargar clientes"
+            description={error}
+            icon="warning"
+          />
+        ) : clientesPaginados.length > 0 ? (
           <>
             <div className="flex-grow overflow-y-auto pb-4">
               {viewType === 'table' ? (
@@ -253,11 +284,19 @@ export const ListaClientesPage: React.FC = () => {
               onItemsPerPageChange={handleItemsPerPageChange}
             />
           </>
-        ) : (
+        ) : busqueda.trim() || filters.status.length > 0 || filters.types.length > 0 || 
+            filters.balanceRange.min !== null || filters.balanceRange.max !== null ||
+            filters.paymentsRange.min !== null || filters.paymentsRange.max !== null ? (
           <EmptyState
             title="No se encontraron clientes"
-            description="Intenta ajustar los términos de búsqueda"
+            description="Intenta ajustar los términos de búsqueda o filtros"
             icon="search_off"
+          />
+        ) : (
+          <EmptyState
+            title="No hay datos en Odoo"
+            description="No hay clientes disponibles en Odoo en este momento"
+            icon="inbox"
           />
         )}
       </div>

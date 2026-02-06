@@ -3,8 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../../components/layout';
 import { useToast } from '../../contexts/ToastContext';
 import { Cliente } from '../../features/entities/types';
-
-const STORAGE_KEY = 'zaffra_clients';
+import { odooService } from '../../services/odooService';
 
 interface SeccionInfo {
   id: string;
@@ -28,9 +27,7 @@ export const NuevoClientePage: React.FC = () => {
   const [seccionActiva, setSeccionActiva] = useState<string>(SECCIONES[0].id);
   const seccionesRefs = useRef<Record<string, HTMLElement | null>>({});
   const [formData, setFormData] = useState<Partial<Cliente>>({});
-  const [shouldNavigateAfterSave, setShouldNavigateAfterSave] = useState<
-    'nuevo' | 'salir' | null
-  >(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Scroll to top cuando se monta el componente
   useEffect(() => {
@@ -56,7 +53,12 @@ export const NuevoClientePage: React.FC = () => {
     }));
   };
 
-  const handleGuardar = () => {
+  const handleGuardar = async () => {
+    // Prevenir múltiples envíos
+    if (isSubmitting) {
+      return;
+    }
+
     // Validar campos requeridos
     if (!formData.nif || !formData.razonSocial) {
       showToast('Por favor, completa los campos obligatorios (NIF y Razón Social)', 'error');
@@ -64,47 +66,38 @@ export const NuevoClientePage: React.FC = () => {
     }
 
     try {
-      // Obtener clientes existentes del localStorage
-      const existingData = localStorage.getItem(STORAGE_KEY);
-      const clientes: Cliente[] = existingData ? JSON.parse(existingData) : [];
+      setIsSubmitting(true);
 
-      // Generar ID único si no existe
-      const nuevoCliente: Cliente = {
-        ...formData,
-        id: formData.id || `cliente-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        created_at: formData.created_at || new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      } as Cliente;
+      // Crear cliente en Odoo
+      // Odoo devuelve un número (ID del nuevo registro)
+      const partnerId = await odooService.createPartner('customer', formData as Cliente);
 
-      // Agregar el nuevo cliente
-      clientes.push(nuevoCliente);
-
-      // Guardar en localStorage
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(clientes));
-
-      showToast('Cliente guardado correctamente', 'success');
-
-      // Navegar según la acción seleccionada
-      if (shouldNavigateAfterSave === 'nuevo') {
-        // Limpiar el formulario recargando la página
-        window.location.href = '/clientes/nuevo';
-      } else if (shouldNavigateAfterSave === 'salir') {
+      // Verificar que el ID sea válido (mayor a 0)
+      if (partnerId && partnerId > 0) {
+        showToast('Cliente creado en Odoo correctamente', 'success');
+        // Redirigir a la lista de clientes (recargará automáticamente desde Odoo)
         navigate('/clientes/lista');
+      } else {
+        throw new Error('Odoo devolvió un ID inválido.');
       }
-      setShouldNavigateAfterSave(null);
     } catch (error) {
-      console.error('Error al guardar cliente:', error);
-      showToast('Error al guardar el cliente', 'error');
+      console.error('Error al crear cliente en Odoo:', error);
+      
+      // Detallar el error si falla la conexión
+      const errorMessage =
+        error instanceof Error
+          ? error.message.includes('conexión') || error.message.includes('conexion') || error.message.includes('network') || error.message.includes('fetch')
+            ? `Error de conexión con Odoo: ${error.message}`
+            : `Error al crear el cliente en Odoo: ${error.message}`
+          : 'Error desconocido al crear el cliente en Odoo';
+      
+      showToast(errorMessage, 'error');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleGuardarYNuevo = () => {
-    setShouldNavigateAfterSave('nuevo');
-    handleGuardar();
-  };
-
   const handleGuardarYSalir = () => {
-    setShouldNavigateAfterSave('salir');
     handleGuardar();
   };
 
@@ -345,45 +338,6 @@ export const NuevoClientePage: React.FC = () => {
                     <option value="A">A - Operaciones interiores</option>
                     <option value="B">B - Adquisiciones intracomunitarias</option>
                   </select>
-                </div>
-                <div className="input-group">
-                  <label htmlFor="id-contable-a3" className="input-group-label">
-                    ID Contable A3
-                  </label>
-                  <input
-                    type="text"
-                    id="id-contable-a3"
-                    className="input-group-input"
-                    placeholder="ID Contable A3"
-                    value={formData.idContableA3 || ''}
-                    onChange={(e) => handleInputChange('idContableA3', e.target.value)}
-                  />
-                </div>
-                <div className="input-group">
-                  <label htmlFor="actividad-a3" className="input-group-label">
-                    Actividad A3
-                  </label>
-                  <input
-                    type="text"
-                    id="actividad-a3"
-                    className="input-group-input"
-                    placeholder="Actividad A3"
-                    value={formData.actividadA3 || ''}
-                    onChange={(e) => handleInputChange('actividadA3', e.target.value)}
-                  />
-                </div>
-                <div className="input-group">
-                  <label htmlFor="serie-a3" className="input-group-label">
-                    Serie A3
-                  </label>
-                  <input
-                    type="text"
-                    id="serie-a3"
-                    className="input-group-input"
-                    placeholder="Serie A3"
-                    value={formData.serieA3 || ''}
-                    onChange={(e) => handleInputChange('serieA3', e.target.value)}
-                  />
                 </div>
               </div>
             </section>
@@ -782,22 +736,17 @@ export const NuevoClientePage: React.FC = () => {
               type="button"
               onClick={handleCancelar}
               className="btn btn-outline btn-md"
+              disabled={isSubmitting}
             >
               Cancelar
             </button>
             <button
               type="button"
-              onClick={handleGuardarYNuevo}
-              className="btn btn-secondary btn-md"
-            >
-              Guardar y Nuevo
-            </button>
-            <button
-              type="button"
               onClick={handleGuardarYSalir}
               className="btn btn-primary btn-md"
+              disabled={isSubmitting}
             >
-              Guardar y Salir
+              {isSubmitting ? 'Enviando a Odoo...' : 'Guardar y Salir'}
             </button>
           </div>
         </main>
