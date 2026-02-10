@@ -7,6 +7,7 @@ import { LinkSupplierModal } from '../../../components/common/LinkSupplierModal'
 import { DataTablePagination } from '../../../components/common/DataTablePagination';
 import { useToast } from '../../../contexts/ToastContext';
 import { mapOdooStatus } from '../../../services/odooService';
+import { useClientsQuery } from '../../../hooks/useClientsQuery';
 
 interface Ingreso {
   id: string;
@@ -37,7 +38,10 @@ interface IngresosTableProps {
  * Convierte un FinancialRecord a un Ingreso para la tabla
  * Solo procesa registros validados (que tienen supplier y total)
  */
-const convertRecordToIngreso = (record: ReturnType<typeof useFinancial>['income'][0]): Ingreso | null => {
+const convertRecordToIngreso = (
+  record: ReturnType<typeof useFinancial>['income'][0],
+  clientes: Array<{ id?: string; nombreComercial?: string; razonSocial?: string }>
+): Ingreso | null => {
   // Solo procesar registros validados
   if (!record.data.supplier || !record.data.total) {
     return null;
@@ -54,23 +58,11 @@ const convertRecordToIngreso = (record: ReturnType<typeof useFinancial>['income'
   let clienteMatch: { id?: string; nombreComercial?: string; razonSocial?: string } | undefined;
 
   if (clienteIdVinculado) {
-    // Si hay un clienteId vinculado, buscar el cliente completo desde localStorage
-    try {
-      const stored = localStorage.getItem('zaffra_clients');
-      if (stored) {
-        const clients = JSON.parse(stored) as Array<{
-          id?: string;
-          nombreComercial?: string;
-          razonSocial?: string;
-        }>;
-        clienteMatch = clients.find((c) => c.id === clienteIdVinculado);
-      }
-    } catch (error) {
-      console.error('Error al buscar cliente vinculado:', error);
-    }
+    // Si hay un clienteId vinculado, buscar el cliente completo desde la lista de clientes
+    clienteMatch = clientes.find((c) => c.id === clienteIdVinculado);
   } else {
     // Si no hay clienteId vinculado, hacer matching por nombre
-    clienteMatch = findSupplierByName(clientName, 'zaffra_clients');
+    clienteMatch = findSupplierByName(clientName, clientes);
   }
   
   // Mapear paymentStatus a estado de la tabla (para datos del contexto financiero)
@@ -135,6 +127,7 @@ export const IngresosTable: React.FC<IngresosTableProps> = ({
   const financialContext = useFinancial();
   const { income, updateRecord, deleteRecord } = financialContext;
   const { showToast } = useToast();
+  const { data: clientes = [] } = useClientsQuery();
   
   // Si se pasan ingresos como prop, usarlos directamente; si no, usar el contexto
   const usePropData = !!ingresosProp;
@@ -248,9 +241,9 @@ export const IngresosTable: React.FC<IngresosTableProps> = ({
       return ingresosProp;
     }
     return income
-      .map(convertRecordToIngreso)
+      .map((record) => convertRecordToIngreso(record, clientes))
       .filter((ingreso): ingreso is Ingreso => ingreso !== null);
-  }, [income, ingresosProp, usePropData]);
+  }, [income, ingresosProp, usePropData, clientes]);
 
   const ingresosFiltrados = useMemo(() => {
     let resultado = ingresos;

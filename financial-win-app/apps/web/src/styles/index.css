@@ -4639,6 +4639,173 @@
     color: #f97316;
   }
 
+  /* Variante morado del contenedor de icono de estadística */
+  .stat-icon-container-purple {
+    @apply stat-icon-container;
+    background-color: #f3e8ff;
+  }
+
+  .dark .stat-icon-container-purple {
+    background-color: rgba(168, 85, 247, 0.2);
+  }
+
+  .stat-icon-purple {
+    @apply material-symbols-outlined;
+    color: #a855f7;
+  }
+
+  /* Layout de rankings en doble columna */
+  .rankings-grid {
+    @apply grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8;
+  }
+
+  .ranking-card {
+    @apply studio-card p-6;
+  }
+
+  .ranking-title {
+    @apply text-xl font-semibold mb-4;
+    color: #1f2937;
+  }
+
+  .dark .ranking-title {
+    color: #f3f4f6;
+  }
+
+  .ranking-table {
+    @apply w-full border-collapse;
+  }
+
+  .ranking-table thead {
+    @apply border-b;
+    border-color: #e5e7eb;
+  }
+
+  .dark .ranking-table thead {
+    border-color: #2A3B5A;
+  }
+
+  .ranking-table th {
+    @apply text-left py-3 px-4 text-sm font-semibold;
+    color: #475569;
+    background-color: #f8fafc;
+  }
+
+  .dark .ranking-table th {
+    color: #9ca3af;
+    background-color: #1B273B;
+  }
+
+  .ranking-table tbody tr {
+    @apply border-b transition-colors;
+    border-color: #f1f5f9;
+    background-color: #ffffff;
+  }
+
+  .dark .ranking-table tbody tr {
+    border-color: #2A3B5A;
+    background-color: transparent;
+  }
+
+  .ranking-table tbody tr:hover {
+    background-color: #f9fafb;
+  }
+
+  .dark .ranking-table tbody tr:hover {
+    background-color: rgba(27, 39, 59, 0.5);
+  }
+
+  .ranking-table td {
+    @apply py-3 px-4 text-sm;
+    color: #1f2937;
+  }
+
+  .dark .ranking-table td {
+    color: #f3f4f6;
+  }
+
+  .ranking-table td:first-child {
+    @apply font-medium;
+    color: #6b7280;
+  }
+
+  .dark .ranking-table td:first-child {
+    color: #9ca3af;
+  }
+
+  .ranking-table td:nth-child(2) {
+    @apply font-medium;
+    color: #1f2937;
+  }
+
+  .dark .ranking-table td:nth-child(2) {
+    color: #f3f4f6;
+  }
+
+  .ranking-table th:last-child,
+  .ranking-table td:last-child {
+    @apply text-right;
+  }
+
+  .ranking-table td:last-child {
+    @apply font-semibold;
+    color: #1f2937;
+  }
+
+  .dark .ranking-table td:last-child {
+    color: #f3f4f6;
+  }
+
+  /* Estado vacío para rankings */
+  .ranking-empty-state {
+    @apply flex flex-col items-center justify-center py-12 text-center;
+    animation: fadeIn 0.3s ease-in;
+  }
+
+  .ranking-empty-icon {
+    @apply text-5xl mb-4;
+    color: #9ca3af;
+  }
+
+  .dark .ranking-empty-icon {
+    color: #4b5563;
+  }
+
+  .ranking-empty-text {
+    @apply text-sm;
+    color: #6b7280;
+  }
+
+  .dark .ranking-empty-text {
+    color: #9ca3af;
+  }
+
+  /* Animación para tablas de ranking */
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .ranking-table-animate {
+    animation: fadeIn 0.4s ease-out;
+  }
+
+  /* Texto adicional para KPI cuando es 0 */
+  .kpi-subtext {
+    @apply text-xs mt-1;
+    color: #6b7280;
+  }
+
+  .dark .kpi-subtext {
+    color: #9ca3af;
+  }
+
   .pagination-ellipsis {
     @apply w-8 h-8 flex items-center justify-center text-sm font-medium;
     color: #1f2937 !important; /* Negro/gris oscuro en Light Mode */
@@ -5873,5 +6040,98 @@
 
   .a3-inspection-actions {
     @apply flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700;
+  }
+
+  /* ============================================
+     Consola de Clasificación de Odoo
+     ============================================ */
+
+  /* Grid de resumen con gráfico */
+  .classification-summary-grid {
+    @apply grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8;
+  }
+
+  .classification-kpi-grid {
+    @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 gap-4;
+  }
+
+  .classification-chart-container {
+    @apply lg:col-span-2;
+  }
+
+  /* Select de departamento estilizado */
+  .department-select-wrapper {
+    @apply flex items-center gap-2;
+  }
+
+  .department-select {
+    @apply flex h-10 w-full rounded-md border border-gray-300 dark:border-[#2A3B5A];
+    @apply bg-white dark:bg-[#131B29];
+    @apply px-3 py-2 text-sm;
+    @apply text-gray-900 dark:text-white;
+    @apply ring-offset-white dark:ring-offset-[#131B29];
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2;
+    @apply disabled:cursor-not-allowed disabled:opacity-50;
+    @apply transition-colors;
+    min-width: 150px;
+  }
+
+  .department-select:hover:not(:disabled) {
+    @apply border-gray-400 dark:border-[#3A4B6A];
+  }
+
+  .department-select:focus {
+    @apply border-primary-500 dark:border-primary-500;
+  }
+
+  .department-select option {
+    @apply bg-white dark:bg-[#131B29];
+    @apply text-gray-900 dark:text-white;
+  }
+
+  /* Indicador de sincronización */
+  .department-sync-indicator {
+    @apply flex items-center justify-center;
+    @apply text-green-500 dark:text-green-400;
+    @apply transition-opacity;
+  }
+
+  .department-sync-indicator .material-symbols-outlined {
+    @apply text-lg;
+    font-size: 1.25rem;
+  }
+
+  /* Tabla de clasificación */
+  .classification-table {
+    @apply w-full border-collapse;
+  }
+
+  .classification-table thead {
+    @apply border-b;
+    border-color: #e5e7eb;
+  }
+
+  .dark .classification-table thead {
+    border-color: #2A3B5A;
+  }
+
+  .classification-table th {
+    @apply px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider;
+    @apply text-gray-700 dark:text-gray-300;
+    @apply bg-gray-50 dark:bg-[#1A2332];
+  }
+
+  .classification-table td {
+    @apply px-4 py-3 text-sm;
+    @apply text-gray-900 dark:text-gray-100;
+    @apply border-b border-gray-200 dark:border-[#2A3B5A];
+  }
+
+  .classification-table tbody tr {
+    @apply transition-colors;
+  }
+
+  .classification-table tbody tr:hover {
+    @apply bg-gray-50 dark:bg-[#1A2332];
   }
 }

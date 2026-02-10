@@ -1,34 +1,45 @@
 import React, { useState, useMemo } from 'react';
-import { useFinancial, type FinancialRecord } from '../../contexts/FinancialContext';
-import { RegistrosTable } from '../../features/finance/components/RegistrosTable';
-import { PageHeader, type PageHeaderAction } from '../../components/layout';
-import { FilterPanel, type FilterValues } from '../../features/finance/components/FilterPanel';
-import { exportToCSV } from '../../utils/exportToCSV';
-import { useToast } from '../../contexts/ToastContext';
-import { UniversalSearchBar } from '../../components/common';
+import { PageHeader } from '../../components/layout';
+import { useFinancialStats } from '../../hooks/useFinancialStats';
+import { ExpensesStackedBarChart } from '../../components/common/ExpensesStackedBarChart';
+import type { FinancialRecord } from '../../contexts/FinancialContext';
+import type { ExtractedData } from '../../types';
 
-// Subcomponente: Resumen de registros (KPI)
-interface RecordsSummaryProps {
-  total: number;
+type Department = 'Marketing' | 'Operaciones' | 'Ventas' | 'IT' | 'General';
+
+interface InvoiceRow {
+  id: string;
+  fecha: string;
+  proveedor: string;
+  numeroFactura: string;
+  importe: number;
+  department: Department | undefined;
+  record: FinancialRecord;
 }
 
-const RecordsSummary: React.FC<RecordsSummaryProps> = ({ total }) => {
-  const formattedTotal = new Intl.NumberFormat('es-ES').format(total);
+/**
+ * Componente de tarjeta KPI para el resumen
+ */
+interface KPICardProps {
+  label: string;
+  value: string | number;
+  icon: string;
+  iconContainerClass?: string;
+}
 
+const KPICard: React.FC<KPICardProps> = ({ label, value, icon, iconContainerClass = 'stat-icon-container-blue' }) => {
   return (
     <div className="studio-kpi-card">
-      <div className="kpi-content">
+      <div className="stat-header">
         <div>
-          <p className="kpi-label">
-            Total de Registros
-          </p>
-          <h3 className="kpi-value">
-            {formattedTotal}
+          <p className="stat-label">{label}</p>
+          <h3 className="stat-value">
+            {value}
           </h3>
         </div>
-        <div className="home-kpi-icon-wrapper-blue">
-          <span className="material-symbols-outlined home-kpi-icon">
-            table_view
+        <div className={iconContainerClass}>
+          <span className="material-symbols-outlined stat-icon-blue">
+            {icon}
           </span>
         </div>
       </div>
@@ -36,297 +47,222 @@ const RecordsSummary: React.FC<RecordsSummaryProps> = ({ total }) => {
   );
 };
 
+/**
+ * Componente de select estilizado para departamento
+ */
+interface DepartmentSelectProps {
+  value: Department | undefined;
+  onChange: (value: Department) => void;
+  invoiceId: string;
+  isSynced: boolean;
+}
+
+const DepartmentSelect: React.FC<DepartmentSelectProps> = ({ value, onChange, invoiceId, isSynced }) => {
+  const departments: Department[] = ['Marketing', 'Operaciones', 'Ventas', 'IT', 'General'];
+
+  return (
+    <div className="department-select-wrapper">
+      <select
+        className="department-select"
+        value={value || ''}
+        onChange={(e) => {
+          if (e.target.value) {
+            onChange(e.target.value as Department);
+          }
+        }}
+      >
+        <option value="">Sin clasificar</option>
+        {departments.map((dept) => (
+          <option key={dept} value={dept}>
+            {dept}
+          </option>
+        ))}
+      </select>
+      {isSynced && value && (
+        <span className="department-sync-indicator" title="Sincronizado">
+          <span className="material-symbols-outlined">check_circle</span>
+        </span>
+      )}
+    </div>
+  );
+};
+
 export const RecordsPage: React.FC = () => {
-  const { records } = useFinancial();
-  const { showToast } = useToast();
-  const [busqueda, setBusqueda] = useState('');
-  const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
-  const [filters, setFilters] = useState<FilterValues>({
-    dateRange: { from: '', to: '' },
-    categories: [],
-    status: [],
-    documentType: [],
-    amountRange: { min: null, max: null },
-  });
+  const { validExpensesForChart, isLoading, formatCurrency } = useFinancialStats();
+  
+  // Estado local para las clasificaciones de departamento
+  // En el futuro, esto se sincronizará con Odoo
+  const [departmentAssignments, setDepartmentAssignments] = useState<Record<string, Department>>({});
+  const [syncedInvoices, setSyncedInvoices] = useState<Set<string>>(new Set());
 
-  // Mostrar el total de todos los registros (invoices, tickets, staff)
-  const totalRegistros = records.length;
-
-  /**
-   * Mapea el documentType interno a un nombre legible para el usuario
-   */
-  const getDocumentTypeLabel = (documentType: FinancialRecord['documentType']): string => {
-    switch (documentType) {
-      case 'invoices':
-        return 'Factura';
-      case 'tickets':
-        return 'Ticket';
-      case 'staff':
-        return 'Staff';
-      default:
-        return documentType;
-    }
-  };
-
-
-  /**
-   * Extrae el valor numérico del importe para búsqueda
-   */
-  const extraerNumeroImporte = (importe: string): string => {
-    const numeroLimpio = importe.replace(/[€$£,\s]/g, '').trim();
-    const numero = parseFloat(numeroLimpio);
-    if (!isNaN(numero)) {
-      return numeroLimpio;
-    }
-    return numeroLimpio;
-  };
-
-  /**
-   * Convierte FinancialRecord a formato de tabla (replicando lógica de RegistrosTable)
-   */
-  const registrosFormateados = useMemo(() => {
-    return records.map((record) => {
-      const estado = record.data.supplier && record.data.total ? 'VALIDADO' : 'PENDIENTE';
-      const importe = record.data.total 
-        ? `${record.data.currency || 'EUR'} ${record.data.total}`
-        : 'N/A';
+  // Transformar facturas a formato de tabla
+  const invoiceRows = useMemo((): InvoiceRow[] => {
+    return validExpensesForChart.map((record) => {
+      const invoiceDate = record.data.issueDate || record.createdAt;
+      const fecha = invoiceDate ? new Date(invoiceDate).toLocaleDateString('es-ES') : 'N/A';
+      const proveedor = record.data.supplier || 'Sin proveedor';
+      const numeroFactura = record.data.invoiceNum || 'N/A';
+      const importe = Number(record.data.total?.toString() || '0');
+      
+      // Obtener departamento asignado o el existente en el record
+      // Mapear departamentos del sistema a los permitidos en la consola
+      const recordDepartment = record.data.department;
+      let mappedDepartment: Department | undefined;
+      
+      if (recordDepartment) {
+        // Mapear departamentos del sistema a los de la consola
+        if (recordDepartment === 'Marketing' || recordDepartment === 'Ventas' || 
+            recordDepartment === 'Operaciones' || recordDepartment === 'IT') {
+          mappedDepartment = recordDepartment;
+        } else {
+          // Para otros departamentos (Administración, RRHH, Dirección), usar 'General'
+          mappedDepartment = 'General';
+        }
+      }
+      
+      const assignedDepartment = departmentAssignments[record.id] || mappedDepartment;
       
       return {
         id: record.id,
-        record, // Guardar el record original para acceso a datos completos
-        estado,
-        tipoDocumento: getDocumentTypeLabel(record.documentType),
-        documentType: record.documentType,
-        departamento: record.data.department || 'N/A',
-        nombreDocumento: record.data.supplier || record.fileName || 'Sin nombre',
-        fechaRegistro: new Date(record.createdAt).toLocaleDateString('es-ES'),
-        fechaRegistroOriginal: record.createdAt,
-        usuario: record.data.supplier || 'N/A',
+        fecha,
+        proveedor,
+        numeroFactura,
         importe,
+        department: assignedDepartment,
+        record,
       };
     });
-  }, [records]);
+  }, [validExpensesForChart, departmentAssignments]);
 
-  /**
-   * Filtra registros según el término de búsqueda y filtros avanzados
-   * Replica la lógica de filtrado de RegistrosTable
-   */
-  const registrosFiltrados = useMemo(() => {
-    let resultado = registrosFormateados;
+  // Calcular estadísticas
+  const totalFacturas = validExpensesForChart.length;
+  const sinClasificar = useMemo(() => {
+    return invoiceRows.filter((row) => !row.department).length;
+  }, [invoiceRows]);
 
-    // Filtro por búsqueda de texto
-    if (busqueda.trim()) {
-      const terminoBusqueda = busqueda.toLowerCase().trim();
-      
-      resultado = resultado.filter((registro) => {
-        const coincideConcepto = registro.nombreDocumento
-          .toLowerCase()
-          .includes(terminoBusqueda);
-        
-        const coincideCategoria = registro.tipoDocumento
-          .toLowerCase()
-          .includes(terminoBusqueda);
-        
-        const coincideEntidad = registro.usuario
-          .toLowerCase()
-          .includes(terminoBusqueda);
-        
-        const importeOriginal = registro.importe.toLowerCase();
-        const importeNumerico = extraerNumeroImporte(registro.importe).toLowerCase();
-        const terminoBusquedaNumerico = terminoBusqueda.replace(/[€$£,\s]/g, '');
-        
-        const coincideImporteTexto = importeOriginal.includes(terminoBusqueda);
-        const coincideImporteNumero = importeNumerico.includes(terminoBusquedaNumerico);
-        
-        return (
-          coincideConcepto ||
-          coincideCategoria ||
-          coincideEntidad ||
-          coincideImporteTexto ||
-          coincideImporteNumero
-        );
-      });
-    }
+  // Datos para el gráfico de barras apiladas (actualizados en tiempo real con las clasificaciones)
+  // El componente ExpensesStackedBarChart procesa los datos internamente agrupando por mes y departamento
+  const chartData = useMemo(() => {
+    return invoiceRows.map((row) => ({
+      ...row.record,
+      data: {
+        ...row.record.data,
+        // Pasar el departamento asignado (o undefined para 'Sin Clasificar')
+        // El componente ExpensesStackedBarChart manejará 'Sin Clasificar' automáticamente
+        department: row.department as ExtractedData['department'] | undefined,
+      },
+    }));
+  }, [invoiceRows]);
 
-    // Aplicar filtros avanzados si existen
-    if (filters) {
-      // Filtro por rango de fechas
-      if (filters.dateRange.from) {
-        resultado = resultado.filter((registro) => {
-          const fechaRegistro = new Date(registro.fechaRegistroOriginal);
-          const fechaDesde = new Date(filters.dateRange.from);
-          fechaDesde.setHours(0, 0, 0, 0);
-          return fechaRegistro >= fechaDesde;
-        });
-      }
-      if (filters.dateRange.to) {
-        resultado = resultado.filter((registro) => {
-          const fechaRegistro = new Date(registro.fechaRegistroOriginal);
-          const fechaHasta = new Date(filters.dateRange.to);
-          fechaHasta.setHours(23, 59, 59, 999);
-          return fechaRegistro <= fechaHasta;
-        });
-      }
+  // Manejar cambio de departamento
+  const handleDepartmentChange = (invoiceId: string, department: Department) => {
+    setDepartmentAssignments((prev) => ({
+      ...prev,
+      [invoiceId]: department,
+    }));
 
-      // Filtro por categorías (departamento)
-      if (filters.categories.length > 0) {
-        resultado = resultado.filter((registro) =>
-          filters.categories.includes(registro.departamento)
-        );
-      }
-
-      // Filtro por estados
-      if (filters.status.length > 0) {
-        resultado = resultado.filter((registro) =>
-          filters.status.includes(registro.estado)
-        );
-      }
-
-      // Filtro por Tipo de Documento
-      if (filters.documentType.length > 0) {
-        resultado = resultado.filter((registro) => {
-          const documentTypesToFilter = filters.documentType.map((dt) => {
-            if (dt === 'Factura') return 'invoices';
-            if (dt === 'Ticket') return 'tickets';
-            if (dt === 'Staff') return 'staff';
-            return dt.toLowerCase();
-          });
-          return documentTypesToFilter.includes(registro.documentType);
-        });
-      }
-
-
-      // Filtro por rango de importe
-      if (filters.amountRange.min !== null) {
-        resultado = resultado.filter((registro) => {
-          const importeNum = parseFloat(
-            registro.importe.replace(/[€$£,\s]/g, '').trim()
-          );
-          return importeNum >= filters.amountRange.min!;
-        });
-      }
-      if (filters.amountRange.max !== null) {
-        resultado = resultado.filter((registro) => {
-          const importeNum = parseFloat(
-            registro.importe.replace(/[€$£,\s]/g, '').trim()
-          );
-          return importeNum <= filters.amountRange.max!;
-        });
-      }
-    }
-
-    return resultado;
-  }, [registrosFormateados, busqueda, filters]);
-
-  /**
-   * Función para exportar registros filtrados a CSV
-   */
-  const handleDescarga = () => {
-    if (registrosFiltrados.length === 0) {
-      showToast('No hay registros para exportar', 'warning');
-      return;
-    }
-
-    // Mapear registros filtrados a formato de exportación
-    const dataToExport = registrosFiltrados.map((registroFormateado) => {
-      const record = registroFormateado.record;
-      const total = parseFloat(record.data.total?.toString() || '0');
-      const base = parseFloat(record.data.base?.toString() || '0');
-      const vat = parseFloat(record.data.vat?.toString() || '0');
-
-      // Obtener fecha del registro
-      const fechaRegistro = new Date(record.createdAt);
-
-      return {
-        Fecha: fechaRegistro.toLocaleDateString('es-ES'),
-        'Cliente/Proveedor': record.data.supplier || '',
-        Concepto: record.data.supplier || record.fileName || 'Sin nombre',
-        'Base Imponible': base.toFixed(2),
-        IVA: vat.toFixed(2),
-        Total: total.toFixed(2),
-      };
-    });
-
-    const headers = [
-      { key: 'Fecha' as const, label: 'Fecha' },
-      { key: 'Cliente/Proveedor' as const, label: 'Cliente/Proveedor' },
-      { key: 'Concepto' as const, label: 'Concepto' },
-      { key: 'Base Imponible' as const, label: 'Base Imponible' },
-      { key: 'IVA' as const, label: 'IVA' },
-      { key: 'Total' as const, label: 'Total' },
-    ];
-
-    // Generar nombre de archivo descriptivo con año actual
-    const añoActual = new Date().getFullYear();
-    const nombreArchivo = `Registros_Financieros_${añoActual}`;
-
-    exportToCSV(dataToExport, nombreArchivo, headers);
-    showToast('Exportación completada correctamente', 'success');
-  };
-
-  const headerActions: PageHeaderAction[] = [
-    {
-      icon: 'filter_list',
-      label: 'Filtros',
-      onClick: () => setIsFilterPanelOpen(true),
-      variant: 'default',
-    },
-    {
-      icon: 'download',
-      label: 'Descargar',
-      onClick: handleDescarga,
-      variant: 'default',
-    },
-  ];
-
-  const handleFilterChange = (newFilters: FilterValues) => {
-    setFilters(newFilters);
+    // Simular sincronización (en el futuro, esto será una llamada a Odoo)
+    setTimeout(() => {
+      setSyncedInvoices((prev) => new Set(prev).add(invoiceId));
+    }, 500);
   };
 
   return (
     <div className="layout-page-container">
       <PageHeader
-        title="Registros"
-        showSearch={false}
-        actions={headerActions}
+        title="Consola de Clasificación de Odoo"
+        showBackButton={false}
       />
-      <div className="action-toolbar">
-        <UniversalSearchBar
-          items={registrosFormateados}
-          onFilter={() => {
-            // El filtrado se maneja en RegistrosTable usando searchTerm
-          }}
-          onSearchTermChange={setBusqueda}
-          searchFields={['nombreDocumento', 'departamento', 'usuario', 'importe']}
-          placeholder="Buscar por nombreDocumento, departamento, usuario, importe..."
+      
+      <div className="studio-container">
+        <div className="studio-card">
+          {/* Grid de Resumen con Gráfico */}
+          <div className="classification-summary-grid">
+            {/* Tarjetas KPI */}
+            <div className="classification-kpi-grid">
+              <KPICard
+                label="Total Facturas Odoo"
+                value={isLoading ? '...' : totalFacturas}
+                icon="receipt_long"
+                iconContainerClass="stat-icon-container-blue"
+              />
+              <KPICard
+                label="Sin Clasificar"
+                value={isLoading ? '...' : sinClasificar}
+                icon="pending_actions"
+                iconContainerClass="stat-icon-container-orange"
         />
       </div>
 
-      <div className="studio-card">
-        <div className="mt-8">
-          <RecordsSummary total={totalRegistros} />
+            {/* Gráfico de Tendencia por Mes y Departamento */}
+            <div className="classification-chart-container">
+              {!isLoading && chartData.length > 0 ? (
+                <ExpensesStackedBarChart 
+                  records={chartData} 
+                  title="Tendencia de Gastos por Mes y Departamento"
+                />
+              ) : (
+                <div className="studio-card flex items-center justify-center h-64">
+                  <p className="text-slate-500 dark:text-slate-400">
+                    {isLoading ? 'Cargando datos...' : 'No hay datos para mostrar'}
+                  </p>
+                </div>
+              )}
+            </div>
         </div>
 
-        <div className="mt-4 px-2">
-          <p className="text-sm" style={{ color: 'var(--text-primary)' }}>
-            {totalRegistros === 0 
-              ? 'No hay registros cargados desde la base de datos local'
-              : `${totalRegistros} ${totalRegistros === 1 ? 'registro cargado' : 'registros cargados'} desde la base de datos local`}
+          {/* Tabla de Clasificación */}
+          <div className="mt-8">
+            <h2 className="text-xl font-semibold mb-4 text-slate-900 dark:text-white">
+              Tabla de Clasificación
+            </h2>
+            
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <p className="text-slate-500 dark:text-slate-400">Cargando facturas de Odoo...</p>
+              </div>
+            ) : invoiceRows.length === 0 ? (
+              <div className="flex items-center justify-center py-12">
+                <p className="text-slate-500 dark:text-slate-400">
+                  No hay facturas disponibles para clasificar
           </p>
         </div>
-
-        <div className="mt-8">
-          <RegistrosTable searchTerm={busqueda} filters={filters} />
+            ) : (
+              <div className="table-wrapper">
+                <table className="classification-table">
+                  <thead>
+                    <tr>
+                      <th>Fecha</th>
+                      <th>Proveedor</th>
+                      <th>Nº Factura</th>
+                      <th>Importe</th>
+                      <th>Departamento</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {invoiceRows.map((row) => (
+                      <tr key={row.id}>
+                        <td>{row.fecha}</td>
+                        <td>{row.proveedor}</td>
+                        <td>{row.numeroFactura}</td>
+                        <td>{formatCurrency(row.importe)}</td>
+                        <td>
+                          <DepartmentSelect
+                            value={row.department}
+                            onChange={(dept) => handleDepartmentChange(row.id, dept)}
+                            invoiceId={row.id}
+                            isSynced={syncedInvoices.has(row.id)}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       </div>
-
-      <FilterPanel
-        isOpen={isFilterPanelOpen}
-        onClose={() => setIsFilterPanelOpen(false)}
-        onFilterChange={handleFilterChange}
-        initialFilters={filters}
-        type="registros"
-      />
     </div>
   );
 };

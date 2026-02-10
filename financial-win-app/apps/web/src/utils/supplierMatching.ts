@@ -15,24 +15,21 @@ export function normalizeName(name: string): string {
 }
 
 /**
- * Busca un proveedor/cliente en localStorage por nombre con matching flexible
+ * Busca un proveedor/cliente en una lista por nombre con matching flexible
  * @param supplierName - Nombre del proveedor/cliente a buscar
- * @param storageKey - Clave de localStorage ('zaffra_suppliers' o 'zaffra_clients')
+ * @param suppliers - Lista de proveedores/clientes donde buscar
  * @returns El proveedor/cliente encontrado o undefined
  */
 export function findSupplierByName(
   supplierName: string,
-  storageKey: 'zaffra_suppliers' | 'zaffra_clients'
+  suppliers: Array<{
+    id?: string;
+    nombreComercial?: string;
+    razonSocial?: string;
+  }>
 ): { id?: string; nombreComercial?: string; razonSocial?: string } | undefined {
   try {
-    const stored = localStorage.getItem(storageKey);
-    if (!stored) return undefined;
-
-    const suppliers = JSON.parse(stored) as Array<{
-      id?: string;
-      nombreComercial?: string;
-      razonSocial?: string;
-    }>;
+    if (!suppliers || suppliers.length === 0) return undefined;
 
     const normalizedSearch = normalizeName(supplierName);
 
@@ -59,7 +56,7 @@ export function findSupplierByName(
 
     return partialMatch;
   } catch (error) {
-    console.error(`Error al buscar proveedor/cliente en localStorage (${storageKey}):`, error);
+    console.error('Error al buscar proveedor/cliente:', error);
     return undefined;
   }
 }

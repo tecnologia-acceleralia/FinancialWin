@@ -49,6 +49,16 @@ if (import.meta.env.DEV) {
   }
 }
 
+// TEMPORAL: Limpiar localStorage para asegurar datos frescos de Odoo
+// TODO: Eliminar esta línea después de que todos los usuarios hayan migrado
+// Ejecutar solo una vez usando una flag en sessionStorage
+if (!sessionStorage.getItem('localStorage_cleared')) {
+  console.log('🧹 [main.tsx] Limpiando localStorage para migración a Odoo...');
+  localStorage.clear();
+  sessionStorage.setItem('localStorage_cleared', 'true');
+  console.log('✅ [main.tsx] localStorage limpiado. Los datos ahora vienen de Odoo.');
+}
+
 // Create React root and render app
 const root = ReactDOM.createRoot(rootElement);
 

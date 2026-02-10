@@ -392,6 +392,7 @@ export const useFinancialStats = () => {
     kpis,
     allIncome: income, // Retornar ingresos transformados
     incomeInvoices, // Retornar facturas originales de Odoo para cálculos adicionales
+    expenseInvoices, // Retornar facturas de gastos originales de Odoo para cálculos adicionales
     validExpensesForChart,
     formatCurrency,
     pendingMovements,

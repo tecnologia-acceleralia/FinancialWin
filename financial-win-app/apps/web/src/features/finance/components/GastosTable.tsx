@@ -8,6 +8,7 @@ import { DataTablePagination } from '../../../components/common/DataTablePaginat
 import { useToast } from '../../../contexts/ToastContext';
 import type { OdooInvoice } from '../../../services/odooService';
 import { mapOdooStatus } from '../../../services/odooService';
+import { useSuppliersQuery } from '../../../hooks/useSuppliersQuery';
 
 interface Gasto {
   id: string;
@@ -66,7 +67,10 @@ const getDepartmentBadgeClasses = (departamento: string): string => {
 /**
  * Convierte una factura de Odoo a un Gasto para la tabla
  */
-const convertInvoiceToGasto = (invoice: OdooInvoice): Gasto => {
+const convertInvoiceToGasto = (
+  invoice: OdooInvoice,
+  proveedores: Array<{ id?: string; nombreComercial?: string; razonSocial?: string }>
+): Gasto => {
   // Mapear estado usando la función auxiliar
   const estado = mapOdooStatus(invoice.state, invoice.payment_state);
 
@@ -81,38 +85,17 @@ const convertInvoiceToGasto = (invoice: OdooInvoice): Gasto => {
     razonSocial?: string;
   } | undefined;
 
-  try {
-    const stored = localStorage.getItem('zaffra_suppliers');
-    if (stored) {
-      const suppliers = JSON.parse(stored) as Array<{
-        id?: string;
-        nombreComercial?: string;
-        razonSocial?: string;
-      }>;
-      
-      // Buscar por ID de Odoo si está disponible
-      if (supplierId) {
-        proveedorMatch = suppliers.find((s) => {
-          // Buscar por ID de Odoo si existe en los datos del proveedor
-          return (s as any).odooId === supplierId || s.id === supplierId;
-        });
-      }
-      
-      // Si no se encuentra por ID, buscar por nombre
-      if (!proveedorMatch) {
-        const found = findSupplierByName(supplierName, 'zaffra_suppliers');
-        if (found?.id) {
-          proveedorMatch = suppliers.find((s) => s.id === found.id);
-        } else {
-          proveedorMatch = found;
-        }
-      }
-    } else {
-      proveedorMatch = findSupplierByName(supplierName, 'zaffra_suppliers');
-    }
-  } catch (error) {
-    console.error('Error al buscar proveedor:', error);
-    proveedorMatch = findSupplierByName(supplierName, 'zaffra_suppliers');
+  // Buscar por ID de Odoo si está disponible
+  if (supplierId) {
+    proveedorMatch = proveedores.find((s) => {
+      // Buscar por ID de Odoo si existe en los datos del proveedor
+      return (s as any).odooId === supplierId || s.id === supplierId;
+    });
+  }
+  
+  // Si no se encuentra por ID, buscar por nombre
+  if (!proveedorMatch) {
+    proveedorMatch = findSupplierByName(supplierName, proveedores);
   }
 
   // Formatear fecha
@@ -160,6 +143,7 @@ const convertInvoiceToGasto = (invoice: OdooInvoice): Gasto => {
 
 export const GastosTable: React.FC<GastosTableProps> = ({ searchTerm = '', filters, invoices = [] }) => {
   const { showToast } = useToast();
+  const { data: proveedores = [] } = useSuppliersQuery();
   const [linkingInvoiceId, setLinkingInvoiceId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [viewingDocumentId, setViewingDocumentId] = useState<string | null>(null);
@@ -236,8 +220,8 @@ export const GastosTable: React.FC<GastosTableProps> = ({ searchTerm = '', filte
 
   // Convertir facturas de Odoo a formato de tabla
   const gastos = useMemo(() => {
-    return invoices.map(convertInvoiceToGasto);
-  }, [invoices]);
+    return invoices.map((invoice) => convertInvoiceToGasto(invoice, proveedores));
+  }, [invoices, proveedores]);
 
   const gastosFiltrados = useMemo(() => {
     let resultado = gastos;

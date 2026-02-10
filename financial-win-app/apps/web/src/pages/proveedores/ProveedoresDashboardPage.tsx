@@ -1,63 +1,171 @@
 import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../../components/layout';
-import { Proveedor } from '../../features/entities/types';
 import { formatearMoneda } from '../../utils/formatUtils';
+import { useFinancialStats } from '../../hooks/useFinancialStats';
 
-const STORAGE_KEY = 'zaffra_suppliers';
+/**
+ * Obtiene el nombre del mes en español
+ */
+const obtenerNombreMes = (): string => {
+  const meses = [
+    'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+    'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
+  ];
+  return meses[new Date().getMonth()];
+};
+
+interface ProveedorInfo {
+  partnerId: number;
+  nombre: string;
+  gastoTotal: number;
+  primeraFacturaFecha: string | null;
+}
 
 export const ProveedoresDashboardPage: React.FC = () => {
   const navigate = useNavigate();
+  const { expenseInvoices, isLoading } = useFinancialStats();
 
-  // Cargar proveedores del localStorage
-  const proveedores = useMemo(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (!stored) return [];
-      const data: Proveedor[] = JSON.parse(stored);
-      return data.filter((p) => p.is_active !== false);
-    } catch (error) {
-      console.error('Error al cargar proveedores del localStorage:', error);
-      return [];
-    }
-  }, []);
+  // Extraer lista de proveedores única de las facturas de gastos
+  const proveedoresUnicos = useMemo(() => {
+    const proveedoresMap = new Map<number, ProveedorInfo>();
 
-  // Calcular métricas
-  const totalProveedores = proveedores.length;
+    expenseInvoices.forEach((invoice) => {
+      if (!invoice.partner_id || !Array.isArray(invoice.partner_id)) return;
 
-  // Proveedores activos
-  const proveedoresActivos = useMemo(() => {
-    return proveedores.filter((p) => p.is_active !== false).length;
-  }, [proveedores]);
+      const partnerId = invoice.partner_id[0];
+      const nombre = invoice.partner_id[1] || 'Proveedor desconocido';
+      const amountTotal = invoice.amount_total || 0;
+      const invoiceDate = invoice.invoice_date || null;
 
-  // Pagos pendientes: suma de deuda de todos los proveedores
+      if (proveedoresMap.has(partnerId)) {
+        // Actualizar gasto total
+        const proveedor = proveedoresMap.get(partnerId)!;
+        proveedor.gastoTotal += amountTotal;
+        // Actualizar primera factura si esta es más antigua
+        if (invoiceDate && (!proveedor.primeraFacturaFecha || invoiceDate < proveedor.primeraFacturaFecha)) {
+          proveedor.primeraFacturaFecha = invoiceDate;
+        }
+      } else {
+        // Nuevo proveedor
+        proveedoresMap.set(partnerId, {
+          partnerId,
+          nombre,
+          gastoTotal: amountTotal,
+          primeraFacturaFecha: invoiceDate,
+        });
+      }
+    });
+
+    return Array.from(proveedoresMap.values());
+  }, [expenseInvoices]);
+
+  // Calcular KPIs reales
+  // Total Proveedores: Conteo único de partner_id presentes en las facturas de gastos
+  const totalProveedores = proveedoresUnicos.length;
+
+  // Próximos Vencimientos: Suma de facturas cuya date_due sea en los próximos 7 días
+  const proximosVencimientos = useMemo(() => {
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    const en7Dias = new Date(hoy);
+    en7Dias.setDate(en7Dias.getDate() + 7);
+
+    return expenseInvoices
+      .filter((invoice) => {
+        // Usar invoice_date_due si está disponible, sino usar invoice_date como fallback
+        const dueDateStr = invoice.invoice_date_due || invoice.invoice_date;
+        if (!dueDateStr) return false;
+
+        try {
+          const dueDate = new Date(dueDateStr);
+          dueDate.setHours(0, 0, 0, 0);
+          // Facturas que vencen entre hoy y en 7 días
+          return dueDate >= hoy && dueDate <= en7Dias;
+        } catch (error) {
+          return false;
+        }
+      })
+      .reduce((total, invoice) => total + (invoice.amount_total || 0), 0);
+  }, [expenseInvoices]);
+
+  // Pagos Pendientes: Suma total de amount_residual de todas las facturas de gasto abiertas
+  // NOTA: Como amount_residual no está disponible en la interfaz actual, usamos amount_total
+  // de facturas no pagadas como aproximación. Idealmente debería usar amount_residual cuando esté disponible.
   const pagosPendientes = useMemo(() => {
-    return proveedores.reduce((total, proveedor) => {
-      // Intentar obtener pagosPendientes o deuda del proveedor
-      // Si el proveedor tiene un campo pagosPendientes o deuda, usarlo; si no, tratar como 0
-      const deuda = (proveedor as any).pagosPendientes ?? (proveedor as any).deuda ?? 0;
-      const valor = typeof deuda === 'number' ? deuda : 0;
-      return total + (isNaN(valor) ? 0 : valor);
-    }, 0);
-  }, [proveedores]);
+    return expenseInvoices
+      .filter((invoice) => {
+        // Facturas abiertas: no pagadas completamente (not_paid, in_payment, partial)
+        return invoice.payment_state !== 'paid';
+      })
+      .reduce((total, invoice) => {
+        // TODO: Usar amount_residual cuando esté disponible en OdooInvoice
+        // Por ahora usamos amount_total como aproximación
+        return total + (invoice.amount_total || 0);
+      }, 0);
+  }, [expenseInvoices]);
 
-  // Gasto mensual estimado
-  // TODO: Conectar con datos reales de gastos cuando esté disponible
-  const gastoMensualEstimado = useMemo(() => {
-    // Placeholder hasta que tengamos datos de gastos vinculados
-    return 0;
-  }, [proveedores]);
-
-  // Proveedores nuevos este mes
-  const nuevosEsteMes = useMemo(() => {
+  // Gasto del Mes: Suma del amount_total de todas las facturas de gasto con fecha del mes actual
+  const gastoDelMes = useMemo(() => {
     const ahora = new Date();
     const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
-    return proveedores.filter((p) => {
-      if (!p.created_at) return false;
-      const fechaCreacion = new Date(p.created_at);
-      return fechaCreacion >= inicioMes;
-    }).length;
-  }, [proveedores]);
+    const finMes = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 0);
+    finMes.setHours(23, 59, 59, 999);
+
+    return expenseInvoices
+      .filter((invoice) => {
+        if (!invoice.invoice_date) return false;
+        const invoiceDate = new Date(invoice.invoice_date);
+        return invoiceDate >= inicioMes && invoiceDate <= finMes;
+      })
+      .reduce((total, invoice) => total + (invoice.amount_total || 0), 0);
+  }, [expenseInvoices]);
+
+  // Ranking Top 5 Proveedores por volumen de gasto total (anual)
+  const topProveedoresAnual = useMemo(() => {
+    return [...proveedoresUnicos]
+      .sort((a, b) => b.gastoTotal - a.gastoTotal)
+      .slice(0, 5);
+  }, [proveedoresUnicos]);
+
+  // Ranking Top 5 Proveedores por gasto del mes actual
+  const topProveedoresMensual = useMemo(() => {
+    const ahora = new Date();
+    const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
+    const finMes = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 0);
+    finMes.setHours(23, 59, 59, 999);
+
+    // Agrupar facturas del mes actual por proveedor
+    const gastoMensualPorProveedor = new Map<number, { nombre: string; gastoTotal: number }>();
+
+    expenseInvoices
+      .filter((invoice) => {
+        if (!invoice.invoice_date) return false;
+        const invoiceDate = new Date(invoice.invoice_date);
+        return invoiceDate >= inicioMes && invoiceDate <= finMes;
+      })
+      .forEach((invoice) => {
+        if (!invoice.partner_id || !Array.isArray(invoice.partner_id)) return;
+
+        const partnerId = invoice.partner_id[0];
+        const nombre = invoice.partner_id[1] || 'Proveedor desconocido';
+        const amountTotal = invoice.amount_total || 0;
+
+        if (gastoMensualPorProveedor.has(partnerId)) {
+          const proveedor = gastoMensualPorProveedor.get(partnerId)!;
+          proveedor.gastoTotal += amountTotal;
+        } else {
+          gastoMensualPorProveedor.set(partnerId, {
+            nombre,
+            gastoTotal: amountTotal,
+          });
+        }
+      });
+
+    return Array.from(gastoMensualPorProveedor.values())
+      .sort((a, b) => b.gastoTotal - a.gastoTotal)
+      .slice(0, 5);
+  }, [expenseInvoices]);
 
   const handleVerLista = () => {
     navigate('/proveedores/listado');
@@ -74,7 +182,7 @@ export const ProveedoresDashboardPage: React.FC = () => {
         showBackButton={false}
       />
       <div className="studio-container">
-        <div className="studio-card flex flex-col gap-8">
+        <div className="studio-card">
           {/* Grid de Estadísticas */}
           <div className="clients-stats-grid">
             <div className="studio-kpi-card">
@@ -84,7 +192,7 @@ export const ProveedoresDashboardPage: React.FC = () => {
                     Total Proveedores
                   </p>
                   <h3 className="stat-value">
-                    {totalProveedores}
+                    {isLoading ? '...' : totalProveedores}
                   </h3>
                 </div>
                 <div className="stat-icon-container-blue">
@@ -99,15 +207,15 @@ export const ProveedoresDashboardPage: React.FC = () => {
               <div className="stat-header">
                 <div>
                   <p className="stat-label">
-                    Proveedores Activos
+                    Próximos Vencimientos
                   </p>
-                  <h3 className="stat-value">
-                    {proveedoresActivos}
+                  <h3 className={`stat-value ${proximosVencimientos > 0 ? 'stat-value-money-highlight' : ''}`}>
+                    {isLoading ? '...' : formatearMoneda(proximosVencimientos)}
                   </h3>
                 </div>
-                <div className="stat-icon-container-green">
-                  <span className="material-symbols-outlined stat-icon-green">
-                    check_circle
+                <div className="stat-icon-container-orange">
+                  <span className="material-symbols-outlined stat-icon-orange">
+                    event_upcoming
                   </span>
                 </div>
               </div>
@@ -120,11 +228,11 @@ export const ProveedoresDashboardPage: React.FC = () => {
                     Pagos Pendientes
                   </p>
                   <h3 className={`stat-value ${pagosPendientes > 0 ? 'stat-value-money-highlight' : ''}`}>
-                    {formatearMoneda(pagosPendientes)}
+                    {isLoading ? '...' : formatearMoneda(pagosPendientes)}
                   </h3>
                 </div>
-                <div className="stat-icon-container-orange">
-                  <span className="material-symbols-outlined stat-icon-orange">
+                <div className="stat-icon-container-blue">
+                  <span className="material-symbols-outlined stat-icon-blue">
                     pending_actions
                   </span>
                 </div>
@@ -135,23 +243,109 @@ export const ProveedoresDashboardPage: React.FC = () => {
               <div className="stat-header">
                 <div>
                   <p className="stat-label">
-                    Gasto Mensual
+                    Gasto del Mes
                   </p>
-                  <h3 className={`stat-value ${gastoMensualEstimado > 0 ? 'stat-value-money-highlight' : ''}`}>
-                    {formatearMoneda(gastoMensualEstimado)}
+                  <h3 className="stat-value">
+                    {isLoading ? '...' : formatearMoneda(gastoDelMes)}
                   </h3>
+                  {!isLoading && gastoDelMes === 0 && (
+                    <p className="kpi-subtext">
+                      Mes sin cargos
+                    </p>
+                  )}
                 </div>
-                <div className="stat-icon-container-pink">
-                  <span className="material-symbols-outlined stat-icon-pink">
-                    trending_up
+                <div className="stat-icon-container-purple">
+                  <span className="material-symbols-outlined stat-icon-purple">
+                    shopping_cart
                   </span>
                 </div>
               </div>
             </div>
           </div>
 
+          {/* Rankings en doble columna */}
+          {!isLoading && (
+            <div className="rankings-grid">
+              {/* Columna Izquierda: Principales Proveedores (Gasto Anual) */}
+              <div className="ranking-card">
+                <h2 className="ranking-title">
+                  Principales Proveedores (Gasto Anual)
+                </h2>
+                {topProveedoresAnual.length > 0 ? (
+                  <div className="table-wrapper ranking-table-animate">
+                    <table className="ranking-table">
+                      <thead>
+                        <tr>
+                          <th>#</th>
+                          <th>Proveedor</th>
+                          <th>Importe Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {topProveedoresAnual.map((proveedor, index) => (
+                          <tr key={proveedor.partnerId}>
+                            <td>{index + 1}</td>
+                            <td>{proveedor.nombre}</td>
+                            <td>{formatearMoneda(proveedor.gastoTotal)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="ranking-empty-state">
+                    <span className="material-symbols-outlined ranking-empty-icon">
+                      history
+                    </span>
+                    <p className="ranking-empty-text">
+                      No hay histórico de gastos
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Columna Derecha: Gasto por Proveedor (Mes Actual) */}
+              <div className="ranking-card">
+                <h2 className="ranking-title">
+                  Gasto por Proveedor (Mes Actual)
+                </h2>
+                {topProveedoresMensual.length > 0 ? (
+                  <div className="table-wrapper ranking-table-animate">
+                    <table className="ranking-table">
+                      <thead>
+                        <tr>
+                          <th>#</th>
+                          <th>Proveedor</th>
+                          <th>Importe Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {topProveedoresMensual.map((proveedor, index) => (
+                          <tr key={`${proveedor.nombre}-${index}`}>
+                            <td>{index + 1}</td>
+                            <td>{proveedor.nombre}</td>
+                            <td>{formatearMoneda(proveedor.gastoTotal)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="ranking-empty-state">
+                    <span className="material-symbols-outlined ranking-empty-icon">
+                      calendar_today
+                    </span>
+                    <p className="ranking-empty-text">
+                      Aún no hay gastos registrados en {obtenerNombreMes()}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Botones de Navegación Hero */}
-          <div className="client-hero-actions-grid">
+          <div className="client-hero-actions-grid mt-8">
             <button
               onClick={handleVerLista}
               className="client-hero-action-card"

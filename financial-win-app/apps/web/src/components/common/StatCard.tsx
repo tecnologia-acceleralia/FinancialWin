@@ -4,8 +4,9 @@ interface StatCardProps {
   title: string;
   value: string | number;
   icon: string;
-  color?: 'blue' | 'green' | 'purple' | 'red' | 'orange' | 'yellow';
+  color?: 'blue' | 'green' | 'purple' | 'red' | 'orange' | 'yellow' | 'pink' | 'cyan';
   compact?: boolean;
+  subtitle?: string;
 }
 
 const colorClasses = {
@@ -33,6 +34,14 @@ const colorClasses = {
     bg: 'bg-white border border-slate-100 dark:bg-yellow-500/15',
     icon: 'text-yellow-600 dark:text-yellow-300',
   },
+  pink: {
+    bg: 'bg-white border border-slate-100 dark:bg-pink-500/15',
+    icon: 'text-pink-600 dark:text-pink-300',
+  },
+  cyan: {
+    bg: 'bg-white border border-slate-100 dark:bg-cyan-500/15',
+    icon: 'text-cyan-600 dark:text-cyan-300',
+  },
 };
 
 export const StatCard: React.FC<StatCardProps> = ({
@@ -41,6 +50,7 @@ export const StatCard: React.FC<StatCardProps> = ({
   icon,
   color = 'blue',
   compact = false,
+  subtitle,
 }) => {
   const colorClass = colorClasses[color];
 
@@ -61,6 +71,7 @@ export const StatCard: React.FC<StatCardProps> = ({
         <div>
           <p className="kpi-label">{title}</p>
           <h3 className="kpi-value">{value}</h3>
+          {subtitle && <p className="kpi-subtext">{subtitle}</p>}
         </div>
         <div className={`stat-card-icon ${colorClass.bg}`}>
           <span className={`material-symbols-outlined ${colorClass.icon} stat-card-icon-size`}>

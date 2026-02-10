@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { PageHeader } from '../../components/layout';
 import {
   StatCard,
@@ -12,6 +12,52 @@ import { useFinancialStats } from '../../hooks/useFinancialStats';
 
 export const FinancialDashboardPage: React.FC = () => {
   const { kpis, allIncome, validExpensesForChart, formatCurrency, pendingMovements, isLoading } = useFinancialStats();
+
+  // Función auxiliar para verificar si una fecha pertenece al mes actual
+  const isInCurrentMonth = (dateString: string | undefined | null): boolean => {
+    if (!dateString) return false;
+    
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return false;
+      
+      const now = new Date();
+      return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+    } catch (error) {
+      return false;
+    }
+  };
+
+  // Calcular Gasto Operativo del Mes (5ª tarjeta)
+  const gastoOperativoMes = useMemo(() => {
+    return validExpensesForChart
+      .filter((expense) => {
+        const invoiceDate = expense.data.issueDate || expense.createdAt;
+        return isInCurrentMonth(invoiceDate);
+      })
+      .reduce((total, expense) => {
+        const amount = parseFloat(expense.data.total?.toString() || '0');
+        return total + amount;
+      }, 0);
+  }, [validExpensesForChart]);
+
+  // Calcular Ventas Totales del Mes
+  const ventasTotalesMes = useMemo(() => {
+    return allIncome
+      .filter((income) => {
+        const invoiceDate = income.data.issueDate || income.createdAt;
+        return isInCurrentMonth(invoiceDate);
+      })
+      .reduce((total, income) => {
+        const amount = parseFloat(income.data.total?.toString() || '0');
+        return total + amount;
+      }, 0);
+  }, [allIncome]);
+
+  // Calcular Previsión de Cierre (6ª tarjeta)
+  const previsiónCierre = useMemo(() => {
+    return ventasTotalesMes - gastoOperativoMes;
+  }, [ventasTotalesMes, gastoOperativoMes]);
 
   // Componente de Skeleton para KPIs
   const KpiSkeleton = () => (
@@ -33,6 +79,8 @@ export const FinancialDashboardPage: React.FC = () => {
         <div className="grid-kpi">
           {isLoading ? (
             <>
+              <KpiSkeleton />
+              <KpiSkeleton />
               <KpiSkeleton />
               <KpiSkeleton />
               <KpiSkeleton />
@@ -63,6 +111,19 @@ export const FinancialDashboardPage: React.FC = () => {
                 value={formatCurrency(kpis.ivaNeto)}
                 icon="receipt_long"
                 color={kpis.ivaNeto >= 0 ? 'green' : 'orange'}
+              />
+              <StatCard
+                title="Gasto Operativo (Mes)"
+                value={formatCurrency(gastoOperativoMes)}
+                icon="account_balance_wallet"
+                color="pink"
+                subtitle={gastoOperativoMes === 0 ? 'Sin gastos registrados aún' : undefined}
+              />
+              <StatCard
+                title="Previsión de Cierre"
+                value={formatCurrency(previsiónCierre)}
+                icon="query_stats"
+                color="cyan"
               />
             </>
           )}

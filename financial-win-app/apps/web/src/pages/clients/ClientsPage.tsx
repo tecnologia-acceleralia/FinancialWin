@@ -1,66 +1,110 @@
 import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../../components/layout';
-import { Cliente } from '../../features/entities/types';
 import { formatearMoneda } from '../../utils/formatUtils';
+import { useFinancialStats } from '../../hooks/useFinancialStats';
 
-const STORAGE_KEY = 'zaffra_clients';
+interface ClienteInfo {
+  partnerId: number;
+  nombre: string;
+  totalFacturacion: number;
+  primeraFacturaFecha: string | null;
+}
 
 export const ClientsPage: React.FC = () => {
   const navigate = useNavigate();
+  const { incomeInvoices, isLoading } = useFinancialStats();
 
-  // Cargar clientes del localStorage
-  const clientes = useMemo(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (!stored) return [];
-      const data: Cliente[] = JSON.parse(stored);
-      return data.filter((c) => c.is_active !== false);
-    } catch (error) {
-      console.error('Error al cargar clientes del localStorage:', error);
-      return [];
-    }
-  }, []);
+  // Extraer lista de clientes única de las facturas de ingresos
+  const clientesUnicos = useMemo(() => {
+    const clientesMap = new Map<number, ClienteInfo>();
 
-  // Calcular métricas
-  const totalClientes = clientes.length;
-  
-  // Clientes nuevos este mes
-  const nuevosEsteMes = useMemo(() => {
-    const ahora = new Date();
-    const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
-    return clientes.filter((c) => {
-      if (!c.created_at) return false;
-      const fechaCreacion = new Date(c.created_at);
-      return fechaCreacion >= inicioMes;
-    }).length;
-  }, [clientes]);
+    incomeInvoices.forEach((invoice) => {
+      if (!invoice.partner_id || !Array.isArray(invoice.partner_id)) return;
 
-  // Estado de cobros: suma de pagos pendientes de todos los clientes
+      const partnerId = invoice.partner_id[0];
+      const nombre = invoice.partner_id[1] || 'Cliente desconocido';
+      const amountTotal = invoice.amount_total || 0;
+      const invoiceDate = invoice.invoice_date || null;
+
+      if (clientesMap.has(partnerId)) {
+        // Actualizar facturación total
+        const cliente = clientesMap.get(partnerId)!;
+        cliente.totalFacturacion += amountTotal;
+        // Actualizar primera factura si esta es más antigua
+        if (invoiceDate && (!cliente.primeraFacturaFecha || invoiceDate < cliente.primeraFacturaFecha)) {
+          cliente.primeraFacturaFecha = invoiceDate;
+        }
+      } else {
+        // Nuevo cliente
+        clientesMap.set(partnerId, {
+          partnerId,
+          nombre,
+          totalFacturacion: amountTotal,
+          primeraFacturaFecha: invoiceDate,
+        });
+      }
+    });
+
+    return Array.from(clientesMap.values());
+  }, [incomeInvoices]);
+
+  // Calcular KPIs reales
+  // Total Clientes: Conteo único de partner_id presentes en las facturas de ingresos
+  const totalClientes = clientesUnicos.length;
+
+  // Estado de Cobros: Suma total del importe pendiente de cobro de todas las facturas de clientes
   const estadoCobros = useMemo(() => {
-    return clientes.reduce((total, cliente) => {
-      // Intentar obtener pagosPendientes del cliente
-      // Si el cliente tiene un campo pagosPendientes, usarlo; si no, tratar como 0
-      const pagosPendientes = (cliente as any).pagosPendientes ?? 0;
-      const valor = typeof pagosPendientes === 'number' ? pagosPendientes : 0;
-      return total + (isNaN(valor) ? 0 : valor);
-    }, 0);
-  }, [clientes]);
+    return incomeInvoices
+      .filter((invoice) => invoice.payment_state !== 'paid')
+      .reduce((total, invoice) => total + (invoice.amount_total || 0), 0);
+  }, [incomeInvoices]);
 
-  // Clientes activos este mes (clientes con actividad)
-  const clientesActivosEsteMes = useMemo(() => {
+  // Deuda Vencida: Suma de amount_total de facturas no pagadas cuya date_due sea anterior a hoy
+  const deudaVencida = useMemo(() => {
+    const ahora = new Date();
+    ahora.setHours(0, 0, 0, 0);
+
+    return incomeInvoices
+      .filter((invoice) => {
+        // Solo facturas no pagadas
+        if (invoice.payment_state === 'paid') return false;
+        
+        // Verificar si tiene fecha de vencimiento
+        const dueDate = invoice.invoice_date_due || invoice.invoice_date;
+        if (!dueDate) return false;
+
+        const fechaVencimiento = new Date(dueDate);
+        fechaVencimiento.setHours(0, 0, 0, 0);
+        
+        // Si la fecha de vencimiento ya pasó
+        return fechaVencimiento < ahora;
+      })
+      .reduce((total, invoice) => total + (invoice.amount_total || 0), 0);
+  }, [incomeInvoices]);
+
+  // Ventas del Mes: Suma del amount_total de todas las facturas emitidas en el mes actual
+  const ventasMesActual = useMemo(() => {
     const ahora = new Date();
     const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
-    // Por ahora, consideramos activos a los que fueron creados o actualizados este mes
-    return clientes.filter((c) => {
-      const fechaCreacion = c.created_at ? new Date(c.created_at) : null;
-      const fechaActualizacion = c.updated_at ? new Date(c.updated_at) : null;
-      return (
-        (fechaCreacion && fechaCreacion >= inicioMes) ||
-        (fechaActualizacion && fechaActualizacion >= inicioMes)
-      );
-    }).length;
-  }, [clientes]);
+    const finMes = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 0);
+    finMes.setHours(23, 59, 59, 999);
+
+    return incomeInvoices
+      .filter((invoice) => {
+        if (!invoice.invoice_date) return false;
+        const invoiceDate = new Date(invoice.invoice_date);
+        return invoiceDate >= inicioMes && invoiceDate <= finMes;
+      })
+      .reduce((total, invoice) => total + (invoice.amount_total || 0), 0);
+  }, [incomeInvoices]);
+
+  // Ranking Top 5 Clientes por volumen de facturación total
+  const topClientes = useMemo(() => {
+    return [...clientesUnicos]
+      .sort((a, b) => b.totalFacturacion - a.totalFacturacion)
+      .slice(0, 5);
+  }, [clientesUnicos]);
 
   const handleVerLista = () => {
     navigate('/clientes/lista');
@@ -87,7 +131,7 @@ export const ClientsPage: React.FC = () => {
                     Total Clientes
                   </p>
                   <h3 className="stat-value">
-                    {totalClientes}
+                    {isLoading ? '...' : totalClientes}
                   </h3>
                 </div>
                 <div className="stat-icon-container-blue">
@@ -102,28 +146,10 @@ export const ClientsPage: React.FC = () => {
               <div className="stat-header">
                 <div>
                   <p className="stat-label">
-                    Nuevos
-                  </p>
-                  <h3 className="stat-value">
-                    {nuevosEsteMes}
-                  </h3>
-                </div>
-                <div className="stat-icon-container-green">
-                  <span className="material-symbols-outlined stat-icon-green">
-                    person_add
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="studio-kpi-card">
-              <div className="stat-header">
-                <div>
-                  <p className="stat-label">
                     Estado de Cobros
                   </p>
                   <h3 className={`stat-value ${estadoCobros > 0 ? 'stat-value-money-highlight' : ''}`}>
-                    {formatearMoneda(estadoCobros)}
+                    {isLoading ? '...' : formatearMoneda(estadoCobros)}
                   </h3>
                 </div>
                 <div className="stat-icon-container-orange">
@@ -138,23 +164,85 @@ export const ClientsPage: React.FC = () => {
               <div className="stat-header">
                 <div>
                   <p className="stat-label">
-                    Actividad
+                    Deuda Vencida
+                  </p>
+                  <h3 className={`stat-value ${deudaVencida > 0 ? 'text-red-600 dark:text-red-400' : ''}`}>
+                    {isLoading ? '...' : formatearMoneda(deudaVencida)}
+                  </h3>
+                </div>
+                <div className="stat-icon-container-orange">
+                  <span className="material-symbols-outlined stat-icon-orange">
+                    warning
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="studio-kpi-card">
+              <div className="stat-header">
+                <div>
+                  <p className="stat-label">
+                    Ventas del Mes
                   </p>
                   <h3 className="stat-value">
-                    {clientesActivosEsteMes}
+                    {isLoading ? '...' : formatearMoneda(ventasMesActual)}
                   </h3>
                 </div>
                 <div className="stat-icon-container-pink">
                   <span className="material-symbols-outlined stat-icon-pink">
-                    trending_up
+                    leaderboard
                   </span>
                 </div>
               </div>
             </div>
           </div>
 
+          {/* Ranking de Clientes Top 5 */}
+          {!isLoading && topClientes.length > 0 && (
+            <div className="mt-8">
+              <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-gray-100">
+                Ranking de Clientes
+              </h2>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="border-b border-gray-200 dark:border-gray-700">
+                      <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700 dark:text-gray-300">
+                        #
+                      </th>
+                      <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700 dark:text-gray-300">
+                        Cliente
+                      </th>
+                      <th className="text-right py-3 px-4 text-sm font-semibold text-gray-700 dark:text-gray-300">
+                        Facturación Total
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {topClientes.map((cliente, index) => (
+                      <tr
+                        key={cliente.partnerId}
+                        className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                      >
+                        <td className="py-3 px-4 text-sm text-gray-600 dark:text-gray-400">
+                          {index + 1}
+                        </td>
+                        <td className="py-3 px-4 text-sm font-medium text-gray-900 dark:text-gray-100">
+                          {cliente.nombre}
+                        </td>
+                        <td className="py-3 px-4 text-sm text-right font-semibold text-gray-900 dark:text-gray-100">
+                          {formatearMoneda(cliente.totalFacturacion)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           {/* Botones de Navegación Hero */}
-          <div className="client-hero-actions-grid">
+          <div className="client-hero-actions-grid mt-8">
             <button
               onClick={handleVerLista}
               className="client-hero-action-card"

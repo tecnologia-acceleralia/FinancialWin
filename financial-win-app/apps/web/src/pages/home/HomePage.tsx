@@ -6,62 +6,49 @@ import { Card } from '../../components/ui';
 import { PageHeader } from '../../components/layout';
 import { useFinancial } from '../../contexts/FinancialContext';
 import { useFinancialStats } from '../../hooks/useFinancialStats';
+import { useClientsQuery } from '../../hooks/useClientsQuery';
+import { useSuppliersQuery } from '../../hooks/useSuppliersQuery';
 import { formatearMoneda } from '../../utils/formatUtils';
 import { EmptyState, Popover } from '../../components/common';
-import { Cliente } from '../../features/entities/types';
-import { Proveedor } from '../../features/entities/types';
 import { getCurrentQuarterInfo } from '../../utils/quarterUtils';
 
 interface HomePageProps {
   onNavigate?: (view: ViewState, subAction?: string) => void;
 }
 
-const STORAGE_KEY_CLIENTS = 'zaffra_clients';
-const STORAGE_KEY_SUPPLIERS = 'zaffra_suppliers';
-
 export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const { records } = useFinancial();
   const { kpis, incomeInvoices } = useFinancialStats();
+  
+  // Obtener clientes y proveedores desde Odoo (en lugar de localStorage)
+  const { data: clientes = [], isLoading: isLoadingClients } = useClientsQuery();
+  const { data: proveedores = [], isLoading: isLoadingSuppliers } = useSuppliersQuery();
 
   // Obtener información del trimestre actual
   const quarterInfo = useMemo(() => getCurrentQuarterInfo(), []);
-
-  // Obtener datos reales de clientes
-  const clientes = useMemo(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY_CLIENTS);
-      if (!stored) return [];
-      const data: Cliente[] = JSON.parse(stored);
-      return data.filter((c) => c.is_active !== false);
-    } catch (error) {
-      console.error('Error al cargar clientes del localStorage:', error);
-      return [];
-    }
-  }, []);
-
-  // Obtener datos reales de proveedores
-  const proveedores = useMemo(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY_SUPPLIERS);
-      if (!stored) return [];
-      const data: Proveedor[] = JSON.parse(stored);
-      return data.filter((p) => p.is_active !== false);
-    } catch (error) {
-      console.error('Error al cargar proveedores del localStorage:', error);
-      return [];
-    }
-  }, []);
+  
+  // Filtrar solo clientes y proveedores activos
+  const activeClientes = useMemo(() => {
+    return clientes.filter((c) => c.is_active !== false);
+  }, [clientes]);
+  
+  const activeProveedores = useMemo(() => {
+    return proveedores.filter((p) => p.is_active !== false);
+  }, [proveedores]);
+  
+  // Estado de carga general
+  const isLoading = isLoadingClients || isLoadingSuppliers;
 
   // Calcular total de deuda de clientes
+  // TODO: Este cálculo debería venir de las facturas de Odoo, no de un campo en el cliente
   const totalDeudaClientes = useMemo(() => {
-    return clientes.reduce((total, cliente) => {
-      const pagosPendientes = (cliente as any).pagosPendientes ?? 0;
-      const valor = typeof pagosPendientes === 'number' ? pagosPendientes : 0;
-      return total + (isNaN(valor) ? 0 : valor);
-    }, 0);
-  }, [clientes]);
+    // Por ahora, calcular desde las facturas de ingresos no pagadas
+    return incomeInvoices
+      .filter((invoice) => invoice.payment_state !== 'paid')
+      .reduce((total, invoice) => total + (invoice.amount_total || 0), 0);
+  }, [incomeInvoices]);
 
   // Contar documentos pendientes de procesar (facturas sin PDF asociado)
   const documentosPendientes = useMemo(() => {
@@ -122,7 +109,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
   }, [incomeInvoices]);
 
   // Verificar si hay datos para mostrar
-  const hasData = records.length > 0 || clientes.length > 0 || proveedores.length > 0;
+  const hasData = records.length > 0 || activeClientes.length > 0 || activeProveedores.length > 0;
 
   const handleNavigate = (view: ViewState, subAction?: string) => {
     // Prevent default behavior and stop propagation
@@ -291,7 +278,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
             subtitle={t('home.shortcuts.clientsDesc')}
             icon="group"
             iconColor="blue"
-            badge={`Total: ${clientes.length}`}
+            badge={isLoading ? 'Cargando...' : `Total: ${activeClientes.length}`}
             badgeColor="pink"
             onClick={() => handleNavigate('clients')}
           />
@@ -300,7 +287,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
             subtitle={t('home.shortcuts.suppliersDesc')}
             icon="local_shipping"
             iconColor="emerald"
-            badge={`Total: ${proveedores.length}`}
+            badge={isLoading ? 'Cargando...' : `Total: ${activeProveedores.length}`}
             badgeColor="pink"
             onClick={() => handleNavigate('suppliers')}
           />
@@ -308,7 +295,17 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
       </div>
 
       {/* Operational Summary & Alerts */}
-      {hasData ? (
+      {isLoading ? (
+        <div className="home-summary-grid">
+          <div className="home-summary-card">
+            <EmptyState
+              title="Cargando datos..."
+              description="Obteniendo información de Odoo"
+              icon="sync"
+            />
+          </div>
+        </div>
+      ) : hasData ? (
         <div className="home-summary-grid">
           {/* Status List */}
           <div className="home-summary-card">

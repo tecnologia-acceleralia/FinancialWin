@@ -1,11 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { ViewState } from '../../types';
 import { useFinancialStats } from '../../hooks/useFinancialStats';
-import { formatearMoneda } from '../../utils/formatUtils';
-import { Cliente } from '../../features/entities/types';
 
 interface TopBarProps {
   currentView: ViewState;
@@ -29,9 +27,11 @@ interface NotificationMenuProps {
   t: (key: string) => string;
   badgeCount: number;
   onNavigate: (path: string) => void;
+  dismissed: boolean;
+  onDismiss: () => void;
 }
 
-const NotificationMenu: React.FC<NotificationMenuProps> = ({ notifications, isOpen, onToggle, onClose, t, badgeCount, onNavigate }) => {
+const NotificationMenu: React.FC<NotificationMenuProps> = ({ notifications, isOpen, onToggle, onClose, t, badgeCount, onNavigate, dismissed, onDismiss }) => {
   const getIconClass = (type: string) => {
     switch (type) {
       case 'error':
@@ -79,7 +79,7 @@ const NotificationMenu: React.FC<NotificationMenuProps> = ({ notifications, isOp
         className={`topbar-notif-btn ${isOpen ? 'topbar-action-btn-active' : ''}`}
       >
         <span className="material-symbols-outlined topbar-action-icon">notifications</span>
-        {badgeCount > 0 && (
+        {badgeCount > 0 && !dismissed && (
           <span className="topbar-notif-badge-number">
             {badgeCount > 99 ? '99+' : badgeCount}
           </span>
@@ -90,11 +90,16 @@ const NotificationMenu: React.FC<NotificationMenuProps> = ({ notifications, isOp
         <div className="topbar-dropdown-panel">
           <div className="topbar-dropdown-header">
             <h4 className="topbar-dropdown-title">{t('topbar.notifications')}</h4>
-            <button className="topbar-dropdown-action">{t('topbar.markRead')}</button>
+            <button 
+              className="topbar-dropdown-action"
+              onClick={onDismiss}
+            >
+              {t('topbar.markRead')}
+            </button>
           </div>
 
           <div className="topbar-dropdown-list">
-            {notifications.length === 0 ? (
+            {(dismissed || notifications.length === 0) ? (
               <div className="topbar-notif-item">
                 <div className="topbar-notif-content">
                   <div className="topbar-notif-details">
@@ -126,7 +131,15 @@ const NotificationMenu: React.FC<NotificationMenuProps> = ({ notifications, isOp
           </div>
 
           <div className="topbar-dropdown-footer">
-            <button className="topbar-dropdown-footer-btn">{t('topbar.viewHistory')}</button>
+            <button 
+              className="topbar-dropdown-footer-btn"
+              onClick={() => {
+                onNavigate('/control-financiero');
+                onClose();
+              }}
+            >
+              {t('topbar.viewHistory')}
+            </button>
           </div>
         </div>
       )}
@@ -195,8 +208,6 @@ const UserDropdown: React.FC<UserDropdownProps> = ({ isOpen, onToggle, onClose, 
   );
 };
 
-const STORAGE_KEY_CLIENTS = 'zaffra_clients';
-
 export const TopBar: React.FC<TopBarProps> = ({ currentView, onToggleSidebar }) => {
   const { theme, toggleTheme } = useTheme();
   const { t } = useLanguage();
@@ -205,6 +216,8 @@ export const TopBar: React.FC<TopBarProps> = ({ currentView, onToggleSidebar }) 
 
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isNotifMenuOpen, setIsNotifMenuOpen] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
+  const previousCountRef = useRef<number>(0);
 
   // Calcular facturas próximas a vencer (ingresos no pagados que vencen en los próximos 5 días)
   const facturasProximasAVencer = useMemo(() => {
@@ -252,30 +265,12 @@ export const TopBar: React.FC<TopBarProps> = ({ currentView, onToggleSidebar }) 
     return { count };
   }, [incomeInvoices]);
 
-  // Calcular total de deuda de clientes
-  const totalDeudaClientes = useMemo(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY_CLIENTS);
-      if (!stored) return 0;
-      const clientes: Cliente[] = JSON.parse(stored);
-      const activeClientes = clientes.filter((c) => c.is_active !== false);
-      return activeClientes.reduce((total, cliente) => {
-        const pagosPendientes = (cliente as any).pagosPendientes ?? 0;
-        const valor = typeof pagosPendientes === 'number' ? pagosPendientes : 0;
-        return total + (isNaN(valor) ? 0 : valor);
-      }, 0);
-    } catch (error) {
-      console.error('Error al cargar clientes del localStorage:', error);
-      return 0;
-    }
-  }, []);
-
-  // Calcular total de alertas
+  // Calcular total de alertas (solo facturas próximas a vencer para el badge)
   const totalAlertas = useMemo(() => {
-    return facturasProximasAVencer.count + (totalDeudaClientes > 0 ? 1 : 0);
-  }, [facturasProximasAVencer.count, totalDeudaClientes]);
+    return facturasProximasAVencer.count;
+  }, [facturasProximasAVencer.count]);
 
-  // Construir notificaciones reales
+  // Construir notificaciones reales (solo facturas próximas a vencer)
   const NOTIFICATIONS: Notification[] = useMemo(() => {
     const notifications: Notification[] = [];
     
@@ -284,27 +279,15 @@ export const TopBar: React.FC<TopBarProps> = ({ currentView, onToggleSidebar }) 
       notifications.push({
         id: 1,
         type: 'warning',
-        title: `${facturasProximasAVencer.count} factura${facturasProximasAVencer.count === 1 ? '' : 's'} vencen pronto`,
+        title: `Tienes ${facturasProximasAVencer.count} factura${facturasProximasAVencer.count === 1 ? '' : 's'} que vencen pronto`,
         desc: 'Revisa las facturas de clientes que vencen en los próximos 5 días',
         time: '',
         read: false,
       });
     }
     
-    // Item 2: Deuda de clientes
-    if (totalDeudaClientes > 0) {
-      notifications.push({
-        id: 2,
-        type: 'warning',
-        title: `Cobros pendientes: ${formatearMoneda(totalDeudaClientes)}`,
-        desc: 'Hay pagos pendientes de clientes que requieren atención',
-        time: '',
-        read: false,
-      });
-    }
-    
     return notifications;
-  }, [facturasProximasAVencer.count, totalDeudaClientes]);
+  }, [facturasProximasAVencer.count]);
 
   const handleNavigate = (path: string) => {
     navigate(path);
@@ -324,6 +307,24 @@ export const TopBar: React.FC<TopBarProps> = ({ currentView, onToggleSidebar }) 
     setIsUserMenuOpen(!isUserMenuOpen);
     setIsNotifMenuOpen(false);
   };
+
+  const handleDismiss = () => {
+    setDismissed(true);
+  };
+
+  // Resetear dismissed cuando hay nuevas notificaciones (el conteo aumenta)
+  useEffect(() => {
+    const currentCount = facturasProximasAVencer.count;
+    const previousCount = previousCountRef.current;
+    
+    // Si el conteo aumentó (nuevas notificaciones), resetear dismissed
+    if (currentCount > previousCount && currentCount > 0) {
+      setDismissed(false);
+    }
+    
+    // Actualizar el ref con el conteo actual
+    previousCountRef.current = currentCount;
+  }, [facturasProximasAVencer.count]);
 
   return (
     <>
@@ -363,6 +364,8 @@ export const TopBar: React.FC<TopBarProps> = ({ currentView, onToggleSidebar }) 
               t={t}
               badgeCount={totalAlertas}
               onNavigate={handleNavigate}
+              dismissed={dismissed}
+              onDismiss={handleDismiss}
             />
           </div>
 
