@@ -8,7 +8,7 @@ import { ProtectedRoutes } from './components/auth/ProtectedRoutes';
 import { HomePage } from './pages/home/HomePage';
 // TODO: Transición a DocumentsPage - Comentado temporalmente
 // import { AIExtractionPage } from './pages/ai-extraction/AIExtractionPage';
-import { RecordsPage } from './pages/records/RecordsPage';
+import { TreasuryReportPage } from './pages/records/TreasuryReportPage';
 import { FinancialDashboardPage } from './pages/control-financiero/FinancialDashboardPage';
 import { ClientsPage } from './pages/clients/ClientsPage';
 import { NuevoClientePage } from './pages/clients/NuevoClientePage';
@@ -58,7 +58,7 @@ function App() {
                   <Route path="/" element={<HomePage />} />
                   {/* TODO: Transición a DocumentsPage - Comentado temporalmente */}
                   {/* <Route path="/ai-extraction" element={<AIExtractionPage />} /> */}
-                  <Route path="/records" element={<RecordsPage />} />
+                  <Route path="/records" element={<TreasuryReportPage />} />
                   <Route path="/control-financiero" element={<FinancialDashboardPage />} />
                   <Route path="/clients" element={<ClientsPage />} />
                   <Route path="/clientes/nuevo" element={<NuevoClientePage />} />

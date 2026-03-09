@@ -1,7 +1,14 @@
 import type { Proveedor, Cliente } from '../features/entities/types';
 import type { ExtractedData } from '../types';
 
-const CORS_PROXY = 'https://cors-anywhere.herokuapp.com/';
+// En desarrollo, usar el proxy de Vite (/odoo-api)
+// En producción, usar la URL directa de Odoo
+const getOdooBaseUrl = (): string => {
+  if (import.meta.env.DEV) {
+    return '/odoo-api';
+  }
+  return 'https://acceleralia-sl.odoo.com';
+};
 
 type PartnerType = 'customer' | 'supplier';
 
@@ -43,7 +50,8 @@ async function jsonRpcCall<T>(
   method: string,
   args: unknown[]
 ): Promise<T> {
-  const proxiedUrl = `${CORS_PROXY}${url}/jsonrpc`;
+  const baseUrl = getOdooBaseUrl();
+  const proxiedUrl = `${baseUrl}/jsonrpc`;
 
   const payload = {
     jsonrpc: '2.0' as const,
@@ -456,7 +464,11 @@ async function findOrCreatePartner(
  */
 async function createInvoice(
   data: ExtractedData,
-  type: 'in_invoice' | 'out_invoice'
+  type: 'in_invoice' | 'out_invoice',
+  options?: {
+    state?: 'draft' | 'posted';
+    comment?: string;
+  }
 ): Promise<number> {
   const config = getOdooConfig();
   const uid = await authenticate(config);
@@ -491,6 +503,16 @@ async function createInvoice(
     ref: data.invoiceNum || false,
   };
 
+  // Agregar estado si se especifica (draft por defecto para importaciones Excel)
+  if (options?.state) {
+    invoicePayload.state = options.state;
+  }
+
+  // Agregar comentario/nota si se especifica
+  if (options?.comment) {
+    invoicePayload.narration = options.comment;
+  }
+
   // Agregar fecha de factura si está disponible
   if (data.issueDate) {
     invoicePayload.invoice_date = data.issueDate;
@@ -516,6 +538,8 @@ async function createInvoice(
     invoiceNum: data.invoiceNum,
     issueDate: data.issueDate,
     total,
+    state: options?.state,
+    comment: options?.comment,
   });
 
   // Crear la factura
@@ -798,14 +822,33 @@ export function mapOdooStatus(
 }
 
 async function getInvoices(
-  type: 'in_invoice' | 'out_invoice'
+  type: 'in_invoice' | 'out_invoice',
+  customDomain?: [string, string, unknown][]
 ): Promise<OdooInvoice[]> {
   const config = getOdooConfig();
   const uid = await authenticate(config);
 
-  const domain: [string, string, string][] = [['move_type', '=', type]];
+  // Construir dominio base con el tipo de factura y estados permitidos
+  // IMPORTANTE: Incluir tanto 'posted' (facturas reales) como 'draft' (previsiones del Excel)
+  // Esto asegura que las previsiones se muestren en TreasuryReportPage
+  const baseDomain: [string, string, unknown][] = [
+    ['move_type', '=', type],
+    ['state', 'in', ['posted', 'draft']]
+  ];
+  
+  // Si se proporciona un dominio personalizado, combinarlo con el dominio base
+  // NOTA: Si customDomain incluye un filtro de 'state', se combinará con el baseDomain
+  // pero el filtro 'in' tiene prioridad sobre filtros más restrictivos
+  const domain: [string, string, unknown][] = customDomain 
+    ? [...baseDomain, ...customDomain]
+    : baseDomain;
+  
+  // CRÍTICO: Incluir 'state' y 'move_type' en los campos solicitados
+  // 'state' es necesario para diferenciar entre 'posted' (Confirmado) y 'draft' (Previsión)
+  // 'move_type' ya está en el dominio, pero lo incluimos por seguridad
   const fields = [
-    'state',
+    'state',        // CRÍTICO: Para diferenciar posted vs draft
+    'move_type',   // CRÍTICO: Para verificar tipo de factura
     'payment_state',
     'name',
     'partner_id',
@@ -826,7 +869,7 @@ async function getInvoices(
       payment_state: 'not_paid' | 'in_payment' | 'paid' | 'partial' | 'reversed' | 'invoicing_legacy';
       currency_id: [number, string] | false | null;
     }>
-  >(config, uid, 'account.move', 'search_read', [domain], { fields });
+  >(config, uid, 'account.move', 'search_read', [domain as [string, string, string][]], { fields });
 
   return invoices
     .filter((inv) => inv.name && inv.partner_id && Array.isArray(inv.partner_id))

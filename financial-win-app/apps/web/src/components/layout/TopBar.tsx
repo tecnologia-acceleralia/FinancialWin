@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { ViewState } from '../../types';
 import { useFinancialStats } from '../../hooks/useFinancialStats';
 
@@ -155,12 +156,14 @@ interface UserDropdownProps {
 }
 
 const UserDropdown: React.FC<UserDropdownProps> = ({ isOpen, onToggle, onClose, t }) => {
+  const { user } = useAuth();
+  
   return (
     <div className="relative">
       <button onClick={onToggle} className="topbar-user-trigger group">
         <img src="https://picsum.photos/100/100" alt="User" className="topbar-user-avatar" />
         <div className="topbar-user-info">
-          <span className="topbar-user-name">Zaffra Burga</span>
+          <span className="topbar-user-name">{user?.name || 'Administrador'}</span>
           <span className="topbar-user-role">Admin</span>
         </div>
         <span className="material-symbols-outlined topbar-user-expand-icon">expand_more</span>
@@ -175,8 +178,8 @@ const UserDropdown: React.FC<UserDropdownProps> = ({ isOpen, onToggle, onClose, 
                 <span className="material-symbols-outlined topbar-user-avatar-edit-icon">photo_camera</span>
               </button>
             </div>
-            <h4 className="topbar-user-header-name">Zaffra Burga</h4>
-            <p className="topbar-user-header-email">zaffra.burga@financialwin.com</p>
+            <h4 className="topbar-user-header-name">{user?.name || 'Administrador'}</h4>
+            <p className="topbar-user-header-email">{user?.email || 'admin@acceleralia.com'}</p>
 
             <button className="topbar-user-manage-btn">{t('topbar.profile.manage')}</button>
           </div>

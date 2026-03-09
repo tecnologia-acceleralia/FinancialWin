@@ -82,49 +82,26 @@ export const HelpPage: React.FC = () => {
       // Mostrar toast de inicio
       showToast('Descargando guía de usuario...', 'success');
 
-      // TODO: Cuando tengamos la guía final en PDF, colocar el archivo en /public/guia-usuario.pdf
-      // y cambiar esta función para usar: window.open('/guia-usuario.pdf', '_blank');
-      // Por ahora, generamos un documento de texto temporal para pruebas
+      // Obtener el archivo PDF desde la carpeta public
+      const response = await fetch('/guia-usuario.pdf');
+      
+      if (!response.ok) {
+        throw new Error('No se pudo cargar el archivo PDF');
+      }
 
-      // Generar contenido de texto con resumen amigable de uso de la app
-      const guideContent = `Guía de Usuario FinancialWin - Versión Provisional
-
-Bienvenido a FinancialWin, tu plataforma de gestión financiera inteligente.
-
-1. SUBIR FACTURAS Y GASTOS
-   Puedes subir tus documentos de dos formas: arrastra los archivos directamente a la zona de "Documentos" 
-   o haz clic en el botón de subida. La plataforma acepta archivos PDF, JPG y PNG.
-
-2. VALIDACIÓN DE DATOS
-   Una vez subidos, nuestra IA (Gemini) analizará automáticamente tus documentos para extraer información 
-   importante como NIF, importes y fechas. Es importante que revises y valides estos datos antes de 
-   archivarlos definitivamente.
-
-3. GESTIÓN DE DOCUMENTOS
-   Todos tus documentos quedan organizados en la sección de "Documentos" donde puedes ver, editar 
-   y gestionar tus facturas y gastos de manera eficiente.
-
-4. CONTABILIDAD AUTOMÁTICA
-   Los documentos validados se archivan automáticamente en tu contabilidad de Gastos o Ingresos, 
-   facilitando el seguimiento de tus finanzas.
-
-5. SOPORTE Y AYUDA
-   Si necesitas ayuda, puedes consultar las preguntas frecuentes en esta sección o contactar 
-   con nuestro equipo de soporte técnico.
-
----
-Esta es una versión provisional. La guía completa en PDF estará disponible próximamente.`;
-
-      // Crear Blob con tipo text/plain para documento de texto temporal
-      const blob = new Blob([guideContent], { type: 'text/plain' });
+      // Convertir la respuesta a Blob
+      const blob = await response.blob();
       
       // Crear URL temporal
       const url = URL.createObjectURL(blob);
       
-      // Crear elemento <a> temporal para descarga
+      // Abrir en nueva pestaña
+      window.open(url, '_blank');
+      
+      // Crear elemento <a> temporal para descarga automática
       const link = document.createElement('a');
       link.href = url;
-      link.download = 'Guia_FinancialWin_Provisional.txt';
+      link.download = 'Guia_Usuario_FinancialWin.pdf';
       document.body.appendChild(link);
       
       // Disparar descarga
@@ -133,7 +110,7 @@ Esta es una versión provisional. La guía completa en PDF estará disponible pr
       // Remover elemento temporal
       document.body.removeChild(link);
       
-      // Esperar medio segundo antes de limpiar y resetear estado
+      // Esperar un momento antes de limpiar y resetear estado
       setTimeout(() => {
         // Limpiar URL para evitar fugas de memoria
         URL.revokeObjectURL(url);

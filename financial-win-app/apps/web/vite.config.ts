@@ -66,6 +66,12 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: path => path.replace(/^\/api/, ''),
       },
+      '/odoo-api': {
+        target: 'https://acceleralia-sl.odoo.com',
+        changeOrigin: true,
+        secure: true,
+        rewrite: path => path.replace(/^\/odoo-api/, ''),
+      },
     },
   },
   // Configuración para manejar TypeScript

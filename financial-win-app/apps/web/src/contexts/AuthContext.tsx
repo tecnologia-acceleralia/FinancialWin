@@ -63,9 +63,9 @@ function isDevelopmentLocal(): boolean {
  * Usuario simulado para desarrollo local
  */
 const DEV_MOCK_USER: User = {
-  sub: 'dev-user-alice',
-  email: 'alice@example.com',
-  name: 'Alice Test User',
+  sub: 'dev-user-admin',
+  email: 'admin@acceleralia.com',
+  name: 'Administrador',
   company_id: 'dev-company-id',
 };
 

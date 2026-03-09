@@ -285,6 +285,17 @@
   .badge {
     @apply inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2;
   }
+  
+  /* Badge de Tipo para Tesorería */
+  /* Badge verde para facturas confirmadas (posted) */
+  .badge-tipo-factura {
+    @apply badge bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800;
+  }
+  
+  /* Badge azul para previsiones (draft) */
+  .badge-tipo-prevision {
+    @apply badge bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800;
+  }
 
   /* StatusBadge - Clases semánticas para estados */
   .status-badge-base {
@@ -4654,6 +4665,21 @@
     color: #a855f7;
   }
 
+  /* Variante roja del contenedor de icono de estadística */
+  .stat-icon-container-red {
+    @apply stat-icon-container;
+    background-color: #fee2e2;
+  }
+
+  .dark .stat-icon-container-red {
+    background-color: rgba(239, 68, 68, 0.2);
+  }
+
+  .stat-icon-red {
+    @apply material-symbols-outlined;
+    color: #ef4444;
+  }
+
   /* Layout de rankings en doble columna */
   .rankings-grid {
     @apply grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8;
@@ -6133,5 +6159,156 @@
 
   .classification-table tbody tr:hover {
     @apply bg-gray-50 dark:bg-[#1A2332];
+  }
+
+  /* Filtros de tiempo para Panel de Tesorería */
+  .treasury-time-filters {
+    @apply flex items-center gap-2;
+  }
+
+  .treasury-filter-btn {
+    @apply px-4 py-2 rounded-md text-sm font-medium transition-colors;
+    @apply bg-white dark:bg-[#131B29];
+    @apply border border-gray-300 dark:border-[#2A3B5A];
+    @apply text-gray-700 dark:text-gray-300;
+    @apply hover:bg-gray-50 dark:hover:bg-[#1A2332];
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2;
+  }
+
+  .treasury-filter-btn.active {
+    @apply bg-primary-500 text-white border-primary-500;
+    @apply hover:bg-primary-600;
+  }
+
+  .dark .treasury-filter-btn.active {
+    @apply bg-primary-600 text-white border-primary-600;
+    @apply hover:bg-primary-700;
+  }
+
+  /* Contenedor de filtros con espaciado generoso */
+  .filter-bar-container {
+    @apply mt-12 flex items-center gap-4 bg-white dark:bg-slate-900/20 p-2 rounded-lg;
+  }
+
+  /* Separador visual entre resumen y gestión */
+  .filter-section-divider {
+    @apply border-t border-slate-200 dark:border-slate-800 my-8;
+    @apply border-b-0 border-l-0 border-r-0;
+  }
+
+  /* Barra de filtros estilo Odoo */
+  .odoo-filter-bar {
+    @apply flex items-center gap-3 flex-wrap;
+  }
+
+  .odoo-filter-pill {
+    @apply inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200;
+    @apply bg-slate-100 dark:bg-slate-800;
+    @apply border border-slate-300 dark:border-slate-700;
+    @apply text-slate-700 dark:text-slate-300;
+    @apply hover:bg-slate-200 dark:hover:bg-slate-700;
+    @apply hover:shadow-sm;
+    @apply cursor-pointer;
+  }
+
+  .odoo-filter-pill.active {
+    @apply dark:bg-slate-600;
+    @apply dark:border-slate-600;
+    @apply text-white;
+    @apply dark:hover:bg-slate-500;
+  }
+
+  /* Estado Activo - Modo Claro (Fondo casi blanco, letra negra) */
+  :root:not(.dark) .odoo-filter-pill.active {
+    background-color: #f1f5f9 !important; /* slate-100 */
+    color: #0f172a !important;            /* slate-900 (Negro casi puro) */
+    border-color: #cbd5e1 !important;     /* slate-300 */
+    font-weight: 600;
+  }
+
+  /* Forzar texto negro en el span cuando el botón está activo en light mode */
+  :root:not(.dark) .odoo-filter-pill.active .odoo-filter-pill-text {
+    color: #0f172a !important; /* slate-900 (Negro casi puro) */
+  }
+
+  .odoo-filter-pill:disabled {
+    @apply opacity-60 cursor-not-allowed;
+    @apply hover:bg-slate-100 dark:hover:bg-slate-800;
+  }
+
+  .odoo-filter-pill-icon {
+    @apply material-symbols-outlined text-base;
+  }
+
+  .odoo-filter-pill-text {
+    @apply flex items-center gap-1;
+  }
+
+  .odoo-date-input {
+    @apply px-4 py-2 rounded-lg text-sm;
+    @apply bg-white dark:bg-slate-800;
+    @apply border border-slate-300 dark:border-slate-700;
+    @apply text-slate-700 dark:text-slate-300;
+    @apply shadow-lg;
+  }
+
+  .odoo-date-input:focus {
+    @apply outline-none ring-2 ring-primary-500 ring-offset-2;
+  }
+
+  /* Título de tabla con espaciado superior */
+  .table-section-title {
+    @apply text-xl font-semibold mb-4 mt-8 text-slate-900 dark:text-white;
+  }
+
+  /* Corrección de legibilidad en Dark Mode para Pendientes */
+  .dark .treasury-pending-item-supplier {
+    color: #f1f5f9 !important; /* Un blanco/gris muy claro (slate-100) */
+    font-weight: 500;
+  }
+  .dark .treasury-pending-item-invoice {
+    color: #cbd5e1 !important; /* Un gris claro legible (slate-300) */
+  }
+
+  /* ============================================
+     FORZAR LIGHT MODE - Estilos solo para modo claro
+     Asegura que solo se apliquen cuando NO estemos en modo oscuro
+     ============================================ */
+  
+  /* 2. Filtros (Pills) - Solo Light Mode */
+  html:not(.dark):not([data-theme='dark']) .odoo-filter-pill {
+    background-color: #f8fafc !important;
+    color: #334155 !important;
+    border: 1px solid #e2e8f0 !important;
+  }
+  
+  html:not(.dark):not([data-theme='dark']) .odoo-filter-pill.active {
+    background-color: #f1f5f9 !important; /* slate-100 */
+    color: #0f172a !important;            /* slate-900 (Negro casi puro) */
+    border-color: #cbd5e1 !important;     /* slate-300 */
+    font-weight: 600;
+  }
+
+  /* 3. Textos y Números en Gráficos/Tablas - Solo Light Mode */
+  html:not(.dark):not([data-theme='dark']) svg text {
+    fill: #1e293b !important; /* Fuerza que los números del gráfico sean oscuros */
+  }
+
+  /* 4. Tabla de tendencias e informes - Solo Light Mode */
+  html:not(.dark):not([data-theme='dark']) .studio-container table th {
+    background-color: #f1f5f9 !important;
+    color: #475569 !important;
+  }
+
+  html:not(.dark):not([data-theme='dark']) .studio-container table td {
+    color: #1e293b !important;
+    border-bottom-color: #f1f5f9 !important;
+  }
+
+  /* 5. Inputs - Solo Light Mode */
+  html:not(.dark):not([data-theme='dark']) .odoo-date-input {
+    background-color: #ffffff !important;
+    color: #1e293b !important;
+    border: 1px solid #cbd5e1 !important;
   }
 }

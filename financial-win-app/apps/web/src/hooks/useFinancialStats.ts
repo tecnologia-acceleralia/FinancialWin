@@ -125,21 +125,46 @@ function transformOdooInvoiceToFinancialRecord(
  * Hook para calcular estadísticas financieras basadas en datos de Odoo
  * Todos los cálculos se actualizan automáticamente cuando cambian los datos de Odoo
  */
-export const useFinancialStats = () => {
+/**
+ * Hook para calcular estadísticas financieras basadas en datos de Odoo
+ * @param treasuryMode - Si es true, filtra solo cuentas pendientes (como en informes de Odoo)
+ */
+export const useFinancialStats = (treasuryMode: boolean = false) => {
+  // Dominio específico para tesorería: solo cuentas pendientes (como en informes de Odoo)
+  // NOTA: El filtro de 'state' ya está incluido en el dominio base de getInvoices
+  // Solo agregamos el filtro de payment_state para modo tesorería
+  const treasuryDomain: [string, string, unknown][] = treasuryMode
+    ? [
+        ['payment_state', 'in', ['not_paid', 'partial']],
+      ]
+    : [];
+
   // Cargar facturas de ingresos (out_invoice)
   // IMPORTANTE: refetchOnWindowFocus para evitar datos en caché obsoletos
-  const { data: incomeInvoices = [], isLoading: isLoadingIncome } = useQuery({
-    queryKey: ['odoo-invoices', 'out_invoice'],
-    queryFn: () => odooService.getInvoices('out_invoice'),
+  // CRÍTICO: El dominio base de getInvoices ya incluye ['state', 'in', ['posted', 'draft']]
+  // para traer tanto facturas confirmadas como previsiones del Excel
+  const { 
+    data: incomeInvoices = [], 
+    isLoading: isLoadingIncome,
+    refetch: refetchIncome 
+  } = useQuery({
+    queryKey: ['odoo-invoices', 'out_invoice', treasuryMode ? 'treasury' : 'all'],
+    queryFn: () => odooService.getInvoices('out_invoice', treasuryMode ? treasuryDomain : undefined),
     staleTime: 5 * 60 * 1000, // 5 minutos
     refetchOnWindowFocus: true, // Forzar refetch al enfocar la ventana
   });
 
   // Cargar facturas de gastos (in_invoice)
   // IMPORTANTE: refetchOnWindowFocus para evitar datos en caché obsoletos
-  const { data: expenseInvoices = [], isLoading: isLoadingExpenses } = useQuery({
-    queryKey: ['odoo-invoices', 'in_invoice'],
-    queryFn: () => odooService.getInvoices('in_invoice'),
+  // CRÍTICO: El dominio base de getInvoices ya incluye ['state', 'in', ['posted', 'draft']]
+  // para traer tanto facturas confirmadas como previsiones del Excel
+  const { 
+    data: expenseInvoices = [], 
+    isLoading: isLoadingExpenses,
+    refetch: refetchExpenses 
+  } = useQuery({
+    queryKey: ['odoo-invoices', 'in_invoice', treasuryMode ? 'treasury' : 'all'],
+    queryFn: () => odooService.getInvoices('in_invoice', treasuryMode ? treasuryDomain : undefined),
     staleTime: 5 * 60 * 1000, // 5 minutos
     refetchOnWindowFocus: true, // Forzar refetch al enfocar la ventana
   });
@@ -255,36 +280,44 @@ export const useFinancialStats = () => {
 
   // Calcular KPIs dinámicos basados en datos de Odoo
   const kpis = useMemo((): FinancialKPIs => {
-    // Filtrar solo facturas con estado 'posted' para cálculos reales
-    const postedIncomeInvoices = incomeInvoices.filter(
-      (invoice) => invoice.state === 'posted'
+    // Filtrar facturas con estado 'posted' O 'draft' para incluir previsiones del Excel
+    // Esto permite que la previsión de caja sea real incluyendo facturas en borrador
+    const validIncomeInvoices = incomeInvoices.filter(
+      (invoice) => invoice.state === 'posted' || invoice.state === 'draft'
     );
-    const postedExpenseInvoices = expenseInvoices.filter(
-      (invoice) => invoice.state === 'posted'
+    const validExpenseInvoices = expenseInvoices.filter(
+      (invoice) => invoice.state === 'posted' || invoice.state === 'draft'
     );
 
-    // Total Ingresos: Suma de facturas de ingresos con estado 'posted'
-    const totalIngresos = postedIncomeInvoices.reduce((sum, invoice) => {
+    // Total Ingresos: Suma de facturas de ingresos con estado 'posted' o 'draft'
+    const totalIngresos = validIncomeInvoices.reduce((sum, invoice) => {
       return sum + (invoice.amount_total || 0);
     }, 0);
 
-    // Total Gastos: Suma de facturas de gastos con estado 'posted'
-    const totalGastos = postedExpenseInvoices.reduce((sum, invoice) => {
+    // Total Gastos: Suma de facturas de gastos con estado 'posted' o 'draft'
+    const totalGastos = validExpenseInvoices.reduce((sum, invoice) => {
       return sum + (invoice.amount_total || 0);
     }, 0);
 
-    // Beneficio Neto: Ingresos - Gastos (solo facturas posted)
+    // Beneficio Neto: Ingresos - Gastos (incluyendo facturas posted y draft)
     const beneficioNeto = totalIngresos - totalGastos;
 
     // Caja Pendiente: Suma de facturas donde payment_state no sea 'paid'
+    // Incluye tanto facturas 'posted' como 'draft' para previsión real
     const ingresosPendientes = incomeInvoices
-      .filter((invoice) => invoice.payment_state !== 'paid')
+      .filter((invoice) => 
+        (invoice.state === 'posted' || invoice.state === 'draft') && 
+        invoice.payment_state !== 'paid'
+      )
       .reduce((sum, invoice) => {
         return sum + (invoice.amount_total || 0);
       }, 0);
 
     const gastosPendientes = expenseInvoices
-      .filter((invoice) => invoice.payment_state !== 'paid')
+      .filter((invoice) => 
+        (invoice.state === 'posted' || invoice.state === 'draft') && 
+        invoice.payment_state !== 'paid'
+      )
       .reduce((sum, invoice) => {
         return sum + (invoice.amount_total || 0);
       }, 0);
@@ -292,23 +325,30 @@ export const useFinancialStats = () => {
     const cajaPendiente = ingresosPendientes + gastosPendientes;
 
     // Ratio de Cobro: Porcentaje de ingresos pagados respecto al total de ingresos
+    // Solo cuenta facturas 'posted' para el ratio (las 'draft' no se pueden pagar aún)
     const ingresosPagados = incomeInvoices
-      .filter((invoice) => invoice.payment_state === 'paid')
+      .filter((invoice) => invoice.state === 'posted' && invoice.payment_state === 'paid')
       .reduce((sum, invoice) => {
         return sum + (invoice.amount_total || 0);
       }, 0);
 
-    const ratioCobro = totalIngresos > 0 ? (ingresosPagados / totalIngresos) * 100 : 0;
+    const totalIngresosPosted = incomeInvoices
+      .filter((invoice) => invoice.state === 'posted')
+      .reduce((sum, invoice) => {
+        return sum + (invoice.amount_total || 0);
+      }, 0);
+
+    const ratioCobro = totalIngresosPosted > 0 ? (ingresosPagados / totalIngresosPosted) * 100 : 0;
 
     // IVA Neto: Estimación basada en amount_total (21% IVA incluido)
-    // En el futuro se puede actualizar odooService para pedir amount_tax_signed
-    const ivaIngresos = postedIncomeInvoices.reduce((sum, invoice) => {
+    // Incluye tanto facturas 'posted' como 'draft' para previsión real
+    const ivaIngresos = validIncomeInvoices.reduce((sum, invoice) => {
       const amount = invoice.amount_total || 0;
       const vat = amount * 0.21 / 1.21; // IVA incluido
       return sum + vat;
     }, 0);
 
-    const ivaGastos = postedExpenseInvoices.reduce((sum, invoice) => {
+    const ivaGastos = validExpenseInvoices.reduce((sum, invoice) => {
       const amount = invoice.amount_total || 0;
       const vat = amount * 0.21 / 1.21; // IVA incluido
       return sum + vat;
@@ -317,12 +357,13 @@ export const useFinancialStats = () => {
     const ivaNeto = ivaIngresos - ivaGastos;
 
     // IVA Trimestral: Calcula el IVA neto solo de los registros del trimestre actual
-    const ingresosTrimestre = postedIncomeInvoices.filter((invoice) => {
+    // Incluye tanto facturas 'posted' como 'draft'
+    const ingresosTrimestre = validIncomeInvoices.filter((invoice) => {
       const fecha = invoice.invoice_date;
       return fecha && isInCurrentQuarter(fecha);
     });
 
-    const gastosTrimestre = postedExpenseInvoices.filter((invoice) => {
+    const gastosTrimestre = validExpenseInvoices.filter((invoice) => {
       const fecha = invoice.invoice_date;
       return fecha && isInCurrentQuarter(fecha);
     });
@@ -388,6 +429,13 @@ export const useFinancialStats = () => {
       });
   }, [incomeInvoices, expenseInvoices]);
 
+  // Función para refrescar los datos después de subir Excel
+  const refreshData = async () => {
+    console.log('🔄 [useFinancialStats] Refrescando datos después de subida de Excel...');
+    await Promise.all([refetchIncome(), refetchExpenses()]);
+    console.log('✅ [useFinancialStats] Datos refrescados correctamente');
+  };
+
   return {
     kpis,
     allIncome: income, // Retornar ingresos transformados
@@ -397,5 +445,6 @@ export const useFinancialStats = () => {
     formatCurrency,
     pendingMovements,
     isLoading,
+    refreshData, // Función para refrescar datos después de subir Excel
   };
 };
